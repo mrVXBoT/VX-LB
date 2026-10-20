@@ -1,0 +1,25 @@
+{
+  "iran_servers": [
+    {
+      "name": "iran-node-1",
+      "ip": "1.2.3.4",
+      "port": 22,
+      "username": "root",
+      "password": "example_password_or_leave_empty_for_key",
+      "arch": "x86_64"
+    }
+  ],
+  "kharej_servers": [
+    {
+      "name": "kharej-srv-1",
+      "ip": "5.6.7.8",
+      "port": 22,
+      "username": "root",
+      "password": "example_password_or_leave_empty_for_key",
+      "arch": "x86_64"
+    }
+  ],
+  "pools": {},
+  "node_telemetry": {},
+  "watchdog_status": {}
+}

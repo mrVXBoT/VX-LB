@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="330" viewBox="0 0 1240 330" role="img" aria-label="VX LB logo">
+<rect width="1240" height="330" rx="0" fill="#101819"/>
+<g transform="translate(50 38) scale(.99)"><rect width="256" height="256" rx="57" fill="#172224"/>
+        <rect x="0.85" y="0.85" width="254.3" height="254.3" rx="56.1" fill="none" stroke="#344a45" stroke-width="1.7"/>
+    <path d="M53 77 L94 173 L133 77" fill="none" stroke="#edf4ef" stroke-width="23" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M158 78 L205 171" fill="none" stroke="#a1dfc3" stroke-width="21.5" stroke-linecap="round"/>
+    <path d="M205 78 L158 171" fill="none" stroke="#a1dfc3" stroke-width="21.5" stroke-linecap="round"/>
+    <circle cx="181.5" cy="124.5" r="13" fill="#172224"/>
+    <circle cx="181.5" cy="124.5" r="6.6" fill="#a1dfc3"/>
+    </g>
+<g font-family="Inter Display, Inter, sans-serif" font-weight="800" letter-spacing="-7">
+  <text x="361" y="182" fill="#edf4ef" font-size="134">VX</text>
+  <text x="552" y="182" fill="#a1dfc3" font-size="134">LB</text>
+</g>
+<text x="369" y="229" font-family="Inter, sans-serif" fill="#8fa69c" font-size="21" font-weight="600" letter-spacing="4.5">NETWORK LOAD BALANCER</text>
+<path d="M370 251 H802" stroke="#2c403b" stroke-width="1.5" />
+<g opacity=".75" fill="none" stroke="#a1dfc3" stroke-width="3" stroke-linecap="round"><path d="M822 251h42m0 0 18-18m-18 18 18 18"/></g>
+</svg>

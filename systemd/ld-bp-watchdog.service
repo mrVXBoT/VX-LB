@@ -1,0 +1,14 @@
+[Unit]
+Description=LD-BP Automated Telemetry Watchdog & DNS Failover Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory="%WORKING_DIR%"
+ExecStart="%WORKING_DIR%/.venv/bin/python" "%WORKING_DIR%/daemon.py" --foreground
+Restart=always
+RestartSec=10
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

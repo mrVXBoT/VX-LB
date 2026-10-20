@@ -1,0 +1,55 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Sensitive database & runtime files (Never commit real credentials or live logs)
+/data/*
+data/inventory.json
+data/*.bak
+data/*.lock
+data/*.pid
+data/*.log
+*.log
+
+# Retain directory structure & clean templates
+!data/.gitkeep
+!data/inventory.example.json
+
+# IDE & OS temporary files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+reference_repos/

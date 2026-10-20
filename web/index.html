@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>VX LB | داشبورد مدیریت و لودبالانسر</title>
+  <meta name="theme-color" content="#101819">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="icon" type="image/svg+xml" href="logo-light.svg" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/svg+xml" href="logo.svg" media="(prefers-color-scheme: light)">
+  <link rel="alternate icon" type="image/png" href="logo.png">
+  <link rel="apple-touch-icon" href="logo.png">
+  <link rel="stylesheet" href="font.css">
+  <link rel="stylesheet" href="style.css?v=2.42">
+</head>
+<body>
+  <a class="skip-link" href="#tab-pools-view">رفتن به محتوای اصلی</a>
+
+  <!-- =======================================================================
+       1. Login Stage (Ultra-Clean, Isolated Native Card)
+       ======================================================================= -->
+  <div id="login-view" class="auth-stage">
+    <div class="auth-story">
+      <span class="story-kicker">VX LB / CONTROL ROOM</span>
+      <h2><span data-copy="storyTitle">تمام مسیرها.</span><br><em data-copy="storyAccent">یک نقطهٔ کنترل.</em></h2>
+      <p data-copy="storyHint">از نودهای ایران تا سرور مقصد؛ شبکه را یک‌جا مدیریت کنید.</p>
+      <div id="login-hairline-stage" class="hairline-login-stage"></div>
+      <div class="story-footer">
+        <button type="button" class="story-fig-btn active" onclick="setLoginFigure('relay', this)">مدیریت تونل‌ها</button>
+        <button type="button" class="story-fig-btn" onclick="setLoginFigure('cabinet', this)">پایش سلامت</button>
+        <button type="button" class="story-fig-btn" onclick="setLoginFigure('patch', this)">فیل‌اور DNS</button>
+      </div>
+    </div>
+    <div class="auth-card">
+      <div class="auth-logo-box">
+        <img src="logo-light.svg" alt="VX LB Logo" class="auth-logo-img">
+      </div>
+      
+      <span class="auth-badge-tag">VX LB LOAD BALANCER</span>
+      <h1 class="auth-heading" data-copy="welcome">به اتاق کنترل خوش آمدید</h1>
+      <p class="auth-caption" data-copy="welcomeHint">برای مدیریت شبکه، وارد پنل VX LB شوید.</p>
+
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="input-group">
+          <label class="field-label" for="password">رمز عبور ورود به پنل</label>
+          <div class="input-box-wrap">
+            <input type="password" id="password" class="field-input" placeholder="رمز عبور داشبورد..." required autocomplete="current-password">
+            <button type="button" class="toggle-eye-btn" onclick="togglePasswordVisibility('password', this)" aria-label="نمایش یا پنهان کردن رمز عبور" title="نمایش رمز">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="login-btn" class="btn-primary full-btn">
+          <span>ورود به داشبورد</span>
+          <span class="btn-icon-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </span>
+        </button>
+
+        <p id="login-error" class="auth-error-msg"></p>
+        <div class="auth-hint-card">
+          <span class="hint-icon" aria-hidden="true">i</span>
+          <span>رمز داشبورد را ابتدا با دستور <code dir="ltr">python3 main.py --set-web-password</code> تنظیم کنید (حداقل 8 کاراکتر).</span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =======================================================================
+       2. Main App Viewport
+       ======================================================================= -->
+  <div id="app-view" class="app-viewport hidden">
+
+    <!-- App Top Bar -->
+    <header class="app-header">
+      <div class="brand-box">
+        <div class="brand-logo-wrap">
+          <img src="mark.svg" alt="VX LB Mark" class="brand-img">
+        </div>
+        <div class="brand-meta">
+          <h2>VX LB Control</h2>
+          <small>Cloudflare Failover Engine</small>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button type="button" class="action-circle-btn theme-toggle" onclick="toggleTheme()" aria-label="تغییر تم روشن و تاریک" title="تغییر ظاهر">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+        </button>
+        <button class="action-circle-btn" id="top-sync-btn" onclick="triggerManualSync()" title="ارزیابی سلامت و همگام‌سازی DNS">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-1.19"></path>
+          </svg>
+        </button>
+        <button class="daemon-pill-btn" id="top-daemon-btn" onclick="toggleDaemonState()" title="تغییر وضعیت دیمن">
+          <span class="pulse-status-dot"></span>
+          <span id="top-daemon-label">دیمن فعال</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="page-intro">
+      <div class="page-intro-lead">
+        <div id="page-hairline-stage" class="hairline-page-stage" aria-hidden="true"></div>
+        <div><span class="eyebrow" id="page-kicker">NETWORK OVERVIEW</span><h1 id="page-heading">نمای کلی شبکه</h1><p id="page-caption">وضعیت مسیرها، سرورها و استخرهای شما در یک نگاه.</p></div>
+      </div>
+      <div class="overview-actions"><a class="topology-link" href="/topology.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="5" r="3"/><circle cx="18" cy="19" r="3"/><path d="m9 10 6-4m-6 8 6 4"/></svg>نقشه تونل‌ها</a><span class="connection-label" id="connection-label" role="status">در حال دریافت اطلاعات</span></div>
+    </div>
+    <div id="status-error" class="inline-error hidden" role="alert"><span data-copy="statusError">دریافت وضعیت ناموفق بود. اطلاعات نمایش‌داده‌شده ممکن است قدیمی باشد.</span><button type="button" onclick="fetchStatus()" data-copy="retry">تلاش دوباره</button></div>
+    <div id="network-summary">
+    <div class="overview-grid">
+    <!-- Hero Cluster & Failover Status Overview Card -->
+    <section class="hero-cluster-card">
+      <div class="hero-ambient-glow"></div>
+      <div class="hero-top-row">
+        <div class="hero-tag-wrap">
+          <span class="hero-eyebrow">DNS ROUTING</span>
+          <span class="hero-status-pill good" id="hero-status-pill">
+            <span class="pulse-dot"></span>
+            <span id="hero-status-pill-text">در انتظار پایش</span>
+          </span>
+        </div>
+        <button class="mini-refresh-btn" onclick="fetchStatus()" title="بروزرسانی وضعیت">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+
+      </div>
+
+      <div class="subdomain-banner">
+        <div class="domain-list-heading"><span class="subdomain-label" data-copy="domain">دامنه‌های اتصال استخرها</span><span id="domain-route-count" class="count-badge">—</span></div>
+        <div id="domain-routes" class="domain-routes"><span class="empty-hint">در حال دریافت اطلاعات</span></div>
+      </div>
+
+      <div class="hero-meta-strip">
+        <span>آخرین پایش سلامت: <strong id="hero-last-check-time">-</strong></span>
+        <span class="cf-badge-indicator">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+          </svg>
+          <span id="cf-summary-label">وضعیت DNS در انتظار دریافت</span>
+        </span>
+      </div>
+    </section>
+
+    <section class="health-card" aria-labelledby="health-title">
+      <div class="card-panel-head"><h2 id="health-title" data-copy="health">سلامت نودها</h2><span class="eyebrow">LIVE STATUS</span></div>
+      <div class="health-donut-grid">
+        <div class="health-donut-wrap" aria-hidden="true">
+          <svg class="health-donut" viewBox="0 0 140 140">
+            <circle class="donut-track" cx="70" cy="70" r="58"></circle>
+            <circle class="donut-seg donut-bad" id="donut-bad" cx="70" cy="70" r="58"></circle>
+            <circle class="donut-seg donut-warn" id="donut-warn" cx="70" cy="70" r="58"></circle>
+            <circle class="donut-seg donut-good" id="donut-good" cx="70" cy="70" r="58"></circle>
+          </svg>
+          <div class="health-donut-center">
+            <strong id="healthy-count">—</strong>
+            <span class="donut-pct" id="healthy-pct">—</span>
+            <span class="donut-label"><span data-copy="healthy">نود سالم</span></span>
+          </div>
+        </div>
+        <div class="health-side">
+          <div id="overview-hairline-stage" class="hairline-overview-stage" aria-hidden="true"></div>
+          <small class="health-total-line" id="health-total-label">از مجموع — نود</small>
+        </div>
+      </div>
+      <ul class="health-status-list">
+        <li class="hstatus good"><i class="hstatus-dot"></i><span class="hstatus-label" data-copy="healthyLegend">سالم</span><b id="health-good">—</b></li>
+        <li class="hstatus warn"><i class="hstatus-dot"></i><span class="hstatus-label" data-copy="pendingLegend">آماده / آزمایشی</span><b id="health-warn">—</b></li>
+        <li class="hstatus bad"><i class="hstatus-dot"></i><span class="hstatus-label" data-copy="issueLegend">اختلال</span><b id="health-bad">—</b></li>
+      </ul>
+      <div class="health-track" aria-hidden="true" style="display:none"><span id="health-track-good"></span><span id="health-track-warn"></span><span id="health-track-bad"></span></div>
+    </section>
+    </div>
+    <!-- 3-Column Cluster Metric Tiles -->
+    <div class="metrics-grid">
+      <div class="metric-box">
+        <span class="metric-label">نودهای ایران</span>
+        <strong class="metric-val" id="hero-node-count-val">0 نود</strong>
+        <small class="metric-sub" id="hero-node-sub-val">در استخرها</small>
+      </div>
+      <div class="metric-box">
+        <span class="metric-label" id="hero-kharej-label">سرورهای خارج (مقاصد تونل)</span>
+        <div class="metric-ip-row">
+          <strong class="metric-val-ip" id="hero-kharej-ip-val">-</strong>
+          <button class="copy-micro-btn" id="hero-kharej-copy-btn" onclick="copyKharejIps()" title="کپی آی‌پی‌های خارج">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <small class="metric-sub" id="hero-kharej-sub-val">مقصد استخرها</small>
+      </div>
+      <div class="metric-box">
+        <span class="metric-label">استخرهای فعال</span>
+        <strong class="metric-val" id="hero-pools-count-val">0 استخر</strong>
+        <small class="metric-sub good-text" id="hero-failover-sub-val">لودبالانسر آماده</small>
+      </div>
+    </div>
+
+    </div>
+
+    <!-- =====================================================================
+         TAB 1: POOLS MANAGEMENT (استخرهای لودبالانسر)
+         ===================================================================== -->
+    <main id="tab-pools-view" class="tab-content-panel">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <h3>استخرهای لودبالانسر</h3>
+          <span class="count-badge" id="pools-total-count-badge">0</span>
+        </div>
+        <button class="btn-sm-action" onclick="openCreatePoolModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>استخر جدید</span>
+        </button>
+      </div>
+
+      <!-- Unified Pools Toolbar -->
+      <div class="tab-toolbar">
+        <div class="filter-segments-bar">
+          <button class="segment-chip active" onclick="setNodeFilter('ALL', this)">
+            <span>همه نودها</span>
+          </button>
+          <button class="segment-chip" onclick="setNodeFilter('HEALTHY', this)">
+            <span>سالم و فعال</span>
+          </button>
+          <button class="segment-chip" onclick="setNodeFilter('ISSUE', this)">
+            <span>نیازمند بررسی</span>
+          </button>
+        </div>
+
+        <div class="pool-filter-bar" role="search">
+          <div class="search-input-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="search" id="pool-search" class="field-input pool-search-input" placeholder="جست‌وجو در نام، آی‌پی یا دامنه..." aria-label="جست‌وجو در استخرها" oninput="setPoolSearch(this.value)">
+          </div>
+          <div class="select-input-wrap">
+            <select id="pool-engine-filter" class="field-input pool-engine-filter" aria-label="فیلتر بر اساس موتور" onchange="setPoolEngineFilter(this.value)">
+              <option value="">همهٔ موتورها</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="pools-container" class="pools-list-container">
+        <!-- Dynamic pools rendered via JS -->
+      </div>
+      <!-- Private Links Section -->
+      <section class="private-links-section" aria-labelledby="private-links-title">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <h3 id="private-links-title">لینک‌های خصوصی مستقل</h3>
+            <span class="count-badge" id="private-links-count-badge">0</span>
+          </div>
+          <button type="button" class="btn-sm-action secondary" onclick="openMatrixModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:16px;height:16px;">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            <span>ساخت ماتریس WireGuard</span>
+          </button>
+        </div>
+        <div class="card-panel private-links-card">
+          <p class="card-desc-text">این لینک‌ها فوروارد پورت کاربر ندارند و به عنوان ارتباط مستقیم و خصوصی بین سرورها عمل می‌کنند. با واچ‌داگ فعال، مسیر هر لینک دوره‌ای بررسی می‌شود.</p>
+          <div id="private-link-jobs" role="status" aria-live="polite"></div>
+          <div id="private-links-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- =====================================================================
+         TAB 2: SERVERS INVENTORY (مخزن سرورهای ایران و خارج)
+         ===================================================================== -->
+    <section id="tab-servers-view" class="tab-content-panel hidden">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <h3>مخزن سرورها (Inventory)</h3>
+          <span class="count-badge" id="servers-total-count-badge">0</span>
+        </div>
+        <button class="btn-sm-action" onclick="openAddServerModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>افزودن سرور</span>
+        </button>
+      </div>
+
+      <!-- Unified Servers Toolbar -->
+      <div class="tab-toolbar">
+        <div class="filter-segments-bar">
+          <button class="segment-chip active" onclick="setServerFilter('ALL', this)">
+            <span>همه سرورها</span>
+          </button>
+          <button class="segment-chip" onclick="setServerFilter('IRAN', this)">
+            <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><span>سرورهای ایران</span>
+          </button>
+          <button class="segment-chip" onclick="setServerFilter('KHAREJ', this)">
+            <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg><span>سرورهای خارج</span>
+          </button>
+        </div>
+        <div class="pool-filter-bar" role="search">
+          <div class="search-input-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="search" id="server-search" class="field-input pool-search-input" placeholder="جست‌وجو در نام، آی‌پی یا کاربر..." aria-label="جست‌وجو در سرورها" oninput="setServerSearch(this.value)">
+          </div>
+        </div>
+      </div>
+
+      <div id="servers-error" class="inline-error hidden" role="alert"><span>دریافت مخزن سرورها ناموفق بود؛ اطلاعات ممکن است قدیمی باشد.</span><button type="button" onclick="fetchServers()">تلاش دوباره</button></div>
+        <div id="servers-container" class="servers-list-container">
+        <!-- Dynamic server inventory rendered via JS -->
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         TAB 3: WATCHDOG & FAILOVER (واچ‌داگ و فیل‌اور خودکار)
+         ===================================================================== -->
+    <section id="tab-watchdog-view" class="tab-content-panel hidden">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <h3>واچ‌داگ و فیل‌اور Cloudflare</h3>
+        </div>
+        <button class="btn-sm-action secondary" onclick="fetchDaemonLogs()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-1.19"></path>
+          </svg>
+          <span>بروزرسانی لاگ</span>
+        </button>
+      </div>
+
+      <!-- Watchdog Status Card -->
+      <div class="card-panel">
+        <div class="card-panel-head">
+          <h4>کنترل دیمن خودکار (Background Daemon)</h4>
+          <span class="badge-pill" id="watchdog-daemon-status-badge">-</span>
+        </div>
+        <p class="card-desc-text">دیمن واچ‌داگ هر 30 ثانیه وضعیت اتصال کاربران را در تمام پورت‌ها پایش کرده و در صورت اختلال در سرور ایران، رکوردهای DNS کلودفلر را بدون وقفه تغییر می‌دهد.</p>
+        
+        <div class="action-btn-row">
+          <button class="btn-primary sm" id="watchdog-run-check-btn" onclick="triggerManualSync()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            <span>ارزیابی فوری و هماهنگی DNS</span>
+          </button>
+          <button class="btn-secondary sm" id="watchdog-toggle-daemon-btn" onclick="toggleDaemonState()">
+            <span>تغییر وضعیت دیمن</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Active DNS Failover Routing Summary -->
+      <div class="card-panel">
+        <div class="card-panel-head">
+          <h4>مسیرهای فعال DNS کلودفلر</h4>
+        </div>
+        <p class="empty-hint">ساب‌دامنه، آی‌پی‌های رکورد A و آخرین هماهنگی؛ وضعیت DNS در زمان درج‌شده بررسی شده است.</p>
+        <div id="watchdog-domain-routes" class="watchdog-domain-routes"></div>
+      </div>
+
+      <!-- Live Watchdog Log Stream -->
+      <div class="card-panel">
+        <div class="card-panel-head">
+          <h4>گزارش زنده رخدادهای واچ‌داگ (watchdog.log)</h4>
+          <small class="live-indicator"><span class="pulse-dot" aria-hidden="true"></span> زنده</small>
+        </div>
+        <div class="terminal-box" id="watchdog-logs-viewer">
+          در حال دریافت لاگ‌های واچ‌داگ...
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         TAB: CLOUDFLARE MANAGER
+         ===================================================================== -->
+    <section id="tab-cloudflare-view" class="tab-content-panel hidden">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <h3>مدیریت Cloudflare</h3>
+          <span class="count-badge" id="cf-profile-count-badge">0</span>
+        </div>
+        <button type="button" class="btn-sm-action" onclick="openCfProfileModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          <span>افزودن توکن</span>
+        </button>
+      </div>
+      <p class="field-hint" style="margin:-8px 0 16px;">
+        توکن‌های API کلودفلر را اضافه کنید؛ Zoneها خودکار کشف و رکوردهای DNS قابل مدیریت می‌شود. توکن‌ها فقط روی سرور ذخیره می‌شوند.
+      </p>
+
+      <!-- Profile cards -->
+      <div id="cf-profiles-list" class="cf-profiles-grid"></div>
+      <div id="cf-profiles-empty" class="empty-state hidden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97 7 7 0 0 0-13.62-1.7A5 5 0 0 0 6 19z"/></svg>
+        <h4>توکنی ثبت نشده</h4>
+        <p>یک API Token کلودفلر با دسترسی Zone Read + DNS Edit اضافه کنید.</p>
+        <button type="button" class="btn-primary sm" onclick="openCfProfileModal()"><span>افزودن اولین توکن</span></button>
+      </div>
+
+      <!-- Zone browser -->
+      <div id="cf-zone-section" class="card-panel hidden">
+        <div class="card-panel-head">
+          <h4 id="cf-zone-heading">Zoneها</h4>
+          <button type="button" class="btn-secondary sm" id="cf-zone-refresh" onclick="cfDiscoverZones(true)">
+            <span>کشف مجدد</span>
+          </button>
+        </div>
+        <div id="cf-zones-list" class="cf-zones-list"></div>
+      </div>
+
+      <!-- DNS records -->
+      <div id="cf-records-section" class="card-panel hidden">
+        <div class="card-panel-head">
+          <h4 id="cf-records-heading">رکوردهای DNS</h4>
+          <button type="button" class="btn-sm-action" id="cf-add-record-btn" onclick="openCfRecordModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            <span>رکورد جدید</span>
+          </button>
+        </div>
+        <div class="cf-record-filters">
+          <input type="search" id="cf-record-search" class="field-input" placeholder="جستجوی نام…" dir="ltr" oninput="cfRenderRecords()">
+          <select id="cf-record-type-filter" class="field-input" onchange="cfRenderRecords()" dir="ltr">
+            <option value="">همه انواع</option>
+            <option>A</option><option>AAAA</option><option>CNAME</option>
+            <option>TXT</option><option>MX</option><option>SRV</option><option>CAA</option>
+            <option>NS</option><option>PTR</option>
+          </select>
+        </div>
+        <div id="cf-records-table-wrap" class="cf-records-wrap"></div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         TAB 4: SETTINGS & PREFERENCES (تنظیمات)
+         ===================================================================== -->
+    <section id="tab-settings-view" class="tab-content-panel hidden">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <h3>تنظیمات سیستم و امنیت</h3>
+        </div>
+      </div>
+
+      <!-- Password Change Card -->
+      <div class="card-panel">
+        <div class="card-panel-head">
+          <h4>امنیت و رمز عبور</h4>
+        </div>
+        <form onsubmit="submitChangePassword(event)">
+          <div class="input-group">
+            <label class="field-label" for="new-pass-input">رمز عبور جدید</label>
+            <div class="input-box-wrap">
+              <input type="password" id="new-pass-input" class="field-input" placeholder="حداقل 4 کاراکتر..." minlength="4" required>
+              <button type="button" class="toggle-eye-btn" onclick="togglePasswordVisibility('new-pass-input', this)" aria-label="نمایش یا پنهان کردن رمز عبور">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" id="change-pass-btn" class="btn-primary sm">
+            <span>ذخیره رمز عبور جدید</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Global Cloudflare Settings Card -->
+      <div class="card-panel">
+        <div class="card-panel-head">
+          <h4>تنظیمات عمومی Cloudflare (پیش‌فرض)</h4>
+        </div>
+        <form onsubmit="submitGlobalCloudflare(event)">
+          <div class="input-group">
+            <label class="field-label" for="cf-global-token">API Token کلودفلر</label>
+            <input type="password" id="cf-global-token" class="field-input" placeholder="API Token..." dir="ltr">
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="cf-global-zone">Zone ID</label>
+            <input type="text" id="cf-global-zone" class="field-input" placeholder="Zone ID..." dir="ltr">
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="cf-global-sub">ساب‌دومین پیش‌فرض (مثلاً lb.example.com)</label>
+            <input type="text" id="cf-global-sub" class="field-input" placeholder="lb.example.com" dir="ltr">
+          </div>
+          <button type="submit" id="save-cf-global-btn" class="btn-secondary sm">
+            <span>ذخیره تنظیمات کلودفلر</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Dashboard Domain & CDN Settings Card -->
+      <div class="card-panel">
+        <div class="card-panel-head">
+          <h4>اتصال دامنه اختصاصی و CDN به داشبورد</h4>
+          <span class="status-badge healthy" id="domain-ssl-badge" style="display: none;">SSL فعال</span>
+        </div>
+        <p class="card-desc-text">برای اتصال امن به داشبورد از طریق Cloudflare (پشت CDN)، ساب‌دامین اختصاصی خود (مثلاً <code dir="ltr">panel.example.com</code>) را ثبت کنید. وب‌سرور به صورت خودکار پورت‌های استاندارد CDN کلودفلر (8443 و 2052) را برای شما کانفیگ می‌کند.</p>
+        
+        <form action="javascript:void(0);" onsubmit="event.preventDefault(); submitDashboardDomain(event); return false;">
+          <div class="input-group">
+            <label class="field-label" for="dash-domain-input">دامنه یا ساب‌دامین داشبورد</label>
+            <input type="text" id="dash-domain-input" class="field-input" placeholder="dash.example.com" dir="ltr">
+          </div>
+
+          <div class="input-group">
+            <label class="field-label" for="dash-ssl-mode">حالت اتصال SSL و گواهینامه</label>
+            <select id="dash-ssl-mode" class="field-input">
+              <option value="cloudflare">Cloudflare Full SSL (پشت CDN با پورت 8443 یا 2052)</option>
+              <option value="letsencrypt">Let's Encrypt خودکار (Certbot مستقیم / بدون پروکسی CDN)</option>
+            </select>
+          </div>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;">
+            <button type="button" id="save-dash-domain-btn" class="btn-primary sm" onclick="submitDashboardDomain(event)">
+              <span>فعال‌سازی و ذخیره دامنه</span>
+            </button>
+            <button type="button" id="issue-le-btn" class="btn-secondary sm" onclick="issueLetsEncryptNow(event)">
+              <span>دریافت فوری سرتیفیکیت Let's Encrypt</span>
+            </button>
+          </div>
+
+          <div id="dash-domain-alert" class="inline-error hidden" style="margin-top: 14px; padding: 12px 16px; border-radius: 14px; font-size: 12px; line-height: 1.8;" role="alert"></div>
+
+          <div id="dash-domain-hint" style="margin-top: 14px; font-size: 11px; color: var(--text-muted); line-height: 1.8;">
+            راهنمای کلودفلر: رکورد A را به آی‌پی سرور متصل کرده، پروکسی ابر نارنجی (Proxied) را روشن کنید و حالت SSL کلودفلر را روی Full قرار دهید. آدرس دسترسی: <code dir="ltr" id="dash-cf-link">https://domain:8443</code>
+          </div>
+        </form>
+      </div>
+
+      <!-- Logout Card -->
+      <div class="card-panel">
+        <div class="card-panel-head">
+          <h4>خروج از حساب</h4>
+        </div>
+        <p class="card-desc-text">با خروج از حساب، سشن فعلی شما در این مرورگر بسته شده و برای ورود مجدد نیاز به وارد کردن رمز عبور خواهید داشت.</p>
+        <button type="button" class="btn-danger sm" onclick="handleLogout()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          <span>خروج از پنل مدیریت</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         Floating Capsule Bottom Tabbar (STRICTLY HIDDEN ON LOGIN)
+         ===================================================================== -->
+    <nav class="app-bottom-nav" id="app-tabbar" aria-label="بخش‌های پنل">
+      <button type="button" class="nav-tab-btn active" id="nav-tab-pools" onclick="switchTab('pools')">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+        </span>
+        <span>استخرها</span>
+      </button>
+
+      <button type="button" class="nav-tab-btn" id="nav-tab-servers" onclick="switchTab('servers')">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        </span>
+        <span>سرورها</span>
+      </button>
+
+      <button type="button" class="nav-tab-btn" id="nav-tab-watchdog" onclick="switchTab('watchdog')">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+        </span>
+        <span>واچ‌داگ</span>
+      </button>
+
+      <button type="button" class="nav-tab-btn" id="nav-tab-cloudflare" onclick="switchTab('cloudflare')">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97 7 7 0 0 0-13.62-1.7A5 5 0 0 0 6 19z"/>
+            <path d="M9 12h6M9 16h4"/>
+          </svg>
+        </span>
+        <span>کلودفلر</span>
+      </button>
+
+      <button type="button" class="nav-tab-btn" id="nav-tab-settings" onclick="switchTab('settings')">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </span>
+        <span>تنظیمات</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- =======================================================================
+       3. Modals & Bottom Sheets
+       ======================================================================= -->
+  
+  <!-- Modal: Node Logs -->
+  <div id="logs-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 id="logs-modal-title" class="sheet-title">لاگ اتصالات زنده سرور</h4>
+          <p id="logs-modal-sub" class="sheet-subtitle">آی‌پی سرور: ...</p>
+        </div>
+        <button class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('logs-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content">
+        <div class="terminal-box" id="node-logs-content">
+          در حال اتصال به سرور و دریافت لاگ‌ها...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Port -->
+  <div id="port-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title">افزودن پورت ورودی کاربران</h4>
+          <p id="port-modal-pool-name" class="sheet-subtitle">استخر: ...</p>
+        </div>
+        <button class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('port-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content">
+        <form onsubmit="submitAddPort(event)">
+          <div class="input-group">
+            <label class="field-label" for="new-port-input">شماره پورت ورودی (مثلاً 443 یا 2053)</label>
+            <input type="number" id="new-port-input" class="field-input" placeholder="443" min="1" max="65535" required inputmode="numeric" dir="ltr">
+          </div>
+          <div class="preset-ports-wrap">
+            <span class="preset-label">پورت‌های پیشنهادی:</span>
+            <div class="preset-pills">
+              <button type="button" class="preset-pill" onclick="selectPresetPort(80)">80</button>
+              <button type="button" class="preset-pill" onclick="selectPresetPort(443)">443</button>
+              <button type="button" class="preset-pill" onclick="selectPresetPort(2053)">2053</button>
+              <button type="button" class="preset-pill" onclick="selectPresetPort(2083)">2083</button>
+              <button type="button" class="preset-pill" onclick="selectPresetPort(8443)">8443</button>
+            </div>
+          </div>
+          <button type="submit" id="add-port-submit-btn" class="btn-primary full-btn" style="margin-top: 14px;">
+            <span>اعمال و بازگشایی پورت در تمام نودها</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add New Server to Inventory -->
+  <div id="add-server-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title">افزودن سرور به مخزن</h4>
+          <p class="sheet-subtitle">تست خودکار اتصال SSH و تشخیص مشخصات سرور</p>
+        </div>
+        <button class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('add-server-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content">
+        <form onsubmit="submitAddServer(event)">
+          <div class="input-group">
+            <label class="field-label">موقعیت / نقش سرور</label>
+            <div class="radio-chips-row">
+              <label class="radio-chip">
+                <input type="radio" name="server-role" value="iran" checked>
+                <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><span>نود ایران</span>
+              </label>
+              <label class="radio-chip">
+                <input type="radio" name="server-role" value="kharej">
+                <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg><span>سرور خارج (مقصد)</span>
+              </label>
+            </div>
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="server-name-input">نام دلخواه (مثلاً ir-mci یا kh-de)</label>
+            <input type="text" id="server-name-input" class="field-input" placeholder="نام مستعار...">
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="server-ip-input">آدرس IP سرور</label>
+            <input type="text" id="server-ip-input" class="field-input" placeholder="1.2.3.4" required dir="ltr">
+          </div>
+          <div class="input-row-2">
+            <div class="input-group">
+              <label class="field-label" for="server-port-input">پورت SSH</label>
+              <input type="number" id="server-port-input" class="field-input" value="22" required dir="ltr">
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="server-user-input">نام کاربری</label>
+              <input type="text" id="server-user-input" class="field-input" value="root" required dir="ltr">
+            </div>
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="server-pass-input">رمز عبور SSH</label>
+            <div class="input-box-wrap">
+              <input type="password" id="server-pass-input" class="field-input" placeholder="رمز عبور سرور..." required>
+              <button type="button" class="toggle-eye-btn" onclick="togglePasswordVisibility('server-pass-input', this)" aria-label="نمایش یا پنهان کردن رمز عبور">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" id="add-server-submit-btn" class="btn-primary full-btn" style="margin-top: 10px;">
+            <span>تست اتصال و ذخیره در مخزن</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Create New Pool -->
+  <div id="create-pool-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title">ایجاد استخر لودبالانسر جدید</h4>
+          <p class="sheet-subtitle">راه‌اندازی تونل چند ایران به یک خارج</p>
+        </div>
+        <button class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('create-pool-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content">
+        <form onsubmit="submitCreatePool(event)">
+          <div class="input-group">
+            <label class="field-label" for="new-pool-name">نام استخر (مثلاً VIP-LB)</label>
+            <input type="text" id="new-pool-name" class="field-input" placeholder="VIP-LB" required>
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="new-pool-kharej">انتخاب سرور مقصد خارج</label>
+            <select id="new-pool-kharej" class="field-input select-styled" required dir="ltr">
+              <!-- Filled dynamically with kharej servers -->
+            </select>
+          </div>
+          <div class="input-group">
+            <label class="field-label">انتخاب سرورهای ایران برای استخر</label>
+            <div id="new-pool-iran-checkboxes" class="checkboxes-list-box">
+              <!-- Filled dynamically with iran servers -->
+            </div>
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="new-pool-engine">اسکریپت و هستهٔ پایهٔ تونل</label>
+            <select id="new-pool-engine" class="field-input select-styled" onchange="onPoolEngineChanged()">
+              <option value="backpack" selected>اسکریپت BackPack (موتور اصلی با 6 ترنسپورت بومی L4)</option>
+              <option value="paqet">اسکریپت Paqet (موتور پکت خام و حالت‌های کوانتوم L3)</option>
+              <option value="waterwall">اسکریپت WaterWall (موتور گراف نود L7 VLESS + TLS + Mux)</option>
+              <option value="xray">استتار پیشرفته Xray (حالت‌های XHTTP، XHTTPS و Nova)</option>
+              <option value="kernel">حامل‌های شبکه و هسته لینوکس (TUN, DC6, WireGuard, GRE, VXLAN)</option>
+              <option value="spoof">پروفایل‌های پردازش بسته — پنج حالت آزمایشی</option>
+              <option value="other">سایر پروتکل‌های وب و اضطراری (WebSocket, HTTP/2, Slipstream)</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="new-pool-proto">روش انتقال / ترنسپورت اختصاصی</label>
+            <select id="new-pool-proto" class="field-input select-styled" onchange="onPoolTransportChanged()">
+              <option value="tcp" selected>01. Standard TCP (کمترین مصرف CPU و تأخیر پایه)</option>
+              <option value="stealth">02. TCP + Stealth (پروتکل استتار Noise بدون اثرانگشت) [پیشنهادی]</option>
+              <option value="pck">03. TCP + PCK (بسته‌های خام مقاوم در برابر تزریق TCP RST)</option>
+              <option value="kcp">04. UDP + KCP + FEC (اصلاح پکت‌های گم‌شده BackPack)</option>
+              <option value="wss">05. WebSocket Secure TLS 1.3 (شبیه‌سازی مرورگر و عبور CDN)</option>
+              <option value="quic">06. UDP + QUIC (رمزنگاری TLS 1.3)</option>
+            </select>
+            <p id="new-pool-transport-desc" class="field-hint" style="margin-top:6px;"></p>
+          </div>
+          <div id="https-create-fields" class="hidden">
+            <p class="field-hint">در حالت‌های خانوادهٔ HTTPS/Xray (شامل XHTTP، XHTTPS، Nova و GRE-XHTTP)، ترافیک با استتار پیشرفته و شبیه‌سازی مرورگر منتقل می‌شود. دامنه و گواهی معتبر مربوط به سرور خارج است.</p>
+            <div class="input-group"><label class="field-label" for="https-server-name">دامنهٔ TLS سرور خارج</label><input id="https-server-name" class="field-input" placeholder="tunnel.example.com" dir="ltr" maxlength="253" disabled required></div>
+            <div class="input-group"><label class="field-label" for="https-outer-port">پورت ترجیحی اتصال به سرور خارج</label><input id="https-outer-port" class="field-input" value="443" type="number" min="1" max="65535" dir="ltr" disabled required><p class="field-hint">اگر اشغال باشد، یکی از پورت‌های HTTPS آزاد انتخاب می‌شود؛ پورت واقعی هر نود نمایش داده خواهد شد.</p></div>
+            <p id="waterwall-certificate-hint" class="field-hint hidden">WaterWall به گواهی صادرشده از CA عمومی مورد اعتماد نیاز دارد؛ نصب CA خصوصی در سیستم به‌تنهایی کافی نیست.</p>
+            <div id="https-xmux-fields" class="hidden">
+              <div class="input-group">
+                <label class="field-label" for="https-xmux-concurrency">تعداد اتصالات هم‌زمان xmux (پیش‌فرض 8)</label>
+                <input type="number" id="https-xmux-concurrency" class="field-input" value="8" min="1" max="32" dir="ltr" disabled>
+              </div>
+            </div>
+            <div id="https-nova-fields" class="hidden">
+              <div class="input-group">
+                <label class="field-label">محدوده بایت‌های برش TLS ClientHello (پیش‌فرض 10 تا 30 بایت)</label>
+                <div style="display:flex;gap:8px;">
+                  <input type="number" id="https-fragment-min" class="field-input" value="10" min="5" max="50" placeholder="حداقل" dir="ltr" disabled>
+                  <input type="number" id="https-fragment-max" class="field-input" value="30" min="10" max="100" placeholder="حداکثر" dir="ltr" disabled>
+                </div>
+              </div>
+            </div>
+            <details class="https-advanced"><summary class="field-label">مسیر گواهی و فایل اجرایی <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 9 6 6 6-6"/></svg></summary>
+            <div id="https-certificate-fields">
+              <div class="input-group"><label class="field-label" for="https-certificate">مسیر گواهی صادرشده روی سرور خارج</label><input id="https-certificate" class="field-input" placeholder="/etc/letsencrypt/live/DOMAIN/fullchain.pem" dir="ltr" disabled></div>
+              <div class="input-group"><label class="field-label" for="https-key">مسیر کلید خصوصی روی سرور خارج</label><input id="https-key" class="field-input" placeholder="/etc/letsencrypt/live/DOMAIN/privkey.pem" dir="ltr" disabled><p class="field-hint">فقط مسیر فایل را وارد کنید، نه محتوای کلید. فیلد خالی از مسیر استاندارد دامنه استفاده می‌کند. DNS دامنه باید به سرور خارج اشاره کند؛ گواهی معتبر پیش از فعال‌سازی بررسی می‌شود.</p></div>
+            </div>
+            <div class="input-group"><label class="field-label" for="https-binary">مسیر Xray روی هر دو سرور</label><input id="https-binary" class="field-input" value="/usr/local/bin/xray" dir="ltr" disabled></div></details>
+            <p class="field-hint">هیچ روشی تضمین غیرقابل‌شناسایی بودن ندارد. قطع انتقال امن، به اتصال خام تبدیل نمی‌شود.</p>
+          </div>
+          <div id="quantum-create-fields" class="input-group hidden">
+            <p class="field-hint">پروتکل KCP Fast-ARQ با شتاب‌دهی بسته‌های UDP/FakeTCP و حذف کامل گلوگاه کنترل ازدحام TCP.</p>
+            <div id="quantum-fec-inputs" class="hidden">
+              <div class="input-group">
+                <label class="field-label" for="new-pool-quantum-data">شارد داده FEC (Data Shards، پیش‌فرض 10)</label>
+                <input type="number" id="new-pool-quantum-data" class="field-input" value="10" min="1" max="20" dir="ltr" disabled>
+              </div>
+              <div class="input-group">
+                <label class="field-label" for="new-pool-quantum-parity">شارد تصحیح خطا FEC (Parity Shards، پیش‌فرض 3)</label>
+                <input type="number" id="new-pool-quantum-parity" class="field-input" value="3" min="1" max="10" dir="ltr" disabled>
+              </div>
+            </div>
+          </div>
+          <div id="tun-create-fields" class="input-group hidden">
+            <p class="field-hint">اینترفیس واقعی TUN لینوکس با حامل UDP/Noise در BackPack L3 و محدودسازی MSS اختصاصی؛ انتقال TCP/UDP پیش از فعال‌شدن بررسی می‌شود.</p>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-tun-mtu">MTU اینترفیس TUN (1200 تا 1420، پیش‌فرض 1280)</label>
+              <input type="number" id="new-pool-tun-mtu" class="field-input" value="1280" min="1200" max="1420" step="1" dir="ltr" disabled>
+            </div>
+          </div>
+          <div id="dc6-create-fields" class="input-group hidden">
+            <p class="field-hint" style="color: var(--amber, #f59e0b);">حامل بدون رمزنگاری برای مسیر مستقیم سرورها. GRE6 و IP6IP6 به IPv6 عمومی و SIT به IPv4 عمومی نیاز دارند؛ انتقال داده پیش از فعال‌شدن بررسی می‌شود.</p>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-dc6-carrier">نوع حامل DC6</label>
+              <select id="new-pool-dc6-carrier" class="field-input select-styled" disabled>
+                <option value="ip6gre" selected>ip6gre (RFC 7676 - استاندارد با کمترین سربار)</option>
+                <option value="ip6ip6">ip6ip6 (RFC 2473 - کپسوله‌سازی مستقیم)</option>
+                <option value="sit">sit (IPv6 in IPv4)</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-dc6-mtu">MTU حامل DC6 (1280 تا 1440، پیش‌فرض 1280)</label>
+              <input type="number" id="new-pool-dc6-mtu" class="field-input" value="1280" min="1280" max="1440" step="1" dir="ltr" disabled>
+            </div>
+          </div>
+          <div id="gre-create-fields" class="input-group hidden">
+            <label class="field-label" for="new-pool-gre-mtu">MTU لینک GRE</label>
+            <input type="number" id="new-pool-gre-mtu" class="field-input" value="1280" min="576" max="1400" step="1" dir="ltr">
+            <p class="field-hint">GRE با IPsec و AES-GCM اجرا می‌شود؛ در قطع رمزنگاری، عبور خام مسدود می‌شود. strongSwan روی هر دو سرور لازم است؛ کلاینت VICI همراه برنامه نصب می‌شود. UDP 500/4500 و ESP باید در مسیر مجاز باشند. این روش ترافیک را شبیه HTTPS نمی‌کند.</p>
+          </div>
+          <div id="geneve-create-fields" class="input-group hidden">
+            <p class="field-hint">Geneve با IPsec AES-256-GCM اجرا می‌شود و بسته‌های خام پورت 6081 در صورت قطع رمزنگاری مسدود می‌گردند. وضعیت فعلی: <strong>آزمایشی — آزمون کرنلی لینک تأیید شد</strong> (نیازمند strongSwan/charon و ماژول کرنل geneve روی سرورها).</p>
+            <div class="input-group"><label class="field-label" for="new-pool-geneve-vni">شناسه شبکه مجازی VNI (اختیاری، 1 تا 16777215)</label><input type="number" id="new-pool-geneve-vni" class="field-input" placeholder="خودکار (تخصیص از 2 تا 16777215)" min="1" max="16777215" step="1" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="new-pool-geneve-mtu">MTU اینترفیس Geneve (576 تا 1420)</label><input type="number" id="new-pool-geneve-mtu" class="field-input" value="1280" min="576" max="1420" step="1" dir="ltr" disabled></div>
+          </div>
+          <div id="vxlan-create-fields" class="input-group hidden">
+            <p class="field-hint" style="color: var(--accent-warning, #f59e0b);">
+              <strong>هشدار امنیتی:</strong> پروتکل VXLAN (RFC 7348) یک کپسوله‌سازی لایه 2 در UDP (پورت 4789) است و <strong>کاملاً بدون رمزنگاری و بدون استتار</strong> می‌باشد. وضعیت فعلی: <strong>آزمایشی؛ بدون رمزنگاری و استتار — آزمون کرنلی لینک تأیید شد</strong>.
+            </p>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-vxlan-method">روش پیاده‌سازی VXLAN (3 پروفایل مرجع)</label>
+              <select id="new-pool-vxlan-method" class="field-input select-styled" disabled>
+                <option value="p2p" selected>1. نقطه به نقطه (P2P Unicast - بدون بریج)</option>
+                <option value="bridge_pointip">2. بریج لینوکس با اشاره به IP ریموت (Bridge + IP Pointing)</option>
+                <option value="fdb_bridge">3. بریج لینوکس با جدول فورواردینگ (Bridge + FDB Unicast)</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-vxlan-vni">شناسه شبکه مجازی VNI (1 تا 16777215)</label>
+              <input type="number" id="new-pool-vxlan-vni" class="field-input" value="1000" min="1" max="16777215" step="1" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-vxlan-port">پورت مقصد UDP (پیش‌فرض 4789)</label>
+              <input type="number" id="new-pool-vxlan-port" class="field-input" value="4789" min="1" max="65535" step="1" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-vxlan-mtu">MTU اینترفیس VXLAN (576 تا 1450، پیش‌فرض 1280)</label>
+              <input type="number" id="new-pool-vxlan-mtu" class="field-input" value="1280" min="576" max="1450" step="1" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-vxlan-bridge">نام بریج اختصاصی (اختیاری؛ برای روش‌های 2 و 3)</label>
+              <input type="text" id="new-pool-vxlan-bridge" class="field-input" placeholder="خودکار (br-vx-...)" dir="ltr" maxlength="15" disabled>
+            </div>
+          </div>
+          <div id="gre6-create-fields" class="input-group hidden">
+            <p class="field-hint" style="color: var(--amber, #f59e0b);">هشدار امنیتی: پروتکل GRE6 (RFC 7676) کاملاً خام، شفاف و بدون رمزنگاری یا استتار است. هر دو سرور ایران و خارج باید دارای آدرس IPv6 معتبر و روت‌پذیر باشند.</p>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-gre6-mtu">MTU اینترفیس GRE6 (1200 تا 1440، پیش‌فرض 1280)</label>
+              <input type="number" id="new-pool-gre6-mtu" class="field-input" value="1280" min="1200" max="1440" step="1" dir="ltr" disabled>
+            </div>
+          </div>
+          <div id="ip6ip6-create-fields" class="input-group hidden">
+            <p class="field-hint" style="color: var(--amber, #f59e0b);">هشدار امنیتی: پروتکل IP6IP6 (RFC 2473) کاملاً خام، شفاف و بدون رمزنگاری است. آدرس‌دهی داخلی منحصراً بر پایه IPv6 است. هر دو سمت باید دارای آدرس IPv6 بیرونی باشند.</p>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-ip6ip6-mtu">MTU اینترفیس IP6IP6 (1280 تا 1460، پیش‌فرض 1280)</label>
+              <input type="number" id="new-pool-ip6ip6-mtu" class="field-input" value="1280" min="1280" max="1460" step="1" dir="ltr" disabled>
+            </div>
+          </div>
+          <div id="wireguard-create-fields" class="input-group hidden">
+            <p class="field-hint" style="color: var(--amber, #f59e0b);">
+              <strong>وضعیت WireGuard:</strong> آزمایشی؛ تبادل TCP/UDP، رد کلید اشتباه و هم‌زیستی دو لینک با کانفیگ آداپتور در کرنل ماشین آزمایش تأیید شد. وضعیت هر اتصال واقعی از پایش مسیر تعیین می‌شود.
+            </p>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-wireguard-port">پورت شنود WireGuard (UDP Listen Port، پیش‌فرض 51820)</label>
+              <input type="number" id="new-pool-wireguard-port" class="field-input" value="51820" min="1" max="65535" step="1" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="new-pool-wireguard-mtu">MTU اینترفیس WireGuard (576 تا 1420، پیش‌فرض 1280)</label>
+              <input type="number" id="new-pool-wireguard-mtu" class="field-input" value="1280" min="576" max="1420" step="1" dir="ltr" disabled>
+            </div>
+            <div class="input-group" style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              <input type="checkbox" id="new-pool-wireguard-psk" disabled>
+              <label class="field-label" for="new-pool-wireguard-psk" style="margin:0;cursor:pointer;">تولید کلید پیش‌مشترک (PresharedKey) جهت مقاومت کوانتومی/متقارن</label>
+            </div>
+          </div>
+          <div id="paqet-create-fields" class="input-group hidden">
+            <p class="field-hint">Paqet از KCP روی بسته‌های خام TCP و رمزنگاری با کلید مشترک استفاده می‌کند؛ استتار HTTPS یا تضمین عبور از فیلتر ندارد. مسیر TCP/UDP با باینری رسمی در ماشین آزمایش تأیید شده است؛ نصب روی سرورهای واقعی هنوز آزمایشی است. پورت حامل ترجیحی 9999 است؛ برای جلوگیری از تداخل سرویس‌ها یا نودها، پورت آزاد دیگری ممکن است انتخاب شود.</p>
+            <div class="input-group"><label class="field-label" for="paqet-tunnel-port">پورت تونل KCP سرور خارج</label><input id="paqet-tunnel-port" class="field-input" value="9999" type="number" min="1" max="65535" dir="ltr" disabled required></div>
+            <div class="input-group"><label class="field-label" for="paqet-binary">مسیر فایل اجرایی Paqet روی هر دو سرور</label><input id="paqet-binary" class="field-input" value="/usr/local/bin/paqet" dir="ltr" disabled></div>
+          </div>
+          <div id="slipstream-create-fields" class="input-group hidden">
+            <p class="field-hint" style="color: var(--amber, #f59e0b);">
+              <strong>تونل اضطراری Slipstream:</strong> از پروتکل DNS و delegation ساب‌دامین برای عبور اضطراری ترافیک در شرایط قطع شدید اینترنت استفاده می‌کند. رکورد NS ساب‌دامنه باید به نام میزبان DNS اشاره کند و رکورد A/AAAA آن میزبان به سرور خارج متصل باشد.
+            </p>
+            <div class="input-group">
+              <label class="field-label" for="slipstream-domain">دامنه / ساب‌دامین تونل DNS (الزامی)</label>
+              <input type="text" id="slipstream-domain" class="field-input" placeholder="t.example.com" dir="ltr" disabled required>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="slipstream-resolvers">DNS Resolvers (با کاما جدا کنید)</label>
+              <input type="text" id="slipstream-resolvers" class="field-input" value="1.1.1.1:53, 8.8.8.8:53" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="slipstream-dns-port">پورت شنود DNS سرور خارج (پیش‌فرض 53)</label>
+              <input type="number" id="slipstream-dns-port" class="field-input" value="53" min="1" max="65535" dir="ltr" disabled>
+              <p class="field-hint">resolver عمومی به پورت 53 نیاز دارد؛ پورت دیگر برای resolver مستقیم یا سفارشی است. UDP این پورت باید در قواعد فایروال شما مجاز باشد.</p>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="slipstream-rate-limit">سقف نرخ DNS برای هر IP منبع (QPS)</label>
+              <input type="number" id="slipstream-rate-limit" class="field-input" value="1000" min="10" max="2000" dir="ltr" disabled required>
+              <p class="field-hint">اعمال روی UDP همان استخر؛ ظرفیت burst برابر دو ثانیه است. چند کاربر پشت یک resolver سقف مشترک دارند.</p>
+            </div>
+          </div>
+          <div id="spoof-create-fields" class="input-group hidden">
+            <p class="field-hint" style="color: var(--accent, #6366f1);">
+              آزمایشی: پذیرش ساخت به آزمون TCP/UDP، مالکیت صف و مشاهدهٔ تغییر واقعی بسته وابسته است.
+            </p>
+            <div class="input-group">
+              <label class="field-label" for="spoof-fake-sni">نام دامنهٔ جعلی SNI (سایت‌های مجاز/داخلی)</label>
+              <input type="text" id="spoof-fake-sni" class="field-input" value="www.shaparak.ir" dir="ltr" disabled required>
+              <p class="field-hint">این دامنه در ClientHello بستهٔ جعلی قرار می‌گیرد؛ نتیجهٔ آن در بسته‌های واقعی بررسی می‌شود.</p>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="spoof-ttl-delta">اختلاف هاپ برای برآورد Auto-TTL</label>
+              <input type="number" id="spoof-ttl-delta" class="field-input" value="3" min="1" max="15" dir="ltr" disabled required>
+              <p class="field-hint">پکت جعلی در فاصله ۳ هاپ مانده به سرور خارج منقضی می‌شود تا به مقصد نرسد.</p>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="spoof-ip-list">لیست آی‌پی‌های چرخشی جعل مبدأ (ParsaKSH / راند-رابین با کاما)</label>
+              <input type="text" id="spoof-ip-list" class="field-input" value="2.188.21.10, 185.143.232.10" dir="ltr" disabled>
+              <p class="field-hint">چرخش بسته‌به‌بسته روی این آی‌پی‌ها تا فایروال نتواند سورس آی‌پی ثابتی را بلاک کند.</p>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="spoof-peer-ip">آی‌پی قرینه جعلی مقصد (Peer Spoof IP)</label>
+              <input type="text" id="spoof-peer-ip" class="field-input" value="104.16.132.229" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="spoof-dns-resolvers">ریزولورهای DNS آپلود (QS-Tunnel / HYPERION-X)</label>
+              <input type="text" id="spoof-dns-resolvers" class="field-input" value="8.8.8.8, 1.1.1.1, 10.202.10.202" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="spoof-fake-send-ip">آی‌پی جعلی دانلود مستقیم سرور خارج (Fake Send IP)</label>
+              <input type="text" id="spoof-fake-send-ip" class="field-input" value="4.2.2.4" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="spoof-knock-key">کلید احراز هویت هاست تاریک (HYPERION-X Knock Key)</label>
+              <input type="text" id="spoof-knock-key" class="field-input" value="hyperion-x-master-canary-key" dir="ltr" disabled>
+              <p class="field-hint">سرور خارج پورت باز ندارد و فقط به بسته‌های دارای امضای این کلید پاسخ می‌دهد.</p>
+            </div>
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="new-pool-ports">پورت‌های سرویس ورودی کاربران (با کاما جدا کنید)</label>
+            <input type="text" id="new-pool-ports" class="field-input" value="443, 2053" required dir="ltr">
+          </div>
+          <button type="submit" id="create-pool-submit-btn" class="btn-primary full-btn" style="margin-top: 10px;">
+            <span>استقرار و راه‌اندازی استخر</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Existing Node to Pool -->
+  <div id="add-node-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title">افزودن سرور ایران به استخر</h4>
+          <p id="add-node-modal-pool" class="sheet-subtitle">استخر: ...</p>
+        </div>
+        <button class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('add-node-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content">
+        <form onsubmit="submitAddNodeToPool(event)">
+          <div class="input-group">
+            <label class="field-label" for="select-iran-node-to-add">انتخاب سرور ایران از مخزن</label>
+            <select id="select-iran-node-to-add" class="field-input select-styled" required dir="ltr">
+              <!-- Filled dynamically -->
+            </select>
+          </div>
+          <button type="submit" id="add-node-submit-btn" class="btn-primary full-btn" style="margin-top: 10px;">
+            <span>افزودن و اتصال تونل نود</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Configure Cloudflare for Pool -->
+  <div id="pool-cf-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title">تنظیمات DNS کلودفلر استخر</h4>
+          <p id="pool-cf-modal-subtitle" class="sheet-subtitle">استخر: ...</p>
+        </div>
+        <button class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('pool-cf-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content">
+        <p id="pool-cf-load-state" class="empty-hint" role="status"></p><button type="button" id="pool-cf-retry" class="node-log-btn hidden" onclick="openPoolCfModal(currentPoolForAction, document.getElementById('pool-cf-sub').value)">تلاش دوباره برای دریافت تنظیمات</button>
+        <form onsubmit="submitPoolCloudflare(event)">
+          <div class="input-group">
+            <label class="field-label" for="pool-cf-token">Cloudflare API Token</label>
+            <input type="password" id="pool-cf-token" class="field-input" placeholder="API Token..." required dir="ltr">
+          </div>
+          <div class="credential-actions"><button type="button" class="node-log-btn" onclick="const input=document.getElementById('pool-cf-token'); input.type=input.type==='password'?'text':'password'; this.textContent=input.type==='password'?'نمایش توکن':'پنهان کردن توکن'">نمایش توکن</button><button type="button" class="node-log-btn" onclick="copyText(document.getElementById('pool-cf-token').value)">کپی توکن</button></div>
+          <div class="input-group">
+            <label class="field-label" for="pool-cf-zone">Zone ID</label>
+            <input type="text" id="pool-cf-zone" class="field-input" placeholder="Zone ID..." required dir="ltr">
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="pool-cf-scope">محدودهٔ مدیریت DNS</label>
+            <select id="pool-cf-scope" class="field-input" onchange="resetPoolCfPreview()"><option value="single">یک رکورد مشخص، شامل wildcard</option><option value="all_subdomains">همهٔ ساب‌دامین‌های دارای رکورد A</option></select>
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="pool-cf-sub">نام رکورد یا دامنهٔ اصلی</label>
+            <input type="text" id="pool-cf-sub" class="field-input" placeholder="lb.tsks.ir" required dir="ltr">
+          </div>
+          <p class="transport-explanation">در حالت همهٔ ساب‌دامین‌ها، رکوردهای A موجود و جدید زیر دامنه به نودهای این استخر هدایت می‌شوند و DNS-only خواهند بود. رکورد دامنهٔ اصلی، CNAME و AAAA تغییر نمی‌کنند. wildcard به‌تنهایی این قابلیت را فعال نمی‌کند.</p>
+          <div id="pool-cf-preview" class="transport-progress hidden" aria-live="polite"></div>
+          <button type="submit" id="pool-cf-submit-btn" class="btn-primary full-btn" style="margin-top: 10px;">
+            <span>ذخیره و فعال‌سازی فیل‌اور DNS</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="transport-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div><div class="sheet-header"><div><h4 class="sheet-title">تغییر مرحله‌ای نوع تونل</h4><p id="transport-summary" class="sheet-subtitle"></p></div><button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('transport-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
+      <div class="sheet-content">
+        <p class="transport-explanation">اعضا، توکن‌ها، پورت‌ها و تنظیمات DNS حفظ می‌شوند. هر بار یک نود و دو سمت آن ری‌استارت می‌شوند؛ اتصال‌های جاری آن نود ممکن است موقتاً قطع شوند.</p>
+        <p class="transport-explanation">برای هر نود، اتصال کانال کنترل و عبور پیام آزمایشی مستقل بررسی می‌شود؛ نیازی به کاربر فعال نیست. در صورت خطا، نودهای تغییرکرده به تنظیم قبلی برمی‌گردند. هنگام عملیات، تغییرات استخر قفل و هماهنگی DNS این دامنه موقتاً متوقف است.</p>
+        <form onsubmit="submitTransportChange(event)">
+          <div class="input-group">
+            <label class="field-label" for="transport-change-engine">موتور و هستهٔ پایهٔ تونل</label>
+            <select id="transport-change-engine" class="field-input select-styled" onchange="onTransportChangeEngineChanged()">
+              <option value="backpack">اسکریپت BackPack (موتور اصلی با 6 ترنسپورت بومی L4)</option>
+              <option value="paqet">اسکریپت Paqet (موتور پکت خام و حالت‌های کوانتوم L3)</option>
+              <option value="waterwall">اسکریپت WaterWall (موتور گراف نود L7 VLESS + TLS + Mux)</option>
+              <option value="xray">استتار پیشرفته Xray (حالت‌های XHTTP، XHTTPS و Nova)</option>
+              <option value="kernel">حامل‌های شبکه و هسته لینوکس (TUN, DC6, WireGuard, GRE, VXLAN)</option>
+              <option value="spoof" disabled>پردازش بسته — استخر جداگانه بسازید</option>
+              <option value="other">سایر پروتکل‌های وب و اضطراری (WebSocket, HTTP/2, Slipstream)</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="transport-target">روش انتقال / ترنسپورت جدید</label>
+            <select id="transport-target" class="field-input select-styled" required onchange="onTransportChangeTransportChanged()">
+              <option value="" selected disabled>نوع جدید را انتخاب کنید</option>
+            </select>
+            <p id="transport-target-desc" class="field-hint" style="margin-top:6px;"></p>
+          </div>
+          <div id="transport-change-tls-fields" class="hidden">
+            <div class="input-group">
+              <label class="field-label" for="transport-tls-server-name">دامنهٔ TLS سرور خارج</label>
+              <input id="transport-tls-server-name" class="field-input" placeholder="tunnel.example.com" dir="ltr" maxlength="253">
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="transport-tls-outer-port">پورت ترجیحی اتصال به سرور خارج</label>
+              <input id="transport-tls-outer-port" class="field-input" value="443" type="number" min="1" max="65535" dir="ltr">
+            </div>
+          </div>
+          <div id="transport-change-spoof-fields" class="hidden">
+            <div class="input-group">
+              <label class="field-label" for="transport-spoof-fake-sni">نام دامنهٔ جعلی SNI</label>
+              <input type="text" id="transport-spoof-fake-sni" class="field-input" value="www.shaparak.ir" dir="ltr">
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="transport-spoof-ttl-delta">اختلاف هاپ Auto-TTL</label>
+              <input type="number" id="transport-spoof-ttl-delta" class="field-input" value="3" min="1" max="10" dir="ltr">
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="transport-spoof-ip-list">لیست آی‌پی‌های چرخشی مبدأ</label>
+              <input type="text" id="transport-spoof-ip-list" class="field-input" value="2.188.21.10, 185.143.232.10" dir="ltr">
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="transport-spoof-peer-ip">آی‌پی قرینه جعلی مقصد</label>
+              <input type="text" id="transport-spoof-peer-ip" class="field-input" value="104.16.132.229" dir="ltr">
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="transport-spoof-dns-resolvers">ریزولورهای DNS آپلود</label>
+              <input type="text" id="transport-spoof-dns-resolvers" class="field-input" value="8.8.8.8, 1.1.1.1, 10.202.10.202" dir="ltr">
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="transport-spoof-fake-send-ip">آی‌پی جعلی دانلود مستقیم</label>
+              <input type="text" id="transport-spoof-fake-send-ip" class="field-input" value="4.2.2.4" dir="ltr">
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="transport-spoof-knock-key">کلید هاست تاریک HYPERION-X</label>
+              <input type="text" id="transport-spoof-knock-key" class="field-input" value="hyperion-x-master-canary-key" dir="ltr">
+            </div>
+          </div>
+          <div id="transport-change-fec-fields" class="hidden">
+            <div class="input-group">
+              <label class="field-label" for="transport-fec-data">شارد داده FEC (Data Shards)</label>
+              <input type="number" id="transport-fec-data" class="field-input" value="10" min="1" max="20" dir="ltr">
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="transport-fec-parity">شارد تصحیح خطا FEC (Parity Shards)</label>
+              <input type="number" id="transport-fec-parity" class="field-input" value="3" min="1" max="10" dir="ltr">
+            </div>
+          </div>
+          <div id="transport-change-dc6-fields" class="hidden">
+            <p class="field-hint" style="color: var(--amber, #f59e0b);">حامل DC6: برای سرورهای IPv4 حامل sit انتخاب شود؛ ip6gre و ip6ip6 به IPv6 عمومی نیاز دارند.</p>
+            <div class="input-group">
+              <label class="field-label" for="transport-dc6-carrier">نوع حامل DC6</label>
+              <select id="transport-dc6-carrier" class="field-input select-styled">
+                <option value="sit" selected>sit (IPv6 in IPv4 - سازگار با آدرس‌های IPv4)</option>
+                <option value="ip6gre">ip6gre (RFC 7676 - نیازمند آدرس‌های IPv6 عمومی دو طرف)</option>
+                <option value="ip6ip6">ip6ip6 (RFC 2473 - نیازمند آدرس‌های IPv6 عمومی دو طرف)</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="transport-dc6-mtu">MTU حامل DC6 (1280 تا 1440، پیش‌فرض 1280)</label>
+              <input type="number" id="transport-dc6-mtu" class="field-input" value="1280" min="1280" max="1440" step="1" dir="ltr">
+            </div>
+          </div>
+          <div id="transport-change-mtu-fields" class="hidden">
+            <div class="input-group">
+              <label class="field-label" for="transport-mtu-input">MTU اینترفیس</label>
+              <input type="number" id="transport-mtu-input" class="field-input" value="1400" min="576" max="1500" dir="ltr">
+            </div>
+          </div>
+          <div id="transport-change-slipstream-fields" class="hidden">
+            <div class="input-group">
+              <label class="field-label" for="transport-slipstream-domain">دامنهٔ واگذارشدهٔ DNS</label>
+              <input id="transport-slipstream-domain" class="field-input" placeholder="dns.example.com" dir="ltr">
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="transport-slipstream-resolvers">Resolverها (با کاما جدا شوند)</label>
+              <input id="transport-slipstream-resolvers" class="field-input" value="1.1.1.1,8.8.8.8" dir="ltr">
+            </div>
+          </div>
+          <button type="submit" id="transport-submit" class="btn-primary full-btn">شروع تغییر مرحله‌ای نوع تونل</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="gre-settings-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1"><div class="sheet-handle"></div><div class="sheet-header"><div><h4 class="sheet-title">تنظیمات لینک GRE</h4><p id="gre-settings-summary" class="sheet-subtitle"></p></div><button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('gre-settings-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div><div class="sheet-content"><form onsubmit="submitGreSettings(event)"><div class="input-group"><label class="field-label" for="gre-settings-mtu">MTU لینک خصوصی</label><input id="gre-settings-mtu" type="number" class="field-input" min="576" max="1400" step="1" required dir="ltr"><p class="field-hint">تغییر روی دو سمت هر لینک اعمال و با TCP/UDP بررسی می‌شود. در خطا، MTU قبلی بازگردانده می‌شود. روت پیش‌فرض تغییر نمی‌کند.</p></div><button id="gre-settings-submit" class="btn-primary full-btn" type="submit"><span>اعمال و بررسی MTU</span></button></form></div></div>
+  </div>
+
+  <div id="matrix-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" aria-labelledby="matrix-title" tabindex="-1">
+      <div class="sheet-handle"></div><div class="sheet-header"><div><h4 id="matrix-title" class="sheet-title">ماتریس لینک‌های WireGuard</h4><p class="sheet-subtitle">فقط زوج‌هایی که انتخاب می‌کنید ساخته می‌شوند.</p></div><button type="button" class="sheet-close-btn" aria-label="بستن" onclick="closeModal('matrix-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
+      <div class="sheet-content"><form onsubmit="submitMatrix(event)">
+        <p class="field-hint">endpointهای IPv4 و ابزارهای WireGuard روی دو سمت لازم‌اند. route مدیریت حفظ می‌شود؛ تداخل subnet یا پورت، نصب لینک را متوقف می‌کند.</p>
+        <div id="matrix-pairs" class="matrix-pair-list"></div>
+        <p id="matrix-preview" role="status" aria-live="polite"></p>
+        <div class="input-group"><label class="field-label" for="matrix-port">پورت پایهٔ UDP (هر زوج یک پورت مستقل)</label><input id="matrix-port" class="field-input" type="number" value="51820" min="1" max="65535" dir="ltr" required></div>
+        <div class="input-group"><label class="field-label" for="matrix-mtu">MTU خصوصی</label><input id="matrix-mtu" class="field-input" type="number" value="1400" min="576" max="1440" dir="ltr" required></div>
+        <button id="matrix-submit" class="btn-primary full-btn" type="submit"><span>شروع ساخت لینک‌های انتخاب‌شده</span></button>
+      </form></div>
+    </div>
+  </div>
+
+  <div id="slipstream-settings-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" aria-labelledby="slipstream-settings-title" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header"><div><h4 id="slipstream-settings-title" class="sheet-title">تنظیمات Slipstream</h4><p id="slipstream-settings-summary" class="sheet-subtitle" dir="auto"></p></div><button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('slipstream-settings-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
+      <div class="sheet-content"><form onsubmit="submitSlipstreamSettings(event)">
+        <p class="field-hint">تغییر در پس‌زمینه انجام می‌شود. اتصال‌های جاری ممکن است قطع شوند؛ در خطا، تنظیم قبلی بازگردانده و مسیر داده بررسی می‌شود.</p>
+        <div class="input-group"><label class="field-label" for="slipstream-settings-domain">دامنهٔ واگذارشدهٔ DNS</label><input id="slipstream-settings-domain" class="field-input" dir="ltr" required></div>
+        <div class="input-group"><label class="field-label" for="slipstream-settings-resolvers">Resolverها با کاما جدا شوند</label><input id="slipstream-settings-resolvers" class="field-input" dir="ltr" required></div>
+        <div class="input-group"><label class="field-label" for="slipstream-settings-port">پورت عمومی DNS</label><input id="slipstream-settings-port" type="number" class="field-input" min="1" max="65535" dir="ltr" required><p class="field-hint">resolver عمومی از پورت 53 استفاده می‌کند؛ پورت دیگر به resolver مستقیم یا سفارشی نیاز دارد.</p></div>
+        <div class="input-group"><label class="field-label" for="slipstream-settings-rate">سقف QPS هر IP منبع</label><input id="slipstream-settings-rate" type="number" class="field-input" min="10" max="2000" dir="ltr" required><p id="slipstream-settings-legacy" class="field-hint hidden">این runtime قدیمی محدودکنندهٔ QPS ندارد؛ فعال‌سازی آن به راه‌اندازی نسخهٔ جدید نیاز دارد.</p></div>
+        <button id="slipstream-settings-submit" class="btn-primary full-btn" type="submit"><span>شروع تغییر و بررسی مسیر</span></button>
+      </form></div>
+    </div>
+  </div>
+
+  <div id="geneve-settings-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1"><div class="sheet-handle"></div><div class="sheet-header"><div><h4 class="sheet-title">تنظیمات اینترفیس Geneve</h4><p id="geneve-settings-summary" class="sheet-subtitle"></p></div><button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('geneve-settings-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div><div class="sheet-content"><form onsubmit="submitGeneveSettings(event)"><div class="input-group"><label class="field-label" for="geneve-settings-mtu">MTU اینترفیس خصوصی (576 تا 1420)</label><input id="geneve-settings-mtu" type="number" class="field-input" min="576" max="1420" step="1" required dir="ltr"><p class="field-hint">تغییر روی دو سمت هر نود اعمال و با بررسی ارتباط تأیید می‌شود. در صورت خطا، MTU قبلی بازگردانده می‌شود.</p></div><button id="geneve-settings-submit" class="btn-primary full-btn" type="submit"><span>اعمال و بررسی MTU Geneve</span></button></form></div></div>
+  </div>
+
+  <div id="vxlan-settings-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title">تنظیمات و وضعیت VXLAN</h4>
+          <p id="vxlan-settings-summary" class="sheet-subtitle"></p>
+        </div>
+        <button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('vxlan-settings-modal')">
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg>
+        </button>
+      </div>
+      <div class="sheet-content">
+        <div id="vxlan-status-box" style="margin-bottom: 12px; font-size: 11.5px; padding: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; white-space: pre-wrap;" dir="ltr"></div>
+        <form onsubmit="submitVxlanSettings(event)">
+          <div class="input-group">
+            <label class="field-label" for="vxlan-settings-mtu">MTU اینترفیس (576 تا 1450)</label>
+            <input id="vxlan-settings-mtu" type="number" class="field-input" min="576" max="1450" step="1" required dir="ltr">
+            <p class="field-hint">تغییر روی دو سمت اعمال و با بررسی سلامت ارزیابی می‌شود.</p>
+          </div>
+          <button id="vxlan-settings-submit" class="btn-primary full-btn" type="submit">
+            <span>اعمال و بررسی MTU</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="gre6-settings-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1"><div class="sheet-handle"></div><div class="sheet-header"><div><h4 class="sheet-title">تنظیمات اینترفیس GRE6</h4><p id="gre6-settings-summary" class="sheet-subtitle"></p></div><button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('gre6-settings-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div><div class="sheet-content"><form onsubmit="submitGre6Settings(event)"><div class="input-group"><label class="field-label" for="gre6-settings-mtu">MTU اینترفیس GRE6 (1200 تا 1440)</label><input id="gre6-settings-mtu" type="number" class="field-input" min="1200" max="1440" step="1" required dir="ltr"><p class="field-hint">تغییر روی دو سمت هر نود اعمال می‌شود. در صورت خطا، MTU قبلی بازگردانده می‌شود.</p></div><button id="gre6-settings-submit" class="btn-primary full-btn" type="submit"><span>اعمال و بررسی MTU GRE6</span></button></form></div></div>
+  </div>
+
+  <div id="ip6ip6-settings-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1"><div class="sheet-handle"></div><div class="sheet-header"><div><h4 class="sheet-title">تنظیمات اینترفیس IP6IP6</h4><p id="ip6ip6-settings-summary" class="sheet-subtitle"></p></div><button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('ip6ip6-settings-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div><div class="sheet-content"><form onsubmit="submitIp6ip6Settings(event)"><div class="input-group"><label class="field-label" for="ip6ip6-settings-mtu">MTU اینترفیس IP6IP6 (1280 تا 1460)</label><input id="ip6ip6-settings-mtu" type="number" class="field-input" min="1280" max="1460" step="1" required dir="ltr"><p class="field-hint">تغییر روی دو سمت هر نود اعمال می‌شود. حداقل 1280 طبق RFC 8200 الزامی است.</p></div><button id="ip6ip6-settings-submit" class="btn-primary full-btn" type="submit"><span>اعمال و بررسی MTU IP6IP6</span></button></form></div></div>
+  </div>
+
+  <div id="wireguard-settings-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title">تنظیمات و آزمون WireGuard</h4>
+          <p id="wireguard-settings-summary" class="sheet-subtitle"></p>
+        </div>
+        <button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('wireguard-settings-modal')">
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg>
+        </button>
+      </div>
+      <div class="sheet-content">
+        <p class="field-hint" style="color: var(--amber, #f59e0b); margin-bottom: 10px;">
+          وضعیت کنونی: <strong>آزمایشی — آزمون کرنلی لینک تأیید شد</strong>. این نتیجه تضمین سلامت اتصال فعلی یا تأیید انتشار پروداکشن نیست؛ نتیجهٔ پایش هر نود را بررسی کنید.
+        </p>
+        <div id="wireguard-status-box" style="margin-bottom: 12px; font-size: 11.5px; padding: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; white-space: pre-wrap;" dir="ltr"></div>
+        <div style="margin-bottom: 14px;">
+          <button id="wireguard-probe-btn" type="button" class="btn-secondary full-btn" onclick="runWireguardPoolProbe()">
+            <span>اجرای آزمون فعال رفت‌وبرگشت (Active Probe)</span>
+          </button>
+          <div id="wireguard-probe-result" style="margin-top: 8px; font-size: 11.5px; display: none;" dir="ltr"></div>
+        </div>
+        <form onsubmit="submitWireguardSettings(event)">
+          <div class="input-group">
+            <label class="field-label" for="wireguard-settings-mtu">MTU اینترفیس WireGuard (576 تا 1420)</label>
+            <input id="wireguard-settings-mtu" type="number" class="field-input" min="576" max="1420" step="1" required dir="ltr">
+            <p class="field-hint">تغییر روی دو سمت هر نود اعمال و فایل پیکربندی /etc/wireguard به‌روزرسانی می‌شود.</p>
+          </div>
+          <button id="wireguard-settings-submit" class="btn-primary full-btn" type="submit">
+            <span>اعمال و ذخیره MTU WireGuard</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cloudflare profile (add token) -->
+  <div id="cf-profile-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title" id="cf-profile-modal-title">افزودن توکن Cloudflare</h4>
+          <p class="sheet-subtitle">توکن با مجوز Zone:Read + DNS:Edit — Zoneها خودکار کشف می‌شوند</p>
+        </div>
+        <button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('cf-profile-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content">
+        <form onsubmit="submitCfProfile(event)">
+          <div class="input-group">
+            <label class="field-label" for="cf-profile-label">نام پروفایل</label>
+            <input type="text" id="cf-profile-label" class="field-input" placeholder="مثلاً Production" maxlength="60">
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="cf-profile-token">API Token</label>
+            <input type="password" id="cf-profile-token" class="field-input" placeholder="توکن کلودفلر…" dir="ltr" required autocomplete="off">
+            <p class="field-hint">توکن فقط روی سرور ذخیره می‌شود و در پاسخ API یا مرورگر نمایش داده نمی‌شود.</p>
+          </div>
+          <button type="submit" id="cf-profile-submit" class="btn-primary full-btn">
+            <span>تأیید توکن و کشف Zoneها</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cloudflare profile edit -->
+  <div id="cf-profile-edit-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title">ویرایش پروفایل</h4>
+          <p class="sheet-subtitle" id="cf-edit-profile-sub"></p>
+        </div>
+        <button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('cf-profile-edit-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content">
+        <input type="hidden" id="cf-edit-profile-id">
+        <div class="input-group">
+          <label class="field-label" for="cf-edit-profile-label">نام پروفایل</label>
+          <input type="text" id="cf-edit-profile-label" class="field-input" maxlength="60">
+        </div>
+        <div class="input-group">
+          <label class="field-label" for="cf-edit-profile-token">چرخش توکن (اختیاری)</label>
+          <input type="password" id="cf-edit-profile-token" class="field-input" placeholder="توکن جدید — برای تغییر وارد کنید" dir="ltr" autocomplete="off">
+          <p class="field-hint">خالی بگذارید تا توکن فعلی حفظ شود.</p>
+        </div>
+        <button type="button" id="cf-edit-profile-save" class="btn-primary full-btn" onclick="submitCfProfileEdit()">
+          <span>ذخیره پروفایل</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: DNS record create/edit -->
+  <div id="cf-record-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title" id="cf-record-modal-title">رکورد DNS</h4>
+          <p class="sheet-subtitle" id="cf-record-modal-sub"></p>
+        </div>
+        <button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('cf-record-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content">
+        <form onsubmit="submitCfRecord(event)">
+          <input type="hidden" id="cf-record-id">
+          <div class="input-group">
+            <label class="field-label" for="cf-record-type">نوع رکورد</label>
+            <select id="cf-record-type" class="field-input" dir="ltr" onchange="cfRecordTypeChanged()">
+              <option value="A">A</option><option value="AAAA">AAAA</option>
+              <option value="CNAME">CNAME</option><option value="TXT">TXT</option>
+              <option value="MX">MX</option><option value="SRV">SRV</option>
+              <option value="CAA">CAA</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="cf-record-name">نام</label>
+            <input type="text" id="cf-record-name" class="field-input" placeholder="sub.example.com یا @" dir="ltr" required>
+            <p class="field-hint" id="cf-record-name-hint">@ برای ریشهٔ Zone</p>
+          </div>
+          <div class="input-group" id="cf-record-content-group">
+            <label class="field-label" for="cf-record-content" id="cf-record-content-label">محتوا</label>
+            <input type="text" id="cf-record-content" class="field-input" dir="ltr">
+          </div>
+          <div class="input-group hidden" id="cf-record-priority-group">
+            <label class="field-label" for="cf-record-priority">اولویت (Priority)</label>
+            <input type="number" id="cf-record-priority" class="field-input" dir="ltr" min="0" max="65535" value="10">
+          </div>
+          <div class="input-group hidden" id="cf-record-data-group">
+            <label class="field-label">فیلدهای SRV/CAA</label>
+            <div id="cf-record-data-fields"></div>
+          </div>
+          <div class="input-group">
+            <label class="field-label" for="cf-record-ttl">TTL</label>
+            <select id="cf-record-ttl" class="field-input" dir="ltr">
+              <option value="1">Auto</option><option value="60">1 دقیقه</option>
+              <option value="300">5 دقیقه</option><option value="1800">30 دقیقه</option>
+              <option value="3600">1 ساعت</option><option value="86400">1 روز</option>
+            </select>
+          </div>
+          <div class="input-group hidden" id="cf-record-proxied-group">
+            <label class="checkbox-row">
+              <input type="checkbox" id="cf-record-proxied">
+              <span>عبور از پروکسی Cloudflare (Proxied)</span>
+            </label>
+          </div>
+          <button type="submit" id="cf-record-submit" class="btn-primary full-btn">
+            <span>ذخیره رکورد</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirm Action -->
+  <div id="confirm-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title" id="confirm-modal-title">تأیید عملیات</h4>
+          <p class="sheet-subtitle" id="confirm-modal-message">آیا اطمینان دارید؟</p>
+        </div>
+        <button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('confirm-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content">
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <button type="button" id="confirm-modal-cancel" class="btn-secondary" style="flex:1;"><span>انصراف</span></button>
+          <button type="button" id="confirm-modal-ok" class="btn-danger" style="flex:1;"><span>تأیید</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast-banner hidden" role="status" aria-live="polite"></div>
+
+  <script src="hairline.js?v=2.29"></script>
+  <script src="copy.fa.js?v=2.29"></script>
+  <script src="app.js?v=2.32"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="VX LB logo"><rect width="256" height="256" rx="57" fill="#101819"/>
+        <rect x="0.85" y="0.85" width="254.3" height="254.3" rx="56.1" fill="none" stroke="#344a45" stroke-width="1.7"/>
+    <path d="M53 77 L94 173 L133 77" fill="none" stroke="#edf4ef" stroke-width="23" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M158 78 L205 171" fill="none" stroke="#a1dfc3" stroke-width="21.5" stroke-linecap="round"/>
+    <path d="M205 78 L158 171" fill="none" stroke="#a1dfc3" stroke-width="21.5" stroke-linecap="round"/>
+    <circle cx="181.5" cy="124.5" r="13" fill="#101819"/>
+    <circle cx="181.5" cy="124.5" r="6.6" fill="#a1dfc3"/>
+    </svg>

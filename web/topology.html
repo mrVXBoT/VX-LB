@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>نقشه زنده تونل‌ها | VX LB</title>
+<link rel="icon" type="image/svg+xml" href="/logo-light.svg" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/svg+xml" href="/logo.svg" media="(prefers-color-scheme: light)">
+<link rel="alternate icon" type="image/png" href="/logo.png">
+<link rel="stylesheet" href="/font.css">
+<link rel="stylesheet" href="/style.css?v=2.3">
+<style>
+  :root {
+    --bg: var(--bg-deep);
+    --bg2: var(--bg-card);
+    --card: var(--bg-card-subtle);
+    --border: var(--border-subtle);
+    --text: var(--text-main);
+    --dim: var(--text-muted);
+    --accent: var(--accent-blue);
+    --green: var(--status-good);
+    --amber: var(--status-warn);
+    --red: var(--status-err);
+    --gray: #6b7280;
+    --blue: #60a5fa;
+    --header-surface: rgba(16, 24, 25, 0.88);
+    --glass-surface: rgba(25, 34, 36, 0.88);
+    --detail-surface: rgba(22, 30, 32, 0.94);
+    --overlay: rgba(4, 10, 12, 0.55);
+    --shadow-color: rgba(0, 0, 0, 0.4);
+  }
+  :root[data-theme="light"] {
+    --gray: #68756e;
+    --blue: #2777a8;
+    --header-surface: rgba(255, 255, 255, 0.92);
+    --glass-surface: rgba(255, 255, 255, 0.92);
+    --detail-surface: rgba(255, 255, 255, 0.96);
+    --overlay: rgba(28, 48, 38, 0.22);
+    --shadow-color: rgba(28, 48, 38, 0.18);
+  }
+  :root[data-theme="light"] .topo-brand-mark { content: url('/mark-dark.svg'); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-family);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Header */
+  .topo-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px;
+    background: var(--header-surface);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    z-index: 10;
+  }
+  .header-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 8px 16px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 12.5px;
+    font-weight: 500;
+    min-height: 40px;
+    transition: all 0.16s ease;
+  }
+  .header-back-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--bg2);
+  }
+  .header-back-btn svg { width: 15px; height: 15px; transform: scaleX(-1); }
+
+  .title-block { display: flex; flex-direction: column; gap: 2px; }
+  .title-block h1 { font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .title-block p { font-size: 11.5px; color: var(--dim); }
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+    box-shadow: 0 0 8px var(--green);
+    animation: livePulse 2s infinite ease-in-out;
+  }
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  .topo-header .spacer { flex: 1; }
+
+  .pool-select-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  .pool-select-wrap select {
+    /* hidden — the custom trigger + sheet replace it */
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 1px;
+    height: 1px;
+  }
+  .pool-select-trigger {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    min-height: 40px;
+    cursor: pointer;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: border-color 0.16s;
+  }
+  .pool-select-trigger:hover,
+  .pool-select-trigger:focus-visible {
+    border-color: var(--accent);
+    outline: none;
+  }
+  .pool-select-trigger .pool-select-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: min(240px, calc(100vw - 260px));
+  }
+  .pool-select-trigger .select-arrow {
+    flex-shrink: 0;
+    color: var(--dim);
+    width: 12px;
+    height: 12px;
+    transition: transform 0.16s;
+  }
+  .pool-select-trigger[aria-expanded="true"] .select-arrow {
+    transform: rotate(180deg);
+  }
+  .pool-select-trigger .pool-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+
+  /* Pool picker bottom-sheet — slides up, always inside the frame. */
+  .pool-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    background: var(--overlay);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s;
+  }
+  .pool-sheet-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .pool-sheet {
+    width: 100%;
+    max-width: 460px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 22px 22px 0 0;
+    padding: 10px 14px calc(18px + env(safe-area-inset-bottom));
+    transform: translateY(105%);
+    transition: transform 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+    /* never taller than the space under the header; keeps the title on screen */
+    max-height: min(72dvh, calc(100dvh - 120px));
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -18px 50px var(--shadow-color);
+  }
+  .pool-sheet-backdrop.open .pool-sheet {
+    transform: translateY(0);
+  }
+  .pool-sheet-handle {
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border);
+    margin: 4px auto 14px;
+    flex-shrink: 0;
+  }
+  .pool-sheet-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+    padding: 0 4px;
+  }
+  .pool-sheet-sub {
+    font-size: 11.5px;
+    color: var(--dim);
+    margin-bottom: 12px;
+    padding: 0 4px;
+  }
+  .pool-sheet-list {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 0;
+  }
+  .pool-sheet-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    text-align: start;
+    padding: 13px 14px;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.14s, border-color 0.14s;
+  }
+  .pool-sheet-option:hover { background: var(--bg); }
+  .pool-sheet-option[aria-selected="true"] {
+    background: var(--bg);
+    border-color: var(--accent);
+  }
+  .pool-sheet-option .opt-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .pool-sheet-option .opt-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .pool-sheet-option .opt-meta {
+    font-size: 11px;
+    color: var(--dim);
+    flex-shrink: 0;
+    direction: ltr;
+  }
+  .pool-sheet-option .opt-check {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    color: var(--accent);
+    opacity: 0;
+  }
+  .pool-sheet-option[aria-selected="true"] .opt-check { opacity: 1; }
+  .pool-sheet-empty {
+    padding: 22px;
+    text-align: center;
+    color: var(--dim);
+    font-size: 12.5px;
+  }
+  @media (min-width: 640px) {
+    .pool-sheet-backdrop { align-items: center; justify-content: center; padding: 24px; }
+    .pool-sheet {
+      border-radius: 22px;
+      border-bottom: 1px solid var(--border);
+      /* centered card — stays fully inside the viewport */
+      max-height: min(420px, calc(100dvh - 96px));
+      box-shadow: 0 24px 70px var(--shadow-color);
+      transform: translateY(14px);
+    }
+    .pool-sheet-backdrop.open .pool-sheet { transform: translateY(0); }
+  }
+
+  .header-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 8px 15px;
+    min-height: 40px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.16s ease;
+  }
+  .header-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .header-btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+  .header-btn.primary:hover { opacity: 0.92; }
+  .header-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .header-btn:disabled svg { animation: spin 1s linear infinite; }
+  @keyframes spin { 100% { transform: rotate(360deg); } }
+
+  /* Subheader / Legend Strip */
+  .topo-subheader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 24px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .legend-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .legend-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--dim);
+    transition: all 0.16s;
+  }
+  .legend-chip .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+  .legend-chip strong {
+    color: var(--text);
+    font-family: system-ui, sans-serif;
+    font-size: 11px;
+    margin-inline-start: 2px;
+  }
+  .topo-hint {
+    color: var(--dim);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Canvas Area */
+  #canvas-wrap {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    margin: 0 24px 20px;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    background: var(--bg);
+    box-shadow: inset 0 2px 20px var(--shadow-color);
+  }
+  #graph {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+  }
+  #graph:active { cursor: grabbing; }
+
+  /* Floating HUD Controls */
+  .graph-hud {
+    position: absolute;
+    bottom: 18px;
+    inset-inline-end: 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px;
+    background: var(--glass-surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    box-shadow: 0 10px 30px var(--shadow-color);
+    z-index: 5;
+  }
+  .hud-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text);
+    border: 0;
+    display: grid;
+    place-items: center;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.16s ease;
+  }
+  .hud-btn:hover { background: var(--card); color: var(--accent); }
+  .hud-btn.text-btn {
+    width: auto;
+    border-radius: 999px;
+    padding: 0 12px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .hud-zoom-readout {
+    font-family: system-ui, sans-serif;
+    font-size: 11px;
+    color: var(--dim);
+    padding: 0 8px;
+    min-width: 44px;
+    text-align: center;
+  }
+
+  /* SVG Elements */
+  .node { cursor: grab; }
+  .node:active { cursor: grabbing; }
+  .node rect.body {
+    fill: var(--card);
+    stroke-width: 1.5;
+    rx: 16;
+    transition: stroke-width 0.15s, stroke 0.15s, filter 0.15s;
+  }
+  .node:hover rect.body {
+    stroke-width: 2;
+    filter: drop-shadow(0 4px 14px var(--shadow-color));
+  }
+  .node text { fill: var(--text); font-family: inherit; }
+  .node .ip { fill: var(--dim); font-family: system-ui, sans-serif; }
+  .node .sub-text { fill: var(--dim); font-size: 10.5px; }
+  .node .badge-bg { rx: 6; }
+  
+  /* Animated Edges */
+  .edge {
+    fill: none;
+    stroke-width: 2.2;
+    transition: opacity 0.2s;
+  }
+  .edge.flow-active {
+    stroke-dasharray: 6 5;
+    animation: flowPulse 1s linear infinite;
+  }
+  @keyframes flowPulse {
+    from { stroke-dashoffset: 22; }
+    to { stroke-dashoffset: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .edge.flow-active { animation: none !important; }
+  }
+
+  .edge-pill-rect {
+    fill: var(--bg2);
+    stroke: var(--border);
+    stroke-width: 1;
+    rx: 6;
+  }
+  .edge-label {
+    fill: var(--text);
+    font-size: 10.5px;
+    font-weight: 500;
+    font-family: system-ui, sans-serif;
+    direction: ltr;
+  }
+  .pool-title { fill: var(--text); font-size: 16px; font-weight: 700; font-family: inherit; }
+  .pool-sub { fill: var(--dim); font-size: 12px; font-family: inherit; }
+
+  /* Details Panel — glass card sliding in from the corner */
+  #detail {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    width: min(340px, calc(100% - 36px));
+    max-height: calc(100% - 36px);
+    overflow-y: auto;
+    background: var(--detail-surface);
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 0;
+    display: none;
+    box-shadow: 0 20px 60px var(--shadow-color);
+    z-index: 20;
+  }
+  #detail.show { display: block; animation: detailIn 0.22s cubic-bezier(0.32,0.72,0,1); }
+  @keyframes detailIn {
+    from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 16px 13px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: inherit;
+    backdrop-filter: blur(28px);
+    border-radius: 22px 22px 0 0;
+  }
+  #d-title { font-size: 13.5px; font-weight: 700; overflow-wrap: anywhere; color: var(--text); }
+  .detail-close-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    padding: 0;
+  }
+  .detail-close-btn:hover { color: var(--text); background: var(--card); border-color: var(--dim); }
+  #d-rows { padding: 6px 16px 14px; }
+  #detail .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    font-size: 11.5px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    overflow-wrap: anywhere;
+  }
+  #detail .row:last-child { border-bottom: none; }
+  #detail .k { color: var(--dim); flex-shrink: 0; padding-top: 1px; }
+  #detail .row > span:last-child { text-align: end; overflow-wrap: anywhere; }
+  #detail .val-mono { font-family: system-ui, sans-serif; direction: ltr; font-weight: 500; }
+
+  .view-mode-switch { display: inline-flex; gap: 2px; padding: 3px; background: var(--card); border: 1px solid var(--border); border-radius: 999px; }
+  .view-mode-btn { border: 0; background: transparent; color: var(--dim); padding: 6px 14px; border-radius: 999px; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .view-mode-btn.active { background: var(--accent); color: var(--accent-ink); }
+  .link-pair-label { font-family: system-ui, sans-serif; font-size: 10px; fill: var(--dim); direction: ltr; }
+  .link-sub-chip { fill: var(--bg2); stroke: var(--border); stroke-width: 0.7; rx: 4; }
+  /* Empty State */
+  #empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    color: var(--dim);
+    font-size: 13px;
+  }
+  #empty.hidden { display: none; }
+
+  /* Toast Notification */
+  #toast {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--glass-surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 8px 20px;
+    font-size: 12px;
+    color: var(--text);
+    display: none;
+    box-shadow: 0 10px 30px var(--shadow-color);
+    z-index: 30;
+  }
+
+  /* Status Badges */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .st-HEALTHY { background: var(--status-good-bg); color: var(--green); }
+  .st-DEGRADED { background: var(--status-warn-bg); color: var(--amber); }
+  .st-FILTERED { background: var(--status-err-bg); color: var(--red); }
+  .st-DOWN { background: rgba(107,114,128,0.2); color: #9ca3af; }
+  .st-IDLE { background: rgba(96,165,250,0.15); color: var(--blue); }
+
+  @media(max-width: 768px) {
+    .topo-header { padding: 10px 14px; gap: 8px; }
+    .title-block p { display: none; }
+    .topo-header .spacer { display: none; }
+    .pool-select-wrap { flex: 1; }
+    .pool-select-trigger { width: 100%; justify-content: flex-start; }
+    .pool-select-trigger .pool-select-label { max-width: none; flex: 1; }
+    .topo-subheader { padding: 8px 14px; }
+    .topo-hint { display: none; }
+    #canvas-wrap { margin: 0 12px 14px; border-radius: 20px; }
+    #detail { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; max-height: 52%; }
+    .graph-hud { bottom: 12px; inset-inline-end: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topo-header">
+  <a href="/" class="header-back-btn" title="بازگشت به داشبورد">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    <span>داشبورد</span>
+  </a>
+  <div class="title-block">
+    <h1>
+      <img src="/mark.svg" alt="VX LB" class="brand-img topo-brand-mark" style="width: 24px; height: 24px; vertical-align: middle; margin-inline-end: 8px;">
+      <span class="live-dot"></span>
+      <span>نقشه زنده تونل‌ها</span>
+    </h1>
+    <p>مسیر اتصال نودهای ایران به سرور خارج</p>
+  </div>
+  <div class="spacer"></div>
+  <div class="view-mode-switch" role="tablist" aria-label="حالت نمایش نقشه">
+    <button type="button" id="view-pools-btn" class="view-mode-btn active" onclick="setViewMode('pools')" role="tab" aria-selected="true">استخرها</button>
+    <button type="button" id="view-links-btn" class="view-mode-btn" onclick="setViewMode('links')" role="tab" aria-selected="false">لینک‌های خصوصی</button>
+  </div>
+  <div class="pool-select-wrap" id="pool-select-wrap">
+    <select id="pool-select" aria-label="انتخاب استخر" onchange="switchPool()" tabindex="-1" aria-hidden="true"></select>
+    <button type="button" id="pool-select-trigger" class="pool-select-trigger" role="combobox" aria-haspopup="dialog" aria-expanded="false" aria-label="انتخاب استخر">
+      <span class="pool-dot" aria-hidden="true"></span>
+      <span class="pool-select-label" id="pool-select-label">انتخاب استخر</span>
+      <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+  </div>
+  <button class="header-btn" onclick="toggleGraphTheme()" aria-label="تغییر تم">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+    <span>ظاهر</span>
+  </button>
+  <button id="refresh-btn" class="header-btn primary" onclick="load(true)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+    <span>به‌روزرسانی</span>
+  </button>
+</header>
+
+<!-- Pool picker bottom-sheet -->
+<div id="pool-sheet-backdrop" class="pool-sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="pool-sheet-title" aria-hidden="true">
+  <div class="pool-sheet" role="document">
+    <div class="pool-sheet-handle" aria-hidden="true"></div>
+    <div class="pool-sheet-title" id="pool-sheet-title">انتخاب استخر</div>
+    <div class="pool-sheet-sub">نمایش نقشهٔ زندهٔ نودهای استخر انتخاب‌شده</div>
+    <div class="pool-sheet-list" id="pool-sheet-list" role="listbox" aria-label="انتخاب استخر"></div>
+  </div>
+</div>
+
+<div class="topo-subheader">
+  <div class="legend-bar" id="legend-chips">
+    <div class="legend-chip"><span class="dot" style="background:var(--green)"></span><span>سالم</span><strong id="cnt-healthy">0</strong></div>
+    <div class="legend-chip"><span class="dot" style="background:var(--amber)"></span><span>ناپایدار</span><strong id="cnt-degraded">0</strong></div>
+    <div class="legend-chip"><span class="dot" style="background:var(--red)"></span><span>فیلترشده</span><strong id="cnt-filtered">0</strong></div>
+    <div class="legend-chip"><span class="dot" style="background:var(--gray)"></span><span>قطع</span><strong id="cnt-down">0</strong></div>
+    <div class="legend-chip"><span class="dot" style="background:var(--blue)"></span><span>بی‌کار</span><strong id="cnt-idle">0</strong></div>
+  </div>
+  <div class="topo-hint">
+    <svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+    <span>برای جزئیات کلیک کنید · برای جابه‌جایی نودها را بکشید (موقعیت ذخیره می‌ماند)</span>
+  </div>
+</div>
+
+<div id="canvas-wrap">
+  <svg id="graph" role="img" aria-label="نقشه اتصال نودهای استخر"></svg>
+  
+  <div class="graph-hud" aria-label="کنترل نمای نقشه">
+    <button class="hud-btn" onclick="zoomGraph(1.2)" aria-label="بزرگ‌نمایی" title="بزرگ‌نمایی">+</button>
+    <span class="hud-zoom-readout" id="zoom-level">100%</span>
+    <button class="hud-btn" onclick="zoomGraph(1/1.2)" aria-label="کوچک‌نمایی" title="کوچک‌نمایی">−</button>
+    <button class="hud-btn text-btn" onclick="fitGraph()" title="تنظیم خودکار نما">نمای کامل</button>
+    <button class="hud-btn text-btn" onclick="resetNodeLayout()" title="بازنشانی موقعیت نودها">چیدمان اولیه</button>
+  </div>
+
+  <div id="detail">
+    <div class="detail-header">
+      <h3 id="d-title">جزئیات نود</h3>
+      <button class="detail-close-btn" onclick="hideDetail()" aria-label="بستن"><svg style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+    </div>
+    <div id="d-rows"></div>
+  </div>
+
+  <div id="empty" class="hidden">
+    <svg style="width:52px;height:52px;color:var(--dim)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg>
+    <div id="empty-msg">استخری یافت نشد — ابتدا از داشبورد یک استخر بسازید.</div>
+    <a href="/" class="header-btn primary">رفتن به داشبورد</a>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script>
+let authToken = localStorage.getItem("ld_bp_token") || "";
+document.documentElement.dataset.theme = localStorage.getItem("ld_bp_theme") || "dark";
+let poolsData = [];
+let privateLinks = {};
+let viewMode = "pools"; // "pools" | "links"
+let graphBounds = { w: 680, h: 400 };
+let mobileGraph = false;
+let view = { x: 0, y: 0, k: 1 };
+let nodePos = {};   // key -> {x, y} coordinates (persisted across polls!)
+let edgeSrc = {};   // edge key -> source node key (pools use "kharej"; links use "lkh:<ip>")
+let dragNode = null;
+let currentPoolName = "";
+let hasFitted = false;
+const NODE_W = 224, NODE_H = 80;
+const LINK_STATUS_COLOR = { HEALTHY: "var(--green)", DEGRADED: "var(--amber)", DOWN: "var(--red)", UNVERIFIED: "var(--gray)" };
+const LINK_STATUS_FA = { HEALTHY: "سالم", DEGRADED: "ناپایدار", DOWN: "قطع", UNVERIFIED: "تأیید نشده" };
+
+const STATUS_COLOR = {
+  HEALTHY: "var(--green)", CANARY: "var(--amber)", DEGRADED: "var(--amber)", FILTERED: "var(--red)",
+  DOWN: "var(--gray)", IDLE: "var(--blue)"
+};
+const STATUS_FA = {
+  HEALTHY: "سالم", CANARY: "آزمایشی", DEGRADED: "ناپایدار", FILTERED: "فیلترشده",
+  DOWN: "قطع", IDLE: "بی‌کار"
+};
+
+async function apiFetch(path) {
+  const res = await fetch(path, { headers: { "Authorization": "Bearer " + authToken } });
+  if (res.status === 401) { location.href = "/"; return null; }
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 2500);
+}
+
+function escHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+function escAttr(s) { return escHtml(s).replace(/'/g, "&#39;"); }
+
+function nodeStatusColor(node) {
+  return STATUS_COLOR[node.status] || STATUS_COLOR.IDLE;
+}
+function nodesCount(pool) { return (pool.nodes || []).length; }
+
+function switchPool() {
+  currentPoolName = "";
+  hasFitted = false;
+  nodePos = {};
+  render(true);
+}
+
+/* Pool picker bottom-sheet — replaces the native <select> dropdown. */
+function poolHealthColor(pool) {
+  const nodes = pool.nodes || [];
+  if (!nodes.length) return "var(--gray)";
+  const st = n => (n.status === "CANARY" ? "DEGRADED" : (n.status || "IDLE"));
+  if (nodes.some(n => ["FILTERED","DOWN"].includes(st(n)))) return "var(--red)";
+  if (nodes.some(n => st(n) === "DEGRADED")) return "var(--amber)";
+  if (nodes.every(n => st(n) === "HEALTHY")) return "var(--green)";
+  return "var(--blue)";
+}
+
+function renderPoolSelectDropdown() {
+  const sel = document.getElementById("pool-select");
+  const label = document.getElementById("pool-select-label");
+  const list = document.getElementById("pool-sheet-list");
+  if (!sel || !label || !list) return;
+  const cur = sel.selectedOptions[0];
+  label.textContent = cur?.textContent || "انتخاب استخر";
+  const dot = document.querySelector("#pool-select-trigger .pool-dot");
+  if (dot) {
+    const curPool = poolsData.find(p => p.name === sel.value);
+    dot.style.background = curPool ? poolHealthColor(curPool) : "var(--gray)";
+  }
+  if (!sel.options.length) {
+    list.innerHTML = `<div class="pool-sheet-empty">استخری یافت نشد</div>`;
+    return;
+  }
+  list.innerHTML = Array.from(sel.options).map(opt => {
+    const pool = poolsData.find(p => p.name === opt.value);
+    const n = pool ? nodesCount(pool) : 0;
+    const col = pool ? poolHealthColor(pool) : "var(--gray)";
+    const meta = n ? `${new Intl.NumberFormat('en-US').format(n)} نود` : "—";
+    return `<button type="button" class="pool-sheet-option" role="option" data-value="${escAttr(opt.value)}" aria-selected="${opt.selected}">
+      <span class="opt-dot" style="background:${col}"></span>
+      <span class="opt-name">${escHtml(opt.textContent)}</span>
+      <span class="opt-meta">${escHtml(meta)}</span>
+      <svg class="opt-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+    </button>`;
+  }).join("");
+}
+
+function openPoolSheet() {
+  const backdrop = document.getElementById("pool-sheet-backdrop");
+  const trigger = document.getElementById("pool-select-trigger");
+  if (!backdrop) return;
+  renderPoolSelectDropdown();
+  backdrop.classList.add("open");
+  backdrop.setAttribute("aria-hidden", "false");
+  trigger?.setAttribute("aria-expanded", "true");
+  // focus the currently-selected option
+  const sel = document.getElementById("pool-sheet-list")?.querySelector('[aria-selected="true"]')
+           || document.getElementById("pool-sheet-list")?.querySelector('.pool-sheet-option');
+  sel?.focus({ preventScroll: true });
+}
+
+function closePoolSheet(restoreFocus = true) {
+  const backdrop = document.getElementById("pool-sheet-backdrop");
+  const trigger = document.getElementById("pool-select-trigger");
+  if (!backdrop) return;
+  backdrop.classList.remove("open");
+  backdrop.setAttribute("aria-hidden", "true");
+  trigger?.setAttribute("aria-expanded", "false");
+  if (restoreFocus) trigger?.focus({ preventScroll: true });
+}
+
+document.getElementById("pool-select-trigger")?.addEventListener("click", () => {
+  const open = document.getElementById("pool-sheet-backdrop")?.classList.contains("open");
+  open ? closePoolSheet() : openPoolSheet();
+});
+
+document.getElementById("pool-sheet-list")?.addEventListener("click", (e) => {
+  const btn = e.target.closest(".pool-sheet-option");
+  if (!btn) return;
+  const sel = document.getElementById("pool-select");
+  if (sel && sel.value !== btn.dataset.value) {
+    sel.value = btn.dataset.value;
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  renderPoolSelectDropdown();
+  closePoolSheet();
+});
+
+document.getElementById("pool-sheet-backdrop")?.addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) closePoolSheet();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closePoolSheet();
+});
+
+function resetNodeLayout() {
+  nodePos = {};
+  render(true);
+  toast("چیدمان نودها بازنشانی شد");
+}
+
+async function load(manual) {
+  const btn = document.getElementById("refresh-btn");
+  if (btn) btn.disabled = true;
+  try {
+    const data = await apiFetch("/api/status");
+    if (!data) return;
+    poolsData = data.pools || [];
+    privateLinks = data.private_links || {};
+    const sel = document.getElementById("pool-select");
+    const cur = sel.value;
+    sel.innerHTML = poolsData.map(p =>
+      `<option value="${escAttr(p.name)}">${escHtml(p.name)}</option>`).join("");
+    if (poolsData.some(p => p.name === cur)) sel.value = cur;
+    renderPoolSelectDropdown();
+    
+    // Background polling passes forceFit = false to PRESERVE user panning/zooming/dragging!
+    render(false);
+    if (manual) toast("به‌روزرسانی شد");
+  } catch (e) {
+    if (manual) toast("خطا در دریافت اطلاعات");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function setViewMode(mode) {
+  if (viewMode === mode) return;
+  viewMode = mode;
+  hasFitted = false;
+  nodePos = {};
+  currentPoolName = "";
+  document.getElementById("view-pools-btn").classList.toggle("active", mode === "pools");
+  document.getElementById("view-links-btn").classList.toggle("active", mode === "links");
+  document.getElementById("view-pools-btn").setAttribute("aria-selected", String(mode === "pools"));
+  document.getElementById("view-links-btn").setAttribute("aria-selected", String(mode === "links"));
+  document.getElementById("pool-select-wrap").style.display = mode === "pools" ? "" : "none";
+  document.getElementById("empty-msg").textContent = mode === "pools"
+    ? "استخری یافت نشد — ابتدا از داشبورد یک استخر بسازید."
+    : "لینک خصوصی ثبت نشده است — از داشبورد ماتریس لینک بسازید.";
+  render(true);
+}
+
+function render(forceFit = false) {
+  if (viewMode === "links") return renderLinks(forceFit);
+  const svg = document.getElementById("graph");
+  const empty = document.getElementById("empty");
+  const sel = document.getElementById("pool-select");
+  const pool = poolsData.find(p => p.name === sel.value) || poolsData[0];
+  
+  if (!pool) {
+    if (empty) empty.classList.remove("hidden");
+    if (svg) svg.innerHTML = "";
+    return;
+  }
+  if (empty) empty.classList.add("hidden");
+
+  // If pool actually changed, reset positioning
+  const poolChanged = (currentPoolName !== pool.name);
+  if (poolChanged) {
+    currentPoolName = pool.name;
+    nodePos = {};
+    hasFitted = false;
+  }
+
+  // Update Status Counts
+  const counts = { HEALTHY: 0, DEGRADED: 0, FILTERED: 0, DOWN: 0, IDLE: 0 };
+  (pool.nodes || []).forEach(n => {
+    const st = n.status || "IDLE";
+    if (st === "CANARY") counts.DEGRADED++;
+    else if (counts[st] !== undefined) counts[st]++;
+    else counts.IDLE++;
+  });
+  const faNum = n => new Intl.NumberFormat('en-US').format(n);
+  document.getElementById("cnt-healthy").textContent = faNum(counts.HEALTHY);
+  document.getElementById("cnt-degraded").textContent = faNum(counts.DEGRADED);
+  document.getElementById("cnt-filtered").textContent = faNum(counts.FILTERED);
+  document.getElementById("cnt-down").textContent = faNum(counts.DOWN);
+  document.getElementById("cnt-idle").textContent = faNum(counts.IDLE);
+
+  svg.innerHTML = "";
+  edgeSrc = {};
+  if (panZoomController) panZoomController.abort();
+  dragNode = null;
+
+  mobileGraph = svg.clientWidth < 640;
+  const W = mobileGraph ? (svg.clientWidth || 390) : Math.max(svg.clientWidth || 1000, 720);
+  const H = svg.clientHeight || 600;
+  const NS = "http://www.w3.org/2000/svg";
+
+  // SVG Defs: Grid Pattern & Filters
+  const defs = document.createElementNS(NS, "defs");
+  defs.innerHTML = `
+    <pattern id="dot-grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.1" fill="var(--border)" opacity="0.55"/>
+    </pattern>
+  `;
+  svg.appendChild(defs);
+
+  // Background Grid Matrix
+  const bgRect = document.createElementNS(NS, "rect");
+  bgRect.setAttribute("width", "100%");
+  bgRect.setAttribute("height", "100%");
+  bgRect.setAttribute("fill", "url(#dot-grid)");
+  bgRect.style.pointerEvents = "none";
+  svg.appendChild(bgRect);
+
+  const g = document.createElementNS(NS, "g");
+  g.setAttribute("class", "canvas-content");
+  svg.appendChild(g);
+
+  // Header info badge inside canvas
+  const title = document.createElementNS(NS, "text");
+  title.setAttribute("x", W - 24); title.setAttribute("y", 36);
+  title.setAttribute("direction", "ltr"); title.setAttribute("text-anchor", "end"); title.setAttribute("class", "pool-title");
+  title.textContent = "استخر: " + pool.name;
+  g.appendChild(title);
+  
+  const sub = document.createElementNS(NS, "text");
+  sub.setAttribute("x", W - 24); sub.setAttribute("y", 58);
+  sub.setAttribute("direction", "ltr"); sub.setAttribute("text-anchor", "end"); sub.setAttribute("class", "pool-sub");
+  sub.textContent = `${pool.transport || "tcp"} · ${faNum(nodesCount(pool))} نود فعال`;
+  g.appendChild(sub);
+
+  const nodes = pool.nodes || [];
+  const khX = mobileGraph ? W / 2 : 160;
+  const iranX = mobileGraph ? W / 2 : Math.max(W - 200, 440);
+  const topY = 110;
+  const gap = Math.max(120, Math.min(160, (H - topY - 70) / Math.max(nodes.length, 1)));
+  const khY = mobileGraph ? topY : topY + (Math.max(nodes.length - 1, 0) * gap) / 2;
+
+  // Preserve existing node positions if user dragged them!
+  if (!nodePos["kharej"]) {
+    nodePos["kharej"] = { x: khX, y: khY };
+  }
+
+  // Kharej hub node
+  drawNode(g, NS, "kharej", {
+    title: "سرور خارج (مقصد)", ip: pool.kharej_ip || "—",
+    sub: `${pool.transport || "tcp"} · هاب مرکزی`, color: "var(--accent)"
+  }, { type: "kharej", ip: pool.kharej_ip, pool: pool.name });
+
+  // Iran nodes & edges
+  nodes.forEach((n, i) => {
+    const defaultY = topY + (mobileGraph ? 150 : 0) + i * gap;
+    const key = "iran:" + (n.ip || i);
+    if (!nodePos[key]) {
+      nodePos[key] = { x: iranX, y: defaultY };
+    }
+    const color = nodeStatusColor(n);
+    const isActive = (n.status === "HEALTHY" || n.status === "CANARY");
+
+    // Edge
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("id", "edge-" + cssId(key));
+    path.setAttribute("class", `edge ${isActive ? "flow-active" : ""}`);
+    path.setAttribute("stroke", color);
+    path.setAttribute("opacity", n.status === "DOWN" ? "0.3" : "0.85");
+    if (n.status === "FILTERED" || n.status === "DOWN") {
+      path.setAttribute("stroke-dasharray", "6 5");
+    }
+    g.appendChild(path);
+    edgeSrc[key] = "kharej";
+
+    // Edge label group
+    const lblGrp = document.createElementNS(NS, "g");
+    lblGrp.setAttribute("id", "elbl-grp-" + cssId(key));
+    const lblBg = document.createElementNS(NS, "rect");
+    lblBg.setAttribute("class", "edge-pill-rect");
+    lblBg.setAttribute("width", "56");
+    lblBg.setAttribute("height", "20");
+    const lbl = document.createElementNS(NS, "text");
+    lbl.setAttribute("class", "edge-label");
+    lbl.setAttribute("text-anchor", "middle");
+    lbl.textContent = (n.transport || pool.transport || "tcp").toUpperCase();
+    lblGrp.appendChild(lblBg);
+    lblGrp.appendChild(lbl);
+    g.appendChild(lblGrp);
+
+    drawNode(g, NS, key, {
+      title: (n.name || n.ip), ip: n.ip,
+      sub: `پورت ${n.tunnel_port || "—"}`,
+      color: color, status: n.status
+    }, { type: "iran", node: n, pool: pool.name });
+
+    updateEdge(key);
+    updateEdgeLabel(key);
+  });
+
+  graphBounds = {
+    w: W,
+    h: Math.max(260, topY + (mobileGraph ? 150 : 0) + Math.max(nodes.length - 1, 0) * gap + 80)
+  };
+
+  // Only fit the viewport on initial load or explicit user action, NOT on background poll!
+  if (!hasFitted || forceFit) {
+    fitGraph();
+    hasFitted = true;
+  } else {
+    applyView(g);
+  }
+
+  enablePanZoom(svg, g);
+}
+
+function linkTelemetry(link) {
+  const status = link?.telemetry?.status || "UNVERIFIED";
+  return {
+    color: LINK_STATUS_COLOR[status] || LINK_STATUS_COLOR.UNVERIFIED,
+    label: LINK_STATUS_FA[status] || "تأیید نشده",
+    raw: status
+  };
+}
+
+function renderLinks(forceFit = false) {
+  const svg = document.getElementById("graph");
+  const empty = document.getElementById("empty");
+  const links = Object.values(privateLinks || {});
+  if (!links.length) {
+    if (empty) empty.classList.remove("hidden");
+    if (svg) svg.innerHTML = "";
+    return;
+  }
+  if (empty) empty.classList.add("hidden");
+
+  svg.innerHTML = "";
+  edgeSrc = {};
+  if (panZoomController) panZoomController.abort();
+  dragNode = null;
+  mobileGraph = svg.clientWidth < 640;
+  const W = mobileGraph ? (svg.clientWidth || 390) : Math.max(svg.clientWidth || 1000, 720);
+  const H = svg.clientHeight || 600;
+  const NS = "http://www.w3.org/2000/svg";
+
+  const defs = document.createElementNS(NS, "defs");
+  defs.innerHTML = `<pattern id="dot-grid" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" fill="var(--border)" opacity="0.55"/></pattern>`;
+  svg.appendChild(defs);
+  const bgRect = document.createElementNS(NS, "rect");
+  bgRect.setAttribute("width", "100%"); bgRect.setAttribute("height", "100%");
+  bgRect.setAttribute("fill", "url(#dot-grid)"); bgRect.style.pointerEvents = "none";
+  svg.appendChild(bgRect);
+  const g = document.createElementNS(NS, "g");
+  g.setAttribute("class", "canvas-content");
+  svg.appendChild(g);
+
+  const title = document.createElementNS(NS, "text");
+  title.setAttribute("x", W - 24); title.setAttribute("y", 36);
+  title.setAttribute("direction", "ltr"); title.setAttribute("text-anchor", "end"); title.setAttribute("class", "pool-title");
+  title.textContent = "لینک‌های خصوصی";
+  g.appendChild(title);
+  const sub = document.createElementNS(NS, "text");
+  sub.setAttribute("x", W - 24); sub.setAttribute("y", 58);
+  sub.setAttribute("direction", "ltr"); sub.setAttribute("text-anchor", "end"); sub.setAttribute("class", "pool-sub");
+  sub.textContent = `${new Intl.NumberFormat('en-US').format(links.length)} لینک · نمای چند‌به‌چند`;
+  g.appendChild(sub);
+
+  // Group links by kharej IP so shared destinations cluster.
+  const byKharej = new Map();
+  links.forEach(link => {
+    const k = link.kharej_server?.ip || "—";
+    if (!byKharej.has(k)) byKharej.set(k, []);
+    byKharej.get(k).push(link);
+  });
+  const kharejIps = [...byKharej.keys()];
+  const khColGap = Math.max(200, W / Math.max(kharejIps.length, 1));
+  const topY = 110;
+  const rowGap = 130;
+
+  kharejIps.forEach((khIp, khIdx) => {
+    const khX = mobileGraph ? W / 2 : 120 + khIdx * khColGap;
+    const group = byKharej.get(khIp);
+    const khY = mobileGraph ? topY : topY + (group.length - 1) * rowGap / 2;
+    const khKey = `lkh:${khIp}`;
+    if (!nodePos[khKey]) nodePos[khKey] = { x: khX, y: khY };
+    drawNode(g, NS, khKey, {
+      title: "سرور خارج", ip: khIp,
+      sub: `${group.length} لینک`, color: "var(--accent)"
+    }, { type: "kharej", ip: khIp, pool: "لینک‌های خصوصی" });
+
+    group.forEach((link, i) => {
+      const irIp = link.iran_server?.ip || "—";
+      const irKey = `lir:${link.link_name}`;
+      const irX = mobileGraph ? W / 2 : Math.max(W - 200, khX + 280);
+      const irY = mobileGraph ? topY + 150 + i * rowGap : topY + i * rowGap;
+      if (!nodePos[irKey]) nodePos[irKey] = { x: irX, y: irY };
+      const telem = linkTelemetry(link);
+      const isActive = link.status === "active" && telem.raw === "HEALTHY";
+
+      const path = document.createElementNS(NS, "path");
+      path.setAttribute("id", `edge-${cssId(irKey)}`);
+      path.setAttribute("class", `edge ${isActive ? "flow-active" : ""}`);
+      path.setAttribute("stroke", telem.color);
+      path.setAttribute("opacity", link.status === "active" ? "0.9" : "0.45");
+      if (!isActive) path.setAttribute("stroke-dasharray", "6 5");
+      g.appendChild(path);
+      edgeSrc[irKey] = khKey;
+
+      // Edge label: engine · MTU · status
+      const lblGrp = document.createElementNS(NS, "g");
+      lblGrp.setAttribute("id", `elbl-grp-${cssId(irKey)}`);
+      const lblBg = document.createElementNS(NS, "rect");
+      lblBg.setAttribute("class", "edge-pill-rect");
+      lblBg.setAttribute("width", "170"); lblBg.setAttribute("height", "34"); lblBg.setAttribute("rx", "8");
+      const lbl = document.createElementNS(NS, "text");
+      lbl.setAttribute("class", "edge-label");
+      lbl.setAttribute("text-anchor", "middle");
+      lbl.textContent = `${(link.engine_id || "?").toUpperCase()} · MTU ${link.mtu || "—"} · ${telem.label}`;
+      lblGrp.appendChild(lblBg); lblGrp.appendChild(lbl);
+      g.appendChild(lblGrp);
+
+      drawNode(g, NS, irKey, {
+        title: link.link_name || irIp,
+        ip: irIp,
+        sub: link.private_subnet || "",
+        color: telem.color,
+        status: telem.raw
+      }, { type: "link", link });
+      updateEdge(irKey, khKey); updateEdgeLabel(irKey, khKey);
+    });
+  });
+
+  graphBounds = {
+    w: W,
+    h: Math.max(260, topY + Math.max(...[...byKharej.values()].map(g2 => g2.length)) * rowGap + 80)
+  };
+  if (!hasFitted || forceFit) { fitGraph(); hasFitted = true; } else applyView(g);
+  enablePanZoom(svg, g);
+}
+
+function toggleGraphTheme() {
+  const theme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem("ld_bp_theme", theme);
+}
+
+function fitGraph() {
+  const svg = document.getElementById("graph");
+  const g = svg.querySelector("g.canvas-content");
+  if (!g) return;
+  view.k = Math.min(1, (svg.clientWidth - 40) / graphBounds.w, (svg.clientHeight - 80) / graphBounds.h);
+  view.k = Math.max(0.15, view.k);
+  view.x = (svg.clientWidth - graphBounds.w * view.k) / 2;
+  view.y = Math.max(16, (svg.clientHeight - 60 - graphBounds.h * view.k) / 2);
+  applyView(g);
+}
+
+function zoomGraph(factor) {
+  const svg = document.getElementById("graph");
+  const g = svg.querySelector("g.canvas-content");
+  if (!g) return;
+  const next = Math.min(3, Math.max(0.15, view.k * factor));
+  const ratio = next / view.k;
+  view.x = svg.clientWidth / 2 - (svg.clientWidth / 2 - view.x) * ratio;
+  view.y = svg.clientHeight / 2 - (svg.clientHeight / 2 - view.y) * ratio;
+  view.k = next;
+  applyView(g);
+}
+
+function cssId(key) {
+  return String(key).replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+function updateEdge(key, srcKey) {
+  const svg = document.getElementById("graph");
+  const path = svg.querySelector("#edge-" + cssId(key));
+  if (!path) return;
+  const a = nodePos[srcKey || "kharej"], b = nodePos[key];
+  if (!a || !b) return;
+  if (mobileGraph) {
+    const y1 = a.y + NODE_H / 2, y2 = b.y - NODE_H / 2;
+    path.setAttribute("d", `M ${a.x} ${y1} C ${a.x - 120} ${y1 + 40}, ${b.x - 120} ${y2 - 40}, ${b.x} ${y2}`);
+    return;
+  }
+  const x1 = a.x + NODE_W / 2, y1 = a.y;
+  const x2 = b.x - NODE_W / 2, y2 = b.y;
+  const mx = (x1 + x2) / 2;
+  path.setAttribute("d", `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`);
+}
+
+function updateEdgeLabel(key, srcKey) {
+  const svg = document.getElementById("graph");
+  const grp = svg.querySelector("#elbl-grp-" + cssId(key));
+  if (!grp) return;
+  const a = nodePos[srcKey || "kharej"], b = nodePos[key];
+  if (!a || !b) return;
+  let mx, my;
+  if (mobileGraph) {
+    mx = a.x - 90;
+    my = (a.y + b.y) / 2;
+  } else {
+    mx = (a.x + b.x) / 2;
+    my = (a.y + b.y) / 2;
+  }
+  const bg = grp.querySelector("rect");
+  const txt = grp.querySelector("text");
+  // Center the pill background on its own declared width (56 for pool edges,
+  // 170 for private-link edges) instead of hardcoding half of 56.
+  const bw = parseFloat(bg.getAttribute("width")) || 56;
+  const bh = parseFloat(bg.getAttribute("height")) || 20;
+  bg.setAttribute("x", mx - bw / 2);
+  bg.setAttribute("y", my - bh / 2);
+  txt.setAttribute("x", mx);
+  txt.setAttribute("y", my + 4);
+}
+
+function drawNode(g, NS, key, info, detail) {
+  const p = nodePos[key];
+  const grp = document.createElementNS(NS, "g");
+  grp.setAttribute("class", "node");
+  grp.setAttribute("transform", `translate(${p.x},${p.y})`);
+  grp.setAttribute("data-key", key);
+  const w = NODE_W, h = NODE_H;
+
+  // Node Card Body
+  const r = document.createElementNS(NS, "rect");
+  r.setAttribute("x", -w / 2); r.setAttribute("y", -h / 2);
+  r.setAttribute("width", w); r.setAttribute("height", h);
+  r.setAttribute("rx", 16); r.setAttribute("class", "body");
+  r.setAttribute("stroke", info.color);
+  grp.appendChild(r);
+
+  // Status Indicator Dot
+  const dot = document.createElementNS(NS, "circle");
+  dot.setAttribute("cx", w / 2 - 18); dot.setAttribute("cy", -h / 2 + 18);
+  dot.setAttribute("r", 5.5); dot.setAttribute("fill", info.color);
+  grp.appendChild(dot);
+
+  // Icon (Server or Cloud)
+  const icon = document.createElementNS(NS, "path");
+  icon.setAttribute("stroke", info.color);
+  icon.setAttribute("stroke-width", "1.6");
+  icon.setAttribute("fill", "none");
+  if (info.title.includes("خارج")) {
+    icon.setAttribute("d", "M-88 -26 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0 M-88 -26 h14 M-81 -33 v14");
+  } else {
+    icon.setAttribute("d", "M-92 -30 h18 v7 h-18 z M-92 -20 h18 v7 h-18 z");
+  }
+  grp.appendChild(icon);
+
+  // Node Name / Title
+  const t1 = document.createElementNS(NS, "text");
+  t1.setAttribute("x", -4); t1.setAttribute("y", -14);
+  t1.setAttribute("text-anchor", "middle"); t1.setAttribute("font-size", "13");
+  t1.setAttribute("font-weight", "700");
+  t1.textContent = info.title.length > 24 ? info.title.slice(0, 23) + "…" : info.title;
+  grp.appendChild(t1);
+
+  // Node IP Chip Background & Text
+  const ipBg = document.createElementNS(NS, "rect");
+  ipBg.setAttribute("x", -65); ipBg.setAttribute("y", 1);
+  ipBg.setAttribute("width", "130"); ipBg.setAttribute("height", "19");
+  ipBg.setAttribute("rx", "5");
+  ipBg.setAttribute("fill", "var(--bg-input)");
+  ipBg.setAttribute("stroke", "var(--border)");
+  ipBg.setAttribute("stroke-width", "0.7");
+  grp.appendChild(ipBg);
+
+  const t2 = document.createElementNS(NS, "text");
+  t2.setAttribute("x", 0); t2.setAttribute("y", 15);
+  t2.setAttribute("text-anchor", "middle"); t2.setAttribute("font-size", "11.5");
+  t2.setAttribute("class", "ip"); t2.setAttribute("direction", "ltr");
+  t2.textContent = info.ip;
+  grp.appendChild(t2);
+
+  // Subtitle (Status & Tunnel Port)
+  const t3 = document.createElementNS(NS, "text");
+  t3.setAttribute("x", 0); t3.setAttribute("y", 32);
+  t3.setAttribute("text-anchor", "middle");
+  t3.setAttribute("class", "sub-text");
+  t3.textContent = info.status
+    ? `${STATUS_FA[info.status] || info.status} · ${info.sub}`
+    : info.sub;
+  grp.appendChild(t3);
+
+  // Pointer drag & click events
+  let moved = false, sx = 0, sy = 0;
+  grp.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    moved = false;
+    sx = e.clientX; sy = e.clientY;
+    dragNode = { key: key, grp: grp };
+    grp.setPointerCapture(e.pointerId);
+  });
+  grp.addEventListener("pointermove", (e) => {
+    if (!dragNode || dragNode.key !== key) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+    if (!moved) return;
+    const k = view.k || 1;
+    nodePos[key].x += dx / k;
+    nodePos[key].y += dy / k;
+    sx = e.clientX; sy = e.clientY;
+    grp.setAttribute("transform", `translate(${nodePos[key].x},${nodePos[key].y})`);
+    // Redraw every edge touching this node — both edges where it is the source
+    // and edges where it is the destination.
+    Object.keys(edgeSrc).forEach(edgeKey => {
+      if (edgeSrc[edgeKey] === key || edgeKey === key) {
+        updateEdge(edgeKey, edgeSrc[edgeKey]);
+        updateEdgeLabel(edgeKey, edgeSrc[edgeKey]);
+      }
+    });
+  });
+  const endDrag = () => {
+    if (dragNode && dragNode.key === key && !moved) showDetail(detail);
+    if (dragNode && dragNode.key === key) dragNode = null;
+  };
+  grp.addEventListener("pointerup", endDrag);
+  grp.addEventListener("pointercancel", () => { dragNode = null; });
+  g.appendChild(grp);
+}
+
+function showDetail(d) {
+  const box = document.getElementById("detail");
+  const title = document.getElementById("d-title");
+  const rows = document.getElementById("d-rows");
+  if (d.type === "kharej") {
+    title.textContent = "سرور خارج (مقصد)";
+    rows.innerHTML = `
+      <div class="row"><span class="k">آی‌پی سرور</span><span class="val-mono">${escHtml(d.ip || "—")}</span></div>
+      <div class="row"><span class="k">استخر</span><span>${escHtml(d.pool)}</span></div>
+      <div class="row"><span class="k">نقش</span><span>مقصد تمام تونل‌ها</span></div>`;
+  } else if (d.type === "link") {
+    const link = d.link || {};
+    const telem = linkTelemetry(link);
+    title.textContent = link.link_name || "لینک";
+    rows.innerHTML = `
+      <div class="row"><span class="k">وضعیت لینک</span><span>${escHtml(link.status || "—")}</span></div>
+      <div class="row"><span class="k">سلامت تله‌متری</span><span class="status-badge st-${escAttr(telem.raw)}">${escHtml(telem.label)}</span></div>
+      <div class="row"><span class="k">موتور</span><span class="val-mono">${escHtml(link.engine_id || "—")}</span></div>
+      <div class="row"><span class="k">ایران</span><span class="val-mono">${escHtml(link.iran_server?.ip || "—")}</span></div>
+      <div class="row"><span class="k">خارج</span><span class="val-mono">${escHtml(link.kharej_server?.ip || "—")}</span></div>
+      <div class="row"><span class="k">شبکه خصوصی</span><span class="val-mono">${escHtml(link.private_subnet || "—")}</span></div>
+      <div class="row"><span class="k">MTU</span><span class="val-mono">${escHtml(String(link.mtu || "—"))}</span></div>
+      ${link.error ? `<div class="row"><span class="k">خطا</span><span>${escHtml(link.error)}</span></div>` : ""}`;
+  } else {
+    const n = d.node;
+    title.textContent = (n.name || n.ip);
+    const pd = n.port_details || {};
+    const pdHtml = Object.keys(pd).length
+      ? Object.entries(pd).map(([p, v]) =>
+          `<div class="row"><span class="k">پورت ${escHtml(p)}</span><span class="val-mono">${escHtml(String(v.status || v))}</span></div>`).join("")
+      : "";
+    rows.innerHTML = `
+      <div class="row"><span class="k">وضعیت پایش</span><span class="status-badge st-${escAttr(n.status || "IDLE")}">${escHtml(STATUS_FA[n.status] || n.status || "—")}</span></div>
+      <div class="row"><span class="k">آی‌پی نود</span><span class="val-mono">${escHtml(n.ip)}</span></div>
+      <div class="row"><span class="k">پورت تونل</span><span class="val-mono">${escHtml(n.tunnel_port || "—")}</span></div>
+      <div class="row"><span class="k">دلیل بررسی</span><span>${escHtml(n.reason || "—")}</span></div>
+      <div class="row"><span class="k">شروع وضعیت</span><span class="val-mono">${escHtml(n.status_since || "—")}</span></div>
+      ${pdHtml}`;
+  }
+  box.classList.add("show");
+}
+
+function hideDetail() {
+  document.getElementById("detail").classList.remove("show");
+}
+
+function applyView(g) {
+  g.setAttribute("transform", `translate(${view.x},${view.y}) scale(${view.k})`);
+  const zoomLbl = document.getElementById("zoom-level");
+  if (zoomLbl) zoomLbl.textContent = Math.round(view.k * 100) + "%";
+}
+
+let panZoomController;
+function enablePanZoom(svg, g) {
+  if (panZoomController) panZoomController.abort();
+  panZoomController = new AbortController();
+  const options = { signal: panZoomController.signal };
+  svg.style.touchAction = "none";
+  let pan = null;
+  svg.addEventListener("pointerdown", (e) => {
+    if (dragNode) return;
+    pan = { x: e.clientX - view.x, y: e.clientY - view.y };
+    svg.setPointerCapture(e.pointerId);
+  }, options);
+  svg.addEventListener("pointermove", (e) => {
+    if (!pan || dragNode) return;
+    view.x = e.clientX - pan.x; view.y = e.clientY - pan.y;
+    applyView(g);
+  }, options);
+  const endPan = () => pan = null;
+  svg.addEventListener("pointerup", endPan, options);
+  svg.addEventListener("pointercancel", endPan, options);
+  svg.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const f = e.deltaY < 0 ? 1.1 : 0.9;
+    view.k = Math.min(3, Math.max(0.15, view.k * f));
+    applyView(g);
+  }, { ...options, passive: false });
+}
+
+window.addEventListener("resize", () => render(false));
+if (typeof document.addEventListener === "function") {
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") hideDetail();
+  });
+}
+load(false);
+setInterval(() => load(false), 30000);
+
+</script>
+</body>
+</html>

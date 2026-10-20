@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Quick launcher for VX-LB
+set -euo pipefail
+
+TARGET_SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$TARGET_SCRIPT")" && pwd)"
+cd "$SCRIPT_DIR"
+
+if [ -x "$SCRIPT_DIR/.venv/bin/python" ]; then
+    PYTHON="$SCRIPT_DIR/.venv/bin/python"
+else
+    PYTHON="python3"
+fi
+
+exec "$PYTHON" "$SCRIPT_DIR/main.py" "$@"
