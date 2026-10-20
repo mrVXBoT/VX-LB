@@ -1218,9 +1218,10 @@ def manage_web_menu():
         console.print("  [3] 🔄 Restart Mobile Dashboard")
         console.print("  [4] ⚙️  Change Dashboard Port (default: 8088)")
         console.print("  [5] 🔐 Set / Reset Dashboard Password")
+        console.print("  [6] 🧯 Open dashboard port in firewall")
         console.print("  [0] 🔙 Back to Main Menu\n")
 
-        choice = Prompt.ask("Select an option", choices=["1", "2", "3", "4", "5", "0"], default="1" if not is_running else "0")
+        choice = Prompt.ask("Select an option", choices=["1", "2", "3", "4", "5", "6", "0"], default="1" if not is_running else "0")
 
         if choice == "1":
             if is_running:
@@ -1279,6 +1280,14 @@ def manage_web_menu():
                 console.print("[bold green]Success: Web Dashboard password updated successfully.[/bold green]")
             else:
                 console.print("[red]Password too short (minimum 8 characters).[/red]")
+            Prompt.ask("\nPress Enter to continue")
+        elif choice == "6":
+            from core.web_server import open_web_port
+            ok, msg = open_web_port(w_port)
+            if ok:
+                console.print(f"[bold green]Success:[/bold green] {msg}")
+            else:
+                console.print(f"[bold red]Error:[/bold red] {msg}")
             Prompt.ask("\nPress Enter to continue")
         elif choice == "0":
             break

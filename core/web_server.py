@@ -1618,6 +1618,31 @@ def get_web_port() -> int:
             pass
     return 8088
 
+def open_web_port(port: int) -> tuple[bool, str]:
+    """Try to open the dashboard TCP port in common firewall frontends."""
+    if port <= 0 or port > 65535:
+        return False, "invalid port"
+    import shutil
+    import subprocess
+    if shutil.which("ufw"):
+        result = subprocess.run(["ufw", "allow", f"{port}/tcp"], capture_output=True, text=True, timeout=15)
+        if result.returncode == 0:
+            return True, "ufw rule added"
+        return False, (result.stderr or result.stdout or "ufw failed").strip()
+    if shutil.which("nft"):
+        result = subprocess.run(["nft", "add", "rule", "inet", "filter", "input", "tcp", "dport", str(port), "accept"], capture_output=True, text=True, timeout=15)
+        if result.returncode == 0:
+            return True, "nftables rule added"
+    if shutil.which("iptables"):
+        check = subprocess.run(["iptables", "-C", "INPUT", "-p", "tcp", "--dport", str(port), "-j", "ACCEPT"], capture_output=True, text=True, timeout=15)
+        if check.returncode == 0:
+            return True, "iptables rule already present"
+        result = subprocess.run(["iptables", "-I", "INPUT", "-p", "tcp", "--dport", str(port), "-j", "ACCEPT"], capture_output=True, text=True, timeout=15)
+        if result.returncode == 0:
+            return True, "iptables rule added"
+        return False, (result.stderr or result.stdout or "iptables failed").strip()
+    return False, "no supported firewall tool found"
+
 def start_background_web(port: int = 8088) -> bool:
     if is_web_running():
         return True
