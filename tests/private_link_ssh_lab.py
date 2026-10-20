@@ -43,7 +43,7 @@ class Peer:
     def write_file(self,path,content):
         if self.fail_upload:
             return False
-        temporary='/tmp/ldbp-private-upload-'+secrets.token_hex(12)
+        temporary='/tmp/vxlb-private-upload-'+secrets.token_hex(12)
         try:
             with self.raw.open_sftp() as sftp:
                 with sftp.file(temporary,'w') as destination:destination.write(content)
@@ -66,10 +66,10 @@ def checked(peer,command):
 def run():
     direct={role:Peer(index) for index,role in enumerate(('iran','kharej'))}
     suffix=secrets.token_hex(6)
-    unrelated='ldbp-ssh-lab-unrelated-'+suffix
+    unrelated='vxlb-ssh-lab-unrelated-'+suffix
     for peer in direct.values():
-        assert checked(peer,'test -f /var/lib/ldbp-lab-ready && echo READY')=='READY'
-    with tempfile.TemporaryDirectory(prefix='ldbp-standalone-inventory-') as temporary:
+        assert checked(peer,'test -f /var/lib/vxlb-lab-ready && echo READY')=='READY'
+    with tempfile.TemporaryDirectory(prefix='vxlb-standalone-inventory-') as temporary:
         folder=Path(temporary)
         inventory=folder/'inventory.json'
         inventory.write_text(json.dumps({'schema_version':3,'pools':{},'custom_links':{},'resource_reservations':{},
@@ -201,7 +201,7 @@ def run():
                     code,_,_ = peer.execute('test -f /etc/iptables/rules.v4 && iptables-restore < /etc/iptables/rules.v4 || true')
                     rules=checked(peer,'iptables -w 5 -S INPUT')
                     assert unrelated in rules, 'Unrelated iptables rule was removed by private-link lifecycle'
-                    assert 'ldbp-pl:link-' not in rules, 'Owned private-link firewall rules leaked after deletion'
+                    assert 'vxlb-pl:link-' not in rules, 'Owned private-link firewall rules leaked after deletion'
                 print('PASS: real deletion removed interfaces/configs/owned rules, released reservations and preserved unrelated firewall rules',flush=True)
             finally:
                 fail_second=False

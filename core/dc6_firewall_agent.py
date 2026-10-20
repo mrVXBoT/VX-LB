@@ -18,7 +18,7 @@ def identity(config):
     iface = config['interface']
     if not re.fullmatch(r'dc6-[0-9a-f]{10}', iface):
         raise ValueError('Invalid owned DC6 interface')
-    return iface, 'ldbp-dc6:' + iface
+    return iface, 'vxlb-dc6:' + iface
 
 
 def rules(config):

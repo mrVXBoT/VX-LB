@@ -1,5 +1,5 @@
 """
-Centralized input validation for LD-BP (security hardening).
+Centralized input validation for VX-LB (security hardening).
 
 Every operator-supplied identifier that can reach a shell command, a file
 path, or a config file MUST pass through these validators. Validating at a

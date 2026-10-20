@@ -1,4 +1,4 @@
-"""Unified Layer and Composition Data Model for LD-BP.
+"""Unified Layer and Composition Data Model for VX-LB.
 
 Explicitly separate:
 1. Transport Layer (L2/L3/L4/L7 overlay/carrier network)
@@ -17,7 +17,7 @@ from dataclasses import dataclass, asdict
 from typing import Optional, List, Dict, Any, Tuple, Union
 import logging
 
-logger = logging.getLogger("ldbp.composition")
+logger = logging.getLogger("vxlb.composition")
 
 VALID_TRANSPORT_TYPES = {
     "tcp", "udp", "gre", "vxlan", "geneve", "wireguard", "ip6ip6", "gre6", "dns", "raw_tcp", "tun", "dc6", "http", "https",

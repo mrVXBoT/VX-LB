@@ -1,4 +1,4 @@
-"""Dedicated tools and utilities for IPv6-based kernel tunnels (GRE6 and IP6IP6) in LD-BP.
+"""Dedicated tools and utilities for IPv6-based kernel tunnels (GRE6 and IP6IP6) in VX-LB.
 
 Covers:
 - IP6IP6 (IPv6-in-IPv6 RFC 2473 encapsulation)
@@ -324,7 +324,7 @@ def render_scoped_service(
     exec_start_lines = "\n".join(f"ExecStart={cmd}" for cmd in start_cmds)
 
     return f"""[Unit]
-Description=LD-BP IPv6 Kernel Tunnel ({interface})
+Description=VX-LB IPv6 Kernel Tunnel ({interface})
 After=network-online.target
 Wants=network-online.target
 
@@ -361,9 +361,9 @@ deadline = time.monotonic() + 15
 while time.monotonic() < deadline:
     try:
         data, addr = sock.recvfrom(2048)
-        if data.startswith(b"LD-BP-IPV6-PROBE:"):
+        if data.startswith(b"VX-LB-IPV6-PROBE:"):
             nonce = data.split(b":", 1)[1]
-            sock.sendto(b"LD-BP-IPV6-ACK:" + nonce, addr)
+            sock.sendto(b"VX-LB-IPV6-ACK:" + nonce, addr)
             break
     except (TimeoutError, OSError):
         pass
@@ -379,8 +379,8 @@ af = socket.AF_INET6 if is_v6 else socket.AF_INET
 
 sock = socket.socket(af, socket.SOCK_DGRAM)
 sock.settimeout(2.5)
-payload = b"LD-BP-IPV6-PROBE:" + nonce
-expected = b"LD-BP-IPV6-ACK:" + nonce
+payload = b"VX-LB-IPV6-PROBE:" + nonce
+expected = b"VX-LB-IPV6-ACK:" + nonce
 
 success = False
 lat_ms = None
@@ -538,10 +538,10 @@ async def main():
 if __name__ == '__main__':
     asyncio.run(main())
 '''
-    relay_script_path = f"/etc/ldbp/{interface}-relay.py"
+    relay_script_path = f"/etc/vxlb/{interface}-relay.py"
     parent_service = service_name.removesuffix("-relay.service") + ".service"
     unit_content = f"""[Unit]
-Description=LD-BP IPv6 Tunnel Port Forwarding Relay ({interface})
+Description=VX-LB IPv6 Tunnel Port Forwarding Relay ({interface})
 After=network-online.target {parent_service}
 Wants=network-online.target
 Requires={parent_service}

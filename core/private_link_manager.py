@@ -1,4 +1,4 @@
-"""Private Link, Multi-Destination Topology, and Routing Manager for LD-BP.
+"""Private Link, Multi-Destination Topology, and Routing Manager for VX-LB.
 
 Covers Sections 3 & 4 items:
 - Port forwarding or engine chaining on any private link IP

@@ -1,4 +1,4 @@
-"""Standalone stdlib helper installed on GRE endpoints by LD-BP.
+"""Standalone stdlib helper installed on GRE endpoints by VX-LB.
 
 All network mutations are restricted to a validated per-link interface and
 comment-tagged INPUT/OUTPUT rules. No default route, NAT or forwarding sysctl changes.
@@ -14,12 +14,12 @@ import sys
 import time
 
 # Official VICI client is shipped separately; no global pip installation.
-sys.path.insert(0, "/usr/local/libexec/ldbp-gre-vici")
+sys.path.insert(0, "/usr/local/libexec/vxlb-gre-vici")
 
 
 def validate(config):
     c = dict(config)
-    if c.get('owner') != 'ldbp-gre-v1' or not re.fullmatch(r'ldg[0-9a-f]{10}', c.get('interface', '')):
+    if c.get('owner') != 'vxlb-gre-v1' or not re.fullmatch(r'ldg[0-9a-f]{10}', c.get('interface', '')):
         raise ValueError('Invalid GRE ownership/interface')
     for field in ('local', 'remote', 'private', 'peer'):
         addr = ipaddress.IPv4Address(c[field])
@@ -84,9 +84,9 @@ def ipsec(c, action):
     import vici
     sec = secure_config(c)
     sock = socket.socket(socket.AF_UNIX); sock.settimeout(40)
-    sock.connect(os.environ.get('LD_BP_VICI_SOCKET', '/var/run/charon.vici'))
+    sock.connect(os.environ.get('VX_LB_VICI_SOCKET', '/var/run/charon.vici'))
     session = vici.Session(sock)
-    name = 'ldbp-' + c['interface']
+    name = 'vxlb-' + c['interface']
     if action == 'load':
         session.load_shared({'id': name, 'type': 'IKE', 'data': bytes.fromhex(sec['psk']),
                              'owners': [c['local'], c['remote']]})
@@ -123,7 +123,7 @@ def ipsec(c, action):
 
 def security_rules(c):
     sec = secure_config(c)
-    tag = ['-m', 'comment', '--comment', 'ldbp-sec-' + c['interface']]
+    tag = ['-m', 'comment', '--comment', 'vxlb-sec-' + c['interface']]
     for chain, direction, source, destination in (
         ('INPUT', 'in', c['remote'], c['local']),
         ('OUTPUT', 'out', c['local'], c['remote'])):
@@ -150,7 +150,7 @@ def security_firewall(c, remove=False):
 
 
 def rules(c):
-    tag = ['-m', 'comment', '--comment', 'ldbp-gre-' + c['interface']]
+    tag = ['-m', 'comment', '--comment', 'vxlb-gre-' + c['interface']]
     # Outer GRE acceptance is restricted to authenticated ESP by security_rules.
     yield ['-i', c['interface'], '-s', c['peer'], '-d', c['private'], *tag, '-j', 'ACCEPT']
     if c['role'] == 'iran':
@@ -184,7 +184,7 @@ def preflight(c):
     secure_config(c)
     import vici
     sock = socket.socket(socket.AF_UNIX); sock.settimeout(10)
-    sock.connect(os.environ.get('LD_BP_VICI_SOCKET', '/var/run/charon.vici'))
+    sock.connect(os.environ.get('VX_LB_VICI_SOCKET', '/var/run/charon.vici'))
     vici.Session(sock).version()
     underlay(c)
     if not command('ip', 'link', 'show', 'dev', c['interface'], check=False).returncode:
@@ -213,7 +213,7 @@ def owned_link(c):
     if existing.returncode: return None
     row = json.loads(existing.stdout)[0]
     info = row.get('linkinfo', {}); data = info.get('info_data', {})
-    if row.get('ifalias') != 'ldbp-gre-v1:' + c['interface'] or info.get('info_kind') != 'gre' or data.get('local') != c['local'] or data.get('remote') != c['remote']:
+    if row.get('ifalias') != 'vxlb-gre-v1:' + c['interface'] or info.get('info_kind') != 'gre' or data.get('local') != c['local'] or data.get('remote') != c['remote']:
         raise RuntimeError('Refusing to modify an unrelated interface')
     return row
 
@@ -225,7 +225,7 @@ def up(c):
     command('modprobe','ip_gre',check=False)
     if not owned_link(c):
         command('ip', 'tunnel', 'add', c['interface'], 'mode', 'gre', 'local', c['local'], 'remote', c['remote'], 'key', str(c['key']), 'ttl', '64')
-        command('ip','link','set','dev',c['interface'],'alias','ldbp-gre-v1:'+c['interface'])
+        command('ip','link','set','dev',c['interface'],'alias','vxlb-gre-v1:'+c['interface'])
     command('ip', 'addr', 'replace', c['private'] + '/30', 'dev', c['interface'])
     command('ip', 'link', 'set', 'dev', c['interface'], 'mtu', str(c['mtu']), 'up')
     firewall(c)

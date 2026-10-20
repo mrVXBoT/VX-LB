@@ -2,7 +2,7 @@
 """
 Integration tests for WaterWall UDP tunnel and concurrent TCP/UDP routing.
 
-Run: LD_BP_WATERWALL_BINARY=/path/to/waterwall python3 -m pytest tests/test_waterwall_udp.py -v -s
+Run: VX_LB_WATERWALL_BINARY=/path/to/waterwall python3 -m pytest tests/test_waterwall_udp.py -v -s
 
 This suite tests:
 1. UDP single datagram roundtrip
@@ -29,9 +29,9 @@ from core import waterwall
 class WaterWallUdpIntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.binary = os.environ.get('LD_BP_WATERWALL_BINARY')
+        cls.binary = os.environ.get('VX_LB_WATERWALL_BINARY')
         if not cls.binary or not Path(cls.binary).exists():
-            raise unittest.SkipTest(f"LD_BP_WATERWALL_BINARY not set or not found: {cls.binary}")
+            raise unittest.SkipTest(f"VX_LB_WATERWALL_BINARY not set or not found: {cls.binary}")
 
     def free_port(self):
         """Find a free port."""
@@ -109,7 +109,7 @@ class WaterWallUdpIntegrationTest(unittest.TestCase):
         node = self.node_config()
         entry_port = self.free_port()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-udp-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-udp-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
 
@@ -177,7 +177,7 @@ class WaterWallUdpIntegrationTest(unittest.TestCase):
         node = self.node_config()
         entry_port = self.free_port()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-udp-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-udp-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
 
@@ -258,7 +258,7 @@ class WaterWallUdpIntegrationTest(unittest.TestCase):
         node = self.node_config()
         entry_port = self.free_port()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-udp-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-udp-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
 
@@ -323,7 +323,7 @@ class WaterWallUdpIntegrationTest(unittest.TestCase):
         node = self.node_config()
         entry_port = self.free_port()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-both-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-both-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
 
@@ -431,7 +431,7 @@ class WaterWallUdpIntegrationTest(unittest.TestCase):
         backend_port = self.free_port()
         unauthorized_port = self.free_port()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-udp-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-udp-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
             node['waterwall']['profile']['certificate'] = str(cert_file)

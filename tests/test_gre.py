@@ -50,7 +50,7 @@ class GreTests(unittest.TestCase):
         self.assertIn('--pol none', ' '.join(secure_rules[0][1]))
         self.assertEqual(secure_rules[0][1][-1], 'DROP')
         self.assertTrue(any(chain == 'OUTPUT' and '--pol none' in ' '.join(rule) for chain, rule in secure_rules))
-        self.assertIn('ldbp-gre-',all_rules)
+        self.assertIn('vxlb-gre-',all_rules)
         self.assertNotIn('FORWARD',all_rules)
 
     def test_security_required_and_authentication_scoped(self):

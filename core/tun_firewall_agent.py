@@ -24,7 +24,7 @@ def validated(config):
         raise ValueError('Invalid TUN endpoint role')
     if not 1 <= int(config['port']) <= 65535 or not 1200 <= int(config['mtu']) <= 1420:
         raise ValueError('Invalid TUN port/MTU')
-    return iface, 'ldbp-tun:' + iface
+    return iface, 'vxlb-tun:' + iface
 
 
 def rules(config):

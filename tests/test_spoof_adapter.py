@@ -31,10 +31,10 @@ def test_unsupported_install_or_missing_endpoint_context_never_mutates_host():
 def test_status_uses_real_command_tuple_and_never_claims_verified_path():
     ssh=MagicMock();ssh.execute.return_value=(0,'active\n','')
     adapter=SpoofDedicatedAdapter()
-    result=adapter.status(ssh,'ldbp-spoof-'+('a'*32)+'-nfq.service')
+    result=adapter.status(ssh,'vxlb-spoof-'+('a'*32)+'-nfq.service')
     assert result['status']=='UP' and result['details']['path_verified'] is False
     ssh.execute.reset_mock()
-    assert adapter.status(ssh,'ldbp_spoof_oldtable')['status']=='DOWN'
+    assert adapter.status(ssh,'vxlb_spoof_oldtable')['status']=='DOWN'
     ssh.execute.assert_not_called()
 
 

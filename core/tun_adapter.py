@@ -43,14 +43,14 @@ class TunDedicatedAdapter(BaseTunnelAdapter):
     def start(self, ssh, name):
         try:
             iface = identifier(name)
-            runtime.execute(ssh, f'systemctl daemon-reload && systemctl enable --now ldbp-tun-{iface}.service')
+            runtime.execute(ssh, f'systemctl daemon-reload && systemctl enable --now vxlb-tun-{iface}.service')
             return True, 'TUN service started; data health requires a probe'
         except Exception as error:
             return False, str(error)
 
     def stop(self, ssh, name):
         try:
-            runtime.execute(ssh, f'systemctl stop ldbp-tun-{identifier(name)}.service')
+            runtime.execute(ssh, f'systemctl stop vxlb-tun-{identifier(name)}.service')
             return True, 'TUN service stopped'
         except Exception as error:
             return False, str(error)

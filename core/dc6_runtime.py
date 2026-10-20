@@ -173,7 +173,7 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
         publish(ir_ssh, conf["firewall_path"], json.dumps(conf["iran_firewall"]))
 
         # Deploy on Kharej
-        kh_ssh.execute("mkdir -p /etc/ldbp/dc6")
+        kh_ssh.execute("mkdir -p /etc/vxlb/dc6")
         publish(kh_ssh, f"/etc/systemd/system/{svc}", conf["kharej_service_unit"])
         publish(kh_ssh, conf["config_path"], json.dumps(conf, indent=2))
         ok_start_kh, msg_start_kh = adapter.start(kh_ssh, iface)
@@ -181,7 +181,7 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
             raise RuntimeError(f"Failed starting DC6 on Kharej: {msg_start_kh}")
 
         # Deploy on Iran
-        ir_ssh.execute("mkdir -p /etc/ldbp/dc6")
+        ir_ssh.execute("mkdir -p /etc/vxlb/dc6")
         publish(ir_ssh, f"/etc/systemd/system/{svc}", conf["iran_service_unit"])
         publish(ir_ssh, conf["config_path"], json.dumps(conf, indent=2))
         ok_start_ir, msg_start_ir = adapter.start(ir_ssh, iface)
@@ -192,16 +192,16 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
         ports = pool.get("client_ports", [])
         if ports:
             target_priv = (conf["private_addressing"]["kharej_ipv4"] or conf["private_addressing"]["kharej_ipv6"])
-            relay_code, relay_unit = render_relay_service(f"ldbp-dc6-{iface}-relay.service", iface, target_priv, ports)
-            publish(ir_ssh, f"/etc/ldbp/{iface}-relay.py", relay_code)
-            publish(ir_ssh, f"/etc/systemd/system/ldbp-dc6-{iface}-relay.service", relay_unit)
-            code, _, error = ir_ssh.execute(f"systemctl daemon-reload && systemctl enable --now ldbp-dc6-{iface}-relay.service")
+            relay_code, relay_unit = render_relay_service(f"vxlb-dc6-{iface}-relay.service", iface, target_priv, ports)
+            publish(ir_ssh, f"/etc/vxlb/{iface}-relay.py", relay_code)
+            publish(ir_ssh, f"/etc/systemd/system/vxlb-dc6-{iface}-relay.service", relay_unit)
+            code, _, error = ir_ssh.execute(f"systemctl daemon-reload && systemctl enable --now vxlb-dc6-{iface}-relay.service")
             if code:
                 raise RuntimeError("Native IPv6 relay startup failed: " + error)
 
         if ports:
             from core.kernel_relay_ports import verify_listeners
-            verify_listeners(ir_ssh, f"ldbp-dc6-{iface}-relay.service", ports)
+            verify_listeners(ir_ssh, f"vxlb-dc6-{iface}-relay.service", ports)
         from core.private_link_health import probe_pair
         result = probe_pair(ir_ssh, kh_ssh, node["dc6"]["local_private"], node["dc6"]["remote_private"], iface)
         def finalize(data):

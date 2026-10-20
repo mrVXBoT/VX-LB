@@ -1,4 +1,4 @@
-"""GRETAP and GRE6TAP Layer 2 Ethernet-over-GRE Adapters for LD-BP.
+"""GRETAP and GRE6TAP Layer 2 Ethernet-over-GRE Adapters for VX-LB.
 
 Coverage:
 - GRETAP (IPv4) and GRE6TAP (IPv6) Layer 2 Ethernet tap tunnels.
@@ -31,7 +31,7 @@ from core.ipv6_tunnel_tools import (
     validate_mtu,
 )
 
-logger = logging.getLogger("ldbp.gretap")
+logger = logging.getLogger("vxlb.gretap")
 
 FORBIDDEN_SYSTEM_BRIDGES = {
     "docker0", "br0", "virbr0", "cni0", "flannel0", "kube-bridge", "lxdbr0", "bridge0"
@@ -148,7 +148,7 @@ def configure_gretap_link(
         pool_config.get("ipv4_subnet") or ("10.100.77.0/30" if not is_v6 else None),
     )
 
-    service_name = f"ldbp-{engine_id}-{iface}.service"
+    service_name = f"vxlb-{engine_id}-{iface}.service"
 
     ir_create_cmd = f"ip link add {iface} type {tunnel_type} local {iran_ext} remote {kharej_ext}"
     kh_create_cmd = f"ip link add {iface} type {tunnel_type} local {kharej_ext} remote {iran_ext}"
@@ -190,7 +190,7 @@ def configure_gretap_link(
     target_peer_ip = addressing.get("kharej_ipv6", "").split("/")[0] if is_v6 else addressing.get("kharej_ipv4", "").split("/")[0]
 
     relay_script, relay_unit = render_relay_service(
-        service_name=f"ldbp-{engine_id}-{iface}-relay.service",
+        service_name=f"vxlb-{engine_id}-{iface}-relay.service",
         interface=iface,
         peer_ip=target_peer_ip,
         ports=[int(p) for p in client_ports],

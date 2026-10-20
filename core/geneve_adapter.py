@@ -1,4 +1,4 @@
-"""Dedicated Geneve (RFC 8926) tunnel adapter for LD-BP.
+"""Dedicated Geneve (RFC 8926) tunnel adapter for VX-LB.
 
 Coverage:
 - Standalone Geneve Layer 2/3 Overlay over UDP port 6081 (RFC 8926).
@@ -44,7 +44,7 @@ from core.ipv6_tunnel_tools import execute_active_data_probe, parse_link_telemet
 from core.ssh_client import SSHManager
 from core.validation import validate_tunnel_name
 
-logger = logging.getLogger("ldbp.geneve_adapter")
+logger = logging.getLogger("vxlb.geneve_adapter")
 
 
 def _normalize_geneve_identifier(identifier: Any) -> Tuple[str, str, str]:
@@ -52,9 +52,9 @@ def _normalize_geneve_identifier(identifier: Any) -> Tuple[str, str, str]:
     raw = str(identifier).strip()
     if raw.endswith(".service"):
         raw = raw[:-8]
-    if raw.startswith("ldbp-geneve-"):
+    if raw.startswith("vxlb-geneve-"):
         raw = raw[12:]
-    elif raw.startswith("ldbp-"):
+    elif raw.startswith("vxlb-"):
         raw = raw[5:]
     if raw.startswith("gnv-"):
         raw_core = raw[4:]
@@ -63,7 +63,7 @@ def _normalize_geneve_identifier(identifier: Any) -> Tuple[str, str, str]:
     clean_candidate = re.sub(r"^[^a-z0-9]+", "", raw_core.lower())
     clean_id = validate_tunnel_name(clean_candidate[:10] if clean_candidate else "node")
     iface = make_geneve_iface(clean_id)
-    svc = f"ldbp-geneve-{iface}.service"
+    svc = f"vxlb-geneve-{iface}.service"
     return clean_id, iface, svc
 
 
@@ -114,8 +114,8 @@ class GeneveDedicatedAdapter(BaseTunnelAdapter):
         fdb_peers = pool_config.get("fdb_peers", [])
 
         # Generate scripts for Iran and Kharej
-        ir_up_path = f"/etc/ldbp/geneve-up-{iface}.sh"
-        ir_down_path = f"/etc/ldbp/geneve-down-{iface}.sh"
+        ir_up_path = f"/etc/vxlb/geneve-up-{iface}.sh"
+        ir_down_path = f"/etc/vxlb/geneve-down-{iface}.sh"
         ir_up, ir_down = generate_geneve_scripts(
             interface=iface,
             vni=vni,
@@ -130,8 +130,8 @@ class GeneveDedicatedAdapter(BaseTunnelAdapter):
             fdb_peers=fdb_peers,
         )
 
-        kh_up_path = f"/etc/ldbp/geneve-up-{iface}.sh"
-        kh_down_path = f"/etc/ldbp/geneve-down-{iface}.sh"
+        kh_up_path = f"/etc/vxlb/geneve-up-{iface}.sh"
+        kh_down_path = f"/etc/vxlb/geneve-down-{iface}.sh"
         kh_up, kh_down = generate_geneve_scripts(
             interface=iface,
             vni=vni,
@@ -155,7 +155,7 @@ class GeneveDedicatedAdapter(BaseTunnelAdapter):
 
         from core.ipv6_tunnel_tools import render_relay_service
         relay_script, relay_unit = render_relay_service(
-            service_name=f"ldbp-geneve-{iface}-relay.service",
+            service_name=f"vxlb-geneve-{iface}-relay.service",
             interface=bridge_name if method == GENEVE_METHOD_FDB_BRIDGE else iface,
             peer_ip=target_priv_ip,
             ports=client_ports,
@@ -195,9 +195,9 @@ class GeneveDedicatedAdapter(BaseTunnelAdapter):
                 "down_script": ir_down,
                 "down_script_path": ir_down_path,
                 "relay_unit": relay_unit,
-                "relay_unit_path": f"/etc/systemd/system/ldbp-geneve-{iface}-relay.service",
+                "relay_unit_path": f"/etc/systemd/system/vxlb-geneve-{iface}-relay.service",
                 "relay_script": relay_script,
-                "relay_script_path": f"/etc/ldbp/{iface}-relay.py",
+                "relay_script_path": f"/etc/vxlb/{iface}-relay.py",
             },
             "kharej_config": {
                 "unit": kh_unit,
@@ -308,8 +308,8 @@ class GeneveDedicatedAdapter(BaseTunnelAdapter):
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            up_script = f"/etc/ldbp/geneve-up-{iface}.sh"
-            up_bak = f"/etc/ldbp/geneve-up-{iface}.sh.bak"
+            up_script = f"/etc/vxlb/geneve-up-{iface}.sh"
+            up_bak = f"/etc/vxlb/geneve-up-{iface}.sh.bak"
             ssh.execute(f"cp {up_script} {up_bak} 2>/dev/null || true")
 
             ok_set, _, err_set = ssh.execute(f"ip link set {shlex.quote(iface)} mtu {new_mtu}")
@@ -337,8 +337,8 @@ class GeneveDedicatedAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            up_script = f"/etc/ldbp/geneve-up-{iface}.sh"
-            up_bak = f"/etc/ldbp/geneve-up-{iface}.sh.bak"
+            up_script = f"/etc/vxlb/geneve-up-{iface}.sh"
+            up_bak = f"/etc/vxlb/geneve-up-{iface}.sh.bak"
 
             cmd = (
                 f"ip link set {shlex.quote(iface)} mtu {valid_mtu} 2>/dev/null; "
@@ -353,7 +353,7 @@ class GeneveDedicatedAdapter(BaseTunnelAdapter):
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
         _, iface, svc = _normalize_geneve_identifier(identifier)
-        relay_svc = f"ldbp-geneve-{iface}-relay.service"
+        relay_svc = f"vxlb-geneve-{iface}-relay.service"
         br = make_geneve_bridge_name(iface)
 
         cmd = (
@@ -363,7 +363,7 @@ class GeneveDedicatedAdapter(BaseTunnelAdapter):
             f"ip link del {shlex.quote(iface)} 2>/dev/null || true; "
             f"ip link del {shlex.quote(br)} 2>/dev/null || true; "
             f"rm -f /etc/systemd/system/{shlex.quote(svc)} /etc/systemd/system/{shlex.quote(relay_svc)} "
-            f"/etc/ldbp/geneve-up-{shlex.quote(iface)}.sh /etc/ldbp/geneve-down-{shlex.quote(iface)}.sh /etc/ldbp/{shlex.quote(iface)}-relay.py; "
+            f"/etc/vxlb/geneve-up-{shlex.quote(iface)}.sh /etc/vxlb/geneve-down-{shlex.quote(iface)}.sh /etc/vxlb/{shlex.quote(iface)}-relay.py; "
             f"systemctl daemon-reload"
         )
         ok, out, err = ssh.execute(cmd)

@@ -17,12 +17,12 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-CACHE = Path.home()/'.cache/ldbp-kernel-lab'
+CACHE = Path.home()/'.cache/vxlb-kernel-lab'
 PAIR = CACHE/'private-link-pair'
 
 
 def module(index=None):
-    spec = importlib.util.spec_from_file_location('ldbp_vm_'+str(index), ROOT/'scripts/kernel_lab_vm.py')
+    spec = importlib.util.spec_from_file_location('vxlb_vm_'+str(index), ROOT/'scripts/kernel_lab_vm.py')
     value = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(value)
     if index is not None:
@@ -56,12 +56,12 @@ def prepare():
         shutil.copyfile(CACHE/'id_ed25519',folder/'id_ed25519')
         (folder/'id_ed25519').chmod(0o600)
         cloud = f'''#cloud-config
-hostname: ldbp-private-link-{index}
+hostname: vxlb-private-link-{index}
 manage_etc_hosts: true
 ssh_deletekeys: true
 ssh_genkeytypes: [ed25519]
 users:
-  - name: ldbp
+  - name: vxlb
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
@@ -73,7 +73,7 @@ package_upgrade: false
 '''
         iso = pycdlib.PyCdlib()
         iso.new(interchange_level=3,joliet=3,rock_ridge='1.09',vol_ident='cidata')
-        for name, filename, value in [('USER_DATA.;1','user-data',cloud), ('META_DATA.;1','meta-data',f'instance-id: ldbp-private-link-{index}\nlocal-hostname: ldbp-private-link-{index}\n')]:
+        for name, filename, value in [('USER_DATA.;1','user-data',cloud), ('META_DATA.;1','meta-data',f'instance-id: vxlb-private-link-{index}\nlocal-hostname: vxlb-private-link-{index}\n')]:
             data = value.encode()
             iso.add_fp(io.BytesIO(data),len(data),iso_path='/'+name,rr_name=filename,joliet_path='/'+filename)
         iso.write(str(folder/'seed.iso'))
@@ -94,7 +94,7 @@ def start():
         if vm.pid():
             continue
         link='listen=127.0.0.1:18768' if index==0 else 'connect=127.0.0.1:18768'
-        command('qemu-system-x86_64','-name',f'ldbp-private-link-{index}', '-enable-kvm','-cpu','host','-m','1024','-smp','2',
+        command('qemu-system-x86_64','-name',f'vxlb-private-link-{index}', '-enable-kvm','-cpu','host','-m','1024','-smp','2',
             '-drive',f'file={vm.CACHE}/disk.qcow2,if=virtio,format=qcow2',
             '-drive',f'file={vm.CACHE}/seed.iso,media=cdrom,readonly=on',
             '-netdev',f'user,id=management,hostfwd=tcp:127.0.0.1:{vm.PORT}-:22',
@@ -122,9 +122,9 @@ def configure():
       addresses: [192.0.2.{index+1}/30]
 '''
             with client.open_sftp() as sftp:
-                with sftp.file('/tmp/ldbp-backplane.yaml','w') as target:target.write(config)
-                sftp.chmod('/tmp/ldbp-backplane.yaml',0o600)
-            _,out,err=client.exec_command('sudo install -m 600 /tmp/ldbp-backplane.yaml /etc/netplan/90-ldbp-backplane.yaml && sudo netplan apply',timeout=30)
+                with sftp.file('/tmp/vxlb-backplane.yaml','w') as target:target.write(config)
+                sftp.chmod('/tmp/vxlb-backplane.yaml',0o600)
+            _,out,err=client.exec_command('sudo install -m 600 /tmp/vxlb-backplane.yaml /etc/netplan/90-vxlb-backplane.yaml && sudo netplan apply',timeout=30)
             error=err.read().decode()
             if out.channel.recv_exit_status():raise RuntimeError(error)
             print('Configured isolated guest backplane',index)

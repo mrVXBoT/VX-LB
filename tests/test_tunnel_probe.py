@@ -37,7 +37,7 @@ class ProbeTests(unittest.TestCase):
         probe=TunnelProbe(ssh,MagicMock());probe.listen_port=32100
         self.assertTrue(probe.verify())
         command=ssh.execute.call_args.args[0]
-        self.assertIn('LD-BP-PROBE:',command)
+        self.assertIn('VX-LB-PROBE:',command)
         self.assertIn('127.0.0.1',command)
 
     def test_wrong_response_is_not_success(self):
@@ -84,7 +84,7 @@ class ProbeTests(unittest.TestCase):
                         if not chunk:break
                         data+=chunk
                     received.append(len(data))
-                    response=b'LD-BP-PROBE:'+data
+                    response=b'VX-LB-PROBE:'+data
                     if corrupt:response=response[:-1]+b'!'
                     connection.sendall(response)
             thread=threading.Thread(target=echo,daemon=True);thread.start()

@@ -14,7 +14,7 @@ from core import https_tunnel as h
 
 
 def run(client, binary):
-    folder='/var/tmp/ldbp-gre-https-lab-'+secrets.token_hex(8)
+    folder='/var/tmp/vxlb-gre-https-lab-'+secrets.token_hex(8)
     owner='ldh'+secrets.token_hex(8)
     configs=[]
     for i in range(2):

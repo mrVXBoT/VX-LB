@@ -175,16 +175,16 @@ class Gre6AdapterTests(unittest.TestCase):
         cmd_start = mock_ssh.execute.call_args[0][0]
         self.assertIn("systemctl enable", cmd_start)
         self.assertIn("systemctl restart", cmd_start)
-        self.assertIn("ldbp-gre6-lg6-irnode1.service", cmd_start)
+        self.assertIn("vxlb-gre6-lg6-irnode1.service", cmd_start)
 
         mock_ssh.reset_mock()
         mock_ssh.execute.return_value = (0, "", "")
-        ok_stop, _ = self.adapter.stop(mock_ssh, "ldbp-gre6-lg6-irnode1.service")
+        ok_stop, _ = self.adapter.stop(mock_ssh, "vxlb-gre6-lg6-irnode1.service")
         self.assertTrue(ok_stop)
         cmd_stop = mock_ssh.execute.call_args[0][0]
         self.assertIn("systemctl stop", cmd_stop)
         self.assertIn("systemctl disable", cmd_stop)
-        self.assertIn("ldbp-gre6-lg6-irnode1.service", cmd_stop)
+        self.assertIn("vxlb-gre6-lg6-irnode1.service", cmd_stop)
 
     def test_status_query_and_telemetry_synthesis(self):
         """Verify status reports active service and interface telemetry."""
@@ -225,14 +225,14 @@ class Gre6AdapterTests(unittest.TestCase):
         mock_ir.execute.return_value = (0, "PASS:14.25\n", "")
         mock_kh.execute.return_value = (0, "", "")
 
-        res = self.adapter.probe(mock_ir, mock_kh, [42892], kharej_private_ip="fd00:ldbp:6:10::2")
+        res = self.adapter.probe(mock_ir, mock_kh, [42892], kharej_private_ip="fd00:vxlb:6:10::2")
         self.assertTrue(res["passed"])
         self.assertEqual(res["latency_ms"], 14.25)
         self.assertTrue(res["details"]["nonce_verified"])
 
         # Probe failure
         mock_ir.execute.return_value = (1, "FAIL:NO_REPLY", "Connection timed out")
-        res_fail = self.adapter.probe(mock_ir, mock_kh, [42892], kharej_private_ip="fd00:ldbp:6:10::2")
+        res_fail = self.adapter.probe(mock_ir, mock_kh, [42892], kharej_private_ip="fd00:vxlb:6:10::2")
         self.assertFalse(res_fail["passed"])
         self.assertIn("failed", res_fail["error"].lower())
 
@@ -333,7 +333,7 @@ class Gre6AdapterTests(unittest.TestCase):
 
         ok_mod, msg_mod = self.adapter.modify("pool_test", {
             "ssh": mock_ssh,
-            "interface": "ldbp-gre6-lg6-test.service",
+            "interface": "vxlb-gre6-lg6-test.service",
             "mtu": 1380,
         })
         self.assertTrue(ok_mod)
@@ -341,7 +341,7 @@ class Gre6AdapterTests(unittest.TestCase):
 
         ok_rb, msg_rb = self.adapter.rollback("pool_test", {
             "ssh": mock_ssh,
-            "interface": "ldbp-gre6-lg6-test.service",
+            "interface": "vxlb-gre6-lg6-test.service",
             "mtu": 1400,
         })
         self.assertTrue(ok_rb)

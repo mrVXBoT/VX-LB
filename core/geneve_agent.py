@@ -1,4 +1,4 @@
-"""On-host Geneve + IPsec agent for LD-BP.
+"""On-host Geneve + IPsec agent for VX-LB.
 
 Operates locally on each endpoint (Iran or Kharej):
 - Validates Geneve + IPsec configurations.
@@ -22,7 +22,7 @@ import threading
 import time
 
 # Support local vendor VICI client if installed or vendored
-sys.path.insert(0, "/usr/local/libexec/ldbp-geneve-vici")
+sys.path.insert(0, "/usr/local/libexec/vxlb-geneve-vici")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "vendor"))
 
 
@@ -48,7 +48,7 @@ def secure_config(c):
 def validate(c):
     if not isinstance(c, dict):
         raise ValueError("Configuration must be a dictionary")
-    if c.get("owner") != "ldbp-geneve-v1":
+    if c.get("owner") != "vxlb-geneve-v1":
         raise ValueError("Invalid configuration owner")
     if c.get("role") not in ("iran", "kharej"):
         raise ValueError("Role must be 'iran' or 'kharej'")
@@ -153,9 +153,9 @@ def ipsec(c, action):
     sec = secure_config(c)
     sock = socket.socket(socket.AF_UNIX)
     sock.settimeout(40)
-    sock.connect(os.environ.get("LD_BP_VICI_SOCKET", "/var/run/charon.vici"))
+    sock.connect(os.environ.get("VX_LB_VICI_SOCKET", "/var/run/charon.vici"))
     session = vici.Session(sock)
-    name = "ldbp-" + c["interface"]
+    name = "vxlb-" + c["interface"]
 
     if action == "load":
         session.load_shared(
@@ -207,7 +207,7 @@ def ipsec(c, action):
 
 def security_rules(c):
     sec = secure_config(c)
-    tag = ["-m", "comment", "--comment", "ldbp-sec-" + c["interface"]]
+    tag = ["-m", "comment", "--comment", "vxlb-sec-" + c["interface"]]
     dst_port = str(c.get("dst_port", 6081))
     for chain, direction, source, destination in (
         ("INPUT", "in", c["remote"], c["local"]),
@@ -250,7 +250,7 @@ def security_firewall(c, remove=False):
 
 
 def rules(c):
-    tag = ["-m", "comment", "--comment", "ldbp-gnv-" + c["interface"]]
+    tag = ["-m", "comment", "--comment", "vxlb-gnv-" + c["interface"]]
     yield ["-i", c["interface"], "-s", c["peer"], "-d", c["private"], *tag, "-j", "ACCEPT"]
     if c["role"] == "iran":
         for port in c["ports"]:
@@ -275,7 +275,7 @@ def preflight(c):
 
     sock = socket.socket(socket.AF_UNIX)
     sock.settimeout(5)
-    sock.connect(os.environ.get("LD_BP_VICI_SOCKET", "/var/run/charon.vici"))
+    sock.connect(os.environ.get("VX_LB_VICI_SOCKET", "/var/run/charon.vici"))
     try:
         vici.Session(sock).version()
     finally:
@@ -496,9 +496,9 @@ def status(c):
     import vici
     sock = socket.socket(socket.AF_UNIX)
     sock.settimeout(5)
-    sock.connect(os.environ.get("LD_BP_VICI_SOCKET", "/var/run/charon.vici"))
+    sock.connect(os.environ.get("VX_LB_VICI_SOCKET", "/var/run/charon.vici"))
     session = vici.Session(sock)
-    is_sa = installed_sa(session, "ldbp-" + c["interface"], c["security"]["reqid"])
+    is_sa = installed_sa(session, "vxlb-" + c["interface"], c["security"]["reqid"])
 
     return {
         "status": "UP" if (info.get("flags") and "UP" in info["flags"] and is_sa) else "DEGRADED" if is_sa else "DOWN",

@@ -1,4 +1,4 @@
-"""Overlay Network Tunnel Adapters (VXLAN and Geneve) for LD-BP.
+"""Overlay Network Tunnel Adapters (VXLAN and Geneve) for VX-LB.
 
 Coverage:
 - VXLAN Single-Server & Multi-Server
@@ -48,23 +48,23 @@ class OverlayBaseAdapter(BaseTunnelAdapter):
             "local_ip": ir_ip,
             "remote_ip": kh_ip,
             "peers": peers,
-            "service_name": f"ldbp-{iface}.service",
+            "service_name": f"vxlb-{iface}.service",
         }
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {svc} && systemctl restart {svc}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-{identifier}.service"
         cmd = f"systemctl stop {svc} && systemctl disable {svc}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-{identifier}.service"
         ok, out, _ = ssh.execute(f"systemctl is-active {svc}")
         is_active = (ok == 0 and out.strip() == "active")
         return {
@@ -87,8 +87,8 @@ class OverlayBaseAdapter(BaseTunnelAdapter):
         return False, f"Rollback is unsupported for overlay tunnel '{self.engine_id}'"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-", "").replace(".service", "")
-        svc = f"ldbp-{iface}.service"
+        iface = identifier.replace("vxlb-", "").replace(".service", "")
+        svc = f"vxlb-{iface}.service"
         cmd = f"systemctl stop {svc} 2>/dev/null; ip link del {iface} 2>/dev/null; rm -f /etc/systemd/system/{svc}; systemctl daemon-reload"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
@@ -136,25 +136,25 @@ class GeneveIpsecAdapter(BaseTunnelAdapter):
             "private_ip": conf["private"],
             "peer_private_ip": conf["peer"],
             "security": conf["security"],
-            "service_name": f"ldbp-geneve-{conf['interface']}.service",
+            "service_name": f"vxlb-geneve-{conf['interface']}.service",
             "node": node,
         }
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-geneve-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-geneve-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {svc} && systemctl restart {svc}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-geneve-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-geneve-{identifier}.service"
         cmd = f"systemctl stop {svc} && systemctl disable {svc}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-geneve-{identifier}.service"
-        iface = identifier.replace("ldbp-geneve-", "").replace(".service", "").replace("-relay", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-geneve-{identifier}.service"
+        iface = identifier.replace("vxlb-geneve-", "").replace(".service", "").replace("-relay", "")
         ok, out, _ = ssh.execute(f"systemctl is-active {svc}")
         is_active = (ok == 0 and out.strip() == "active")
         return {

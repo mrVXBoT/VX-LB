@@ -88,7 +88,7 @@ def configuration(tmp_path,mode):
     app,public,backend,carrier,probe=free_ports(5)
     node=dict(ip='127.0.0.2',node_name='http-'+('1'*32),transport=mode,engine=mode,
               http_connect=dict(id='1'*32,token='2'*64,public_port=public,relay_backend_port=backend,
-                                carrier_local_port=carrier,probe_port=probe,security=identity_material('ldbp-http')))
+                                carrier_local_port=carrier,probe_port=probe,security=identity_material('vxlb-http')))
     pool=dict(client_ports=[str(app)],kharej_server={'ip':'127.0.0.1'})
     config=http.plan(node,pool);base=config['base']
     for files in [config['server_files'],config['client_files']]:

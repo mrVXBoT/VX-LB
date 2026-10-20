@@ -42,7 +42,7 @@ def checked(command):
 
 
 def run():
-    if os.geteuid() != 0 or not Path('/var/lib/ldbp-lab-ready').exists():
+    if os.geteuid() != 0 or not Path('/var/lib/vxlb-lab-ready').exists():
         raise RuntimeError('Run only as root inside the managed disposable lab VM')
     token = secrets.token_hex(8)
     iran_ns, outside_ns = 'sli'+token[:8], 'slo'+token[:8]
@@ -76,7 +76,7 @@ def run():
                 path.write_text('[Service]\nNetworkNamespacePath=/run/netns/'+namespace+'\nRuntimeMaxSec=90\n')
                 dropins.append(path)
                 services.append(name)
-        unrelated_tag = 'ldbp-lab-unrelated-' + token
+        unrelated_tag = 'vxlb-lab-unrelated-' + token
         code, _, error = outside.execute('iptables -w 5 -A INPUT -p udp --dport 25999 -m comment --comment '+unrelated_tag+' -j ACCEPT')
         assert code == 0, error
         runtime.deploy(outside, config['server_files'], config['server_services'])
@@ -134,7 +134,7 @@ def run():
                     slipstream_config_path=config['client_config_path'])
         pool.update(name='dns-lab', engine='slipstream', transport='slipstream',
                     kharej_server={'ip': '192.0.2.2'}, nodes=[node])
-        with tempfile.TemporaryDirectory(prefix='ldbp-slipstream-inventory-') as temporary:
+        with tempfile.TemporaryDirectory(prefix='vxlb-slipstream-inventory-') as temporary:
             folder = Path(temporary)
             inventory = folder/'inventory.json'
             inventory.write_text(json.dumps({'schema_version': 3, 'pools': {'dns-lab': pool},
@@ -176,7 +176,7 @@ def run():
                 assert ok, message
                 code, rules, error = outside.execute('iptables -S INPUT')
                 assert code == 0, error
-                assert rules.count('ldbp-slipstream:'+token) == 2, rules
+                assert rules.count('vxlb-slipstream:'+token) == 2, rules
                 assert '--hashlimit-above 20/sec' in rules, rules
                 assert unrelated_tag in rules
                 # Send an intentionally invalid UDP burst: the kernel limiter
@@ -189,7 +189,7 @@ def run():
                 code, counters, error = outside.execute('iptables-save -c')
                 assert code == 0, error
                 import re
-                row = next(row for row in counters.splitlines() if 'ldbp-slipstream:'+token in row and '--dport 25053' in row)
+                row = next(row for row in counters.splitlines() if 'vxlb-slipstream:'+token in row and '--dport 25053' in row)
                 count = int(re.search(r'\[(\d+):\d+\]', row).group(1))
                 assert count > 0, row
                 print('PASS: actual per-source DNS QPS rule dropped '+str(count)+' excess UDP packets and preserved unrelated rule', flush=True)
@@ -197,14 +197,14 @@ def run():
                 direct = "import socket;s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.sendto(b'lab-rate-test',('192.0.2.2',25054));s.close()"
                 assert iran.execute('python3 -c '+shlex.quote(direct))[0] == 0
                 code, counters, error = outside.execute('iptables-save -c')
-                row = next(row for row in counters.splitlines() if 'ldbp-slipstream:'+token in row and '--dport 25054' in row)
+                row = next(row for row in counters.splitlines() if 'vxlb-slipstream:'+token in row and '--dport 25054' in row)
                 assert int(re.search(r'\[(\d+):\d+\]', row).group(1)) > 0, row
                 print('PASS: malformed public DNS burst did not restart upstream; direct internal-port packet was dropped', flush=True)
                 ok, message = slipstream_update.change('dns-lab', {'rate_limit': 1000})
                 assert ok, message
                 code, rules, error = outside.execute('iptables -S INPUT')
                 assert code == 0 and '--hashlimit-above 1000/sec' in rules, rules+error
-                assert rules.count('ldbp-slipstream:'+token) == 2
+                assert rules.count('vxlb-slipstream:'+token) == 2
                 print('PASS: transactional QPS update replaced only owned rule and authenticated DNS path recovered', flush=True)
                 assert not list(Path(config['base']).glob('*.slip-*')), 'Terminal snapshots were not cleaned'
         runtime.cleanup(iran, config['client_files'], config['client_services'])
@@ -216,7 +216,7 @@ def run():
             assert code != 0
         code, rules, error = outside.execute('iptables -S INPUT')
         assert code == 0, error
-        assert 'ldbp-slipstream:'+token not in rules
+        assert 'vxlb-slipstream:'+token not in rules
         assert unrelated_tag in rules
         print('PASS: service cleanup removed its DNS limiter and preserved unrelated firewall rule', flush=True)
         print('PASS: actual cleanup stopped services, removed owned unit/config/key files and disabled units', flush=True)

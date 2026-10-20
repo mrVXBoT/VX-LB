@@ -6,7 +6,7 @@ from core import nfqws2_queue_agent as agent
 
 
 def configuration():
-    return dict(id='a'*32,peer='192.0.2.2',carrier_port=45100,queue=45101,incoming=True,binary='/opt/ldbp/nfqws2')
+    return dict(id='a'*32,peer='192.0.2.2',carrier_port=45100,queue=45101,incoming=True,binary='/opt/vxlb/nfqws2')
 
 
 def result(code=0,text=''):return SimpleNamespace(returncode=code,stdout=text,stderr='')
@@ -25,7 +25,7 @@ def test_rules_are_limited_to_peer_port_and_generated_packets_skip_queue():
 
 def fake_proc(tmp_path,cmd_queue=45101,inode=123,portid=456):
     pid=78;root=tmp_path/'proc';(root/str(pid)/'fd').mkdir(parents=True)
-    (root/str(pid)/'cmdline').write_bytes(b'/opt/ldbp/nfqws2\0'+('--qnum='+str(cmd_queue)).encode()+b'\0')
+    (root/str(pid)/'cmdline').write_bytes(b'/opt/vxlb/nfqws2\0'+('--qnum='+str(cmd_queue)).encode()+b'\0')
     (root/str(pid)/'fd'/'9').symlink_to('socket:['+str(inode)+']')
     (root/'net/netfilter').mkdir(parents=True)
     (root/'net/netfilter/nfnetlink_queue').write_text('45101 456 0 2 65535 0 0 12 1\n')
@@ -67,8 +67,8 @@ def test_partial_apply_rolls_back_only_newly_inserted_rules(monkeypatch):
 
 
 def test_remove_preserves_other_owner_and_checks_absence_without_live_daemon(monkeypatch):
-    owned='-A OUTPUT -d 192.0.2.2 -m comment --comment ldbp-nfq:'+('a'*32)+' -j NFQUEUE --queue-num 45101'
-    other='-A OUTPUT -m comment --comment ldbp-nfq:'+('b'*32)+' -j NFQUEUE --queue-num 45102'
+    owned='-A OUTPUT -d 192.0.2.2 -m comment --comment vxlb-nfq:'+('a'*32)+' -j NFQUEUE --queue-num 45101'
+    other='-A OUTPUT -m comment --comment vxlb-nfq:'+('b'*32)+' -j NFQUEUE --queue-num 45102'
     rows=[owned,other];calls=[]
     def iptables(*args,**kwargs):
         calls.append(args)
@@ -105,7 +105,7 @@ def test_existing_rule_survives_failed_addition(monkeypatch):
 
 
 def test_remove_requires_proven_absence_even_when_delete_command_succeeds(monkeypatch):
-    owned='-A OUTPUT -m comment --comment ldbp-nfq:'+('a'*32)+' -j NFQUEUE --queue-num 45101'
+    owned='-A OUTPUT -m comment --comment vxlb-nfq:'+('a'*32)+' -j NFQUEUE --queue-num 45101'
     monkeypatch.setattr(agent,'iptables',lambda *args,**kwargs:result(text=owned if args[:2]==('-S','OUTPUT') else ''))
     with pytest.raises(RuntimeError,match='remains after removal'):agent.remove(configuration())
 

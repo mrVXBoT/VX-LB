@@ -1,4 +1,4 @@
-"""Geneve (RFC 8926) Tunnel Tools and Configuration Helpers for LD-BP.
+"""Geneve (RFC 8926) Tunnel Tools and Configuration Helpers for VX-LB.
 
 Coverage:
 - Standalone Geneve Layer 2/3 Overlay over UDP port 6081 (RFC 8926).
@@ -93,7 +93,7 @@ def validate_dedicated_bridge(bridge_name: str) -> str:
         raise ValueError(f"Bridge name '{bridge_name}' must be 1..15 alphanumeric characters")
     if is_system_or_protected_bridge(clean):
         raise ValueError(
-            f"Bridge '{clean}' is a protected system interface and cannot be modified or deleted by LD-BP"
+            f"Bridge '{clean}' is a protected system interface and cannot be modified or deleted by VX-LB"
         )
     return clean
 
@@ -122,14 +122,14 @@ def build_geneve_systemd_unit(
     interface: str,
     up_script_path: str,
     down_script_path: str,
-    description: str = "LD-BP Geneve Overlay Tunnel",
+    description: str = "VX-LB Geneve Overlay Tunnel",
 ) -> str:
     """Generates isolated systemd unit managing the lifecycle of the Geneve interface."""
     return f"""[Unit]
 Description={description} ({interface})
 After=network-online.target
 Wants=network-online.target
-PartOf=ldbp-tunnels.target
+PartOf=vxlb-tunnels.target
 
 [Service]
 Type=oneshot

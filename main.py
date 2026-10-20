@@ -586,7 +586,7 @@ def diagnose_pool_flow(pool_name: str):
         engine = pool.get("engine", transport)
         service_name = f"backpack-{node_name}.service"
         if engine in ("paqet", "waterwall", "slipstream", "wireguard", "vxlan", "gre", "geneve_ipsec"):
-            service_name = f"ldbp-{engine}-{node_name}.service"
+            service_name = f"vxlb-{engine}-{node_name}.service"
 
         code_svc, out_svc, _ = ir_ssh.execute(f"systemctl is-active {shquote(service_name)} 2>/dev/null || systemctl is-active {shquote(f'backpack-{node_name}.service')} 2>/dev/null || echo 'inactive'")
         svc_active = (out_svc.strip() == "active")
@@ -1169,7 +1169,7 @@ def cloudflare_watchdog_menu():
             if not ok:
                 console.print(f"[red]Failed to connect: {msg}[/red]")
             else:
-                _, log_text, _ = ssh.execute("tail -n 35 /var/log/bp-user-connections.log 2>/dev/null || echo 'No logs recorded yet.'")
+                _, log_text, _ = ssh.execute("tail -n 35 /var/log/vxlb-user-connections.log 2>/dev/null || echo 'No logs recorded yet.'")
                 ssh.close()
                 console.print(Panel(log_text.strip() or "No logs recorded.", title=f"User Connection Log ({target_node['ip']})", border_style="cyan"))
             Prompt.ask("\nPress Enter to return")
@@ -1188,11 +1188,11 @@ def manage_web_menu():
         web_pass = load_data().get("web_password")
         pass_status = "[bold green]Configured[/bold green]" if web_pass else "[yellow]Not set — use option [5] below[/yellow]"
         status_text = f"[bold green]RUNNING (PID: {w_pid})[/bold green]" if is_running else "[bold red]STOPPED[/bold red]"
-        bind_host = os.environ.get("LD_BP_WEB_HOST", "127.0.0.1")
+        bind_host = os.environ.get("VX_LB_WEB_HOST", "127.0.0.1")
 
         console.print("[bold cyan]=== Mobile Web Dashboard (Phone Control Panel) ===[/bold cyan]\n")
         console.print(f"  [white]Status:[/white] {status_text}")
-        console.print(f"  [white]Bind Address:[/white] [yellow]{bind_host}[/yellow]  (LD_BP_WEB_HOST to change)")
+        console.print(f"  [white]Bind Address:[/white] [yellow]{bind_host}[/yellow]  (VX_LB_WEB_HOST to change)")
         console.print(f"  [white]Listening Port:[/white] [yellow]{w_port}[/yellow]")
         console.print(f"  [white]Local URL:[/white] [cyan]http://127.0.0.1:{w_port}[/cyan]")
         console.print(f"  [white]Remote Access:[/white] [dim]dashboard binds localhost; use an SSH tunnel:[/dim]")
@@ -1329,7 +1329,7 @@ def _cli_list_capabilities():
     """Prints a structured table of all registered tunnel engines and capabilities."""
     from core.capabilities import list_all_capabilities
     caps = list_all_capabilities()
-    table = Table(title="LD-BP Multi-Tunnel Platform Capabilities Catalog")
+    table = Table(title="VX-LB Multi-Tunnel Platform Capabilities Catalog")
     table.add_column("Engine ID", style="cyan")
     table.add_column("Name", style="bold")
     table.add_column("Layer", style="magenta")
@@ -1381,7 +1381,7 @@ def _cli_list_compositions():
     """Prints a structured table of available layered tunnel compositions."""
     from core.composition import get_available_compositions
     comps = get_available_compositions()
-    table = Table(title="LD-BP Available Tunnel Compositions")
+    table = Table(title="VX-LB Available Tunnel Compositions")
     table.add_column("ID", style="cyan")
     table.add_column("Name", style="bold")
     table.add_column("Layer", style="magenta")

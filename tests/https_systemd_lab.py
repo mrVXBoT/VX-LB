@@ -28,7 +28,7 @@ class Peer:
 
 def run(client,binary):
     peer=Peer(client);name='ldh'+secrets.token_hex(8)
-    folder='/var/lib/ldbp-https-lab-'+secrets.token_hex(8)
+    folder='/var/lib/vxlb-https-lab-'+secrets.token_hex(8)
     node={'node_name':name,'https':{'profile':https.profile('xhttp',{'server_name':'tunnel.test','binary':folder+'/xray',
           'certificate':folder+'/cert.pem','key':folder+'/key.pem'}),'uuid':secrets.token_hex(16),
           'path':'/'+secrets.token_hex(24),'outer_port':24443,'probe_local':22252,'probe_remote':22251}}
@@ -36,7 +36,7 @@ def run(client,binary):
     node['https']['uuid']=str(uuid.uuid4())
     try:
         https.execute(peer,'mkdir -m 755 '+folder)
-        with tempfile.TemporaryDirectory(prefix='ldbp-systemd-cert-') as temporary:
+        with tempfile.TemporaryDirectory(prefix='vxlb-systemd-cert-') as temporary:
             temporary=Path(temporary)
             subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','2','-subj','/CN=tunnel.test',
                             '-addext','subjectAltName=DNS:tunnel.test','-keyout',str(temporary/'key.pem'),'-out',str(temporary/'cert.pem')],

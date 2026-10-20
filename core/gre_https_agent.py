@@ -42,8 +42,8 @@ def validate(c):
 
 def shared():
     path = Path(__file__).with_name('gre_agent.py')
-    if not path.exists(): path = Path('/usr/local/libexec/ldbp-gre-v1.py')
-    spec = importlib.util.spec_from_file_location('ldbp_gre_shared', path)
+    if not path.exists(): path = Path('/usr/local/libexec/vxlb-gre-v1.py')
+    spec = importlib.util.spec_from_file_location('vxlb_gre_shared', path)
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
     return module
 

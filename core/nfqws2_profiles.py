@@ -9,7 +9,7 @@ from pathlib import PurePosixPath
 import re
 
 VERSION = 'v1.0.5.2'
-LIBRARY_DIRECTORY = '/usr/local/lib/ldbp-nfqws2/'+VERSION
+LIBRARY_DIRECTORY = '/usr/local/lib/vxlb-nfqws2/'+VERSION
 ARCHIVE_URL = 'https://github.com/bol-van/zapret2/releases/download/v1.0.5.2/zapret2-v1.0.5.2.tar.gz'
 ARCHIVE_SHA256 = 'fb3bcf69e7d86b9fa2d60bd53c956ac06d9dcc3adf9392afd84865f1d94b1158'
 COMPONENT_SHA256 = {

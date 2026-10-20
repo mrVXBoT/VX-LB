@@ -1,4 +1,4 @@
-"""SIT / 6in4 (IPv6-over-IPv4) Tunnel Engine and Tools for LD-BP.
+"""SIT / 6in4 (IPv6-over-IPv4) Tunnel Engine and Tools for VX-LB.
 
 Coverage:
 - Point-to-point IPv6-in-IPv4 tunnel carried over native IPv4 underlay (RFC 4213 / protocol 41)
@@ -31,7 +31,7 @@ from core.ipv6_tunnel_tools import (
     validate_mtu,
 )
 
-logger = logging.getLogger("ldbp.sit")
+logger = logging.getLogger("vxlb.sit")
 
 ENGINE_ID = "sit"
 TUNNEL_MODE = "sit"
@@ -102,7 +102,7 @@ def configure_sit_link(
     ipv4_subnet = pool_config.get("ipv4_subnet")
     addressing = allocate_tunnel_ips(ipv6_subnet, ipv4_subnet)
 
-    service_name = f"ldbp-sit-{iface}.service"
+    service_name = f"vxlb-sit-{iface}.service"
 
     ir_create_cmd = f"ip link add {iface} type {TUNNEL_MODE} local {iran_ip} remote {kharej_ip} ttl 64"
     kh_create_cmd = f"ip link add {iface} type {TUNNEL_MODE} local {kharej_ip} remote {iran_ip} ttl 64"
@@ -135,7 +135,7 @@ def configure_sit_link(
 
     from core.ipv6_tunnel_tools import render_relay_service
     relay_script, relay_unit = render_relay_service(
-        service_name=f"ldbp-sit-{iface}-relay.service",
+        service_name=f"vxlb-sit-{iface}-relay.service",
         interface=iface,
         peer_ip=target_ipv6,
         ports=[int(p) for p in client_ports],
@@ -163,9 +163,9 @@ def configure_sit_link(
             "unit": iran_unit,
             "unit_path": f"/etc/systemd/system/{service_name}",
             "relay_unit": relay_unit,
-            "relay_unit_path": f"/etc/systemd/system/ldbp-sit-{iface}-relay.service",
+            "relay_unit_path": f"/etc/systemd/system/vxlb-sit-{iface}-relay.service",
             "relay_script": relay_script,
-            "relay_script_path": f"/etc/ldbp/{iface}-relay.py",
+            "relay_script_path": f"/etc/vxlb/{iface}-relay.py",
         },
         "kharej_config": {
             "unit": kharej_unit,

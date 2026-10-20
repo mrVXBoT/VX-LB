@@ -317,14 +317,14 @@ class VxlanAdapterTests(unittest.TestCase):
         mock_ssh = Mock()
         mock_ssh.execute.return_value = (0, "active\n", "")
 
-        for ident in ["node1", "vx-node1", "ldbp-vxlan-vx-node1.service", "ldbp-vx-node1.service"]:
+        for ident in ["node1", "vx-node1", "vxlb-vxlan-vx-node1.service", "vxlb-vx-node1.service"]:
             ok, _ = self.adapter.start(mock_ssh, ident)
             self.assertTrue(ok)
-            self.assertIn("ldbp-vxlan-vx-node1.service", mock_ssh.execute.call_args[0][0])
+            self.assertIn("vxlb-vxlan-vx-node1.service", mock_ssh.execute.call_args[0][0])
 
             ok, _ = self.adapter.stop(mock_ssh, ident)
             self.assertTrue(ok)
-            self.assertIn("ldbp-vxlan-vx-node1.service", mock_ssh.execute.call_args[0][0])
+            self.assertIn("vxlb-vxlan-vx-node1.service", mock_ssh.execute.call_args[0][0])
 
     def test_lifecycle_operations(self):
         """Test install, start, stop, status, modify, rollback, probe."""
@@ -462,8 +462,8 @@ class VxlanAdapterTests(unittest.TestCase):
         py_code, unit = generate_relay_script_and_unit("vx-test1", "10.204.1.2", ["2222", "443"])
         self.assertIn("10.204.1.2", py_code)
         self.assertIn("[2222, 443]", py_code)
-        self.assertIn("ldbp-vx-test1-relay.py", unit)
-        self.assertIn("ldbp-vxlan-vx-test1.service", unit)
+        self.assertIn("vxlb-vx-test1-relay.py", unit)
+        self.assertIn("vxlb-vxlan-vx-test1.service", unit)
 
     def test_pool_lifecycle_orchestration(self):
         """create, add, change_mtu, and remove_pool work together seamlessly."""

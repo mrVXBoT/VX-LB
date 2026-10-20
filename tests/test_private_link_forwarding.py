@@ -81,7 +81,7 @@ def test_render_relay_script_and_unit():
     assert "forward_tcp" in script
     assert "UdpRelay" in script
 
-    unit = forwarding.render_relay_unit("ldbp-pl-link-11223344-relay.service", "/usr/local/bin/test.py", "pl_11223344")
+    unit = forwarding.render_relay_unit("vxlb-pl-link-11223344-relay.service", "/usr/local/bin/test.py", "pl_11223344")
     assert "Requires=wg-quick@pl_11223344.service" in unit
     assert "After=network.target wg-quick@pl_11223344.service" in unit
     assert "ExecStart=/usr/bin/python3 /usr/local/bin/test.py" in unit
@@ -113,7 +113,7 @@ def test_apply_forwarding_lifecycle_success(active_link_state):
     # Verify commands executed
     commands = " ".join(call.args[0] for call in mock_ssh.execute.call_args_list)
     assert "systemctl daemon-reload" in commands
-    assert "systemctl restart ldbp-pl-link-11223344-relay.service" in commands
+    assert "systemctl restart vxlb-pl-link-11223344-relay.service" in commands
 
     verify_mock.assert_called_once()
     assert verify_mock.call_args[0][2] == [8080, 9000]
@@ -122,7 +122,7 @@ def test_apply_forwarding_lifecycle_success(active_link_state):
     link = data["custom_links"]["link_test"]
     assert len(link["port_forwarding_rules"]) == 2
     relay = link["runtime"]["relay"]
-    assert relay["service"] == "ldbp-pl-link-11223344-relay.service"
+    assert relay["service"] == "vxlb-pl-link-11223344-relay.service"
     assert relay["ports"] == [8080, 9000]
     assert relay["state"] == "active"
 
@@ -138,7 +138,7 @@ def test_apply_forwarding_rollback_on_listener_failure(active_link_state):
     assert "Relay listener verification failed" in msg
     # Verify rollback commands executed
     commands = " ".join(call.args[0] for call in mock_ssh.execute.call_args_list)
-    assert "systemctl stop ldbp-pl-link-11223344-relay.service" in commands
+    assert "systemctl stop vxlb-pl-link-11223344-relay.service" in commands
     assert "rm -f" in commands
     assert data["custom_links"]["link_test"]["port_forwarding_rules"] == []
 
@@ -149,23 +149,23 @@ def test_remove_forwarding_lifecycle(active_link_state):
     link = data["custom_links"]["link_test"]
     link["port_forwarding_rules"] = [{"listen_port": 8080, "target_port": 8080, "protocol": "both"}]
     link["runtime"]["relay"] = {
-        "service": "ldbp-pl-link-11223344-relay.service",
-        "script": "/usr/local/bin/ldbp-pl-link-11223344-relay.py",
-        "unit": "/etc/systemd/system/ldbp-pl-link-11223344-relay.service",
+        "service": "vxlb-pl-link-11223344-relay.service",
+        "script": "/usr/local/bin/vxlb-pl-link-11223344-relay.py",
+        "unit": "/etc/systemd/system/vxlb-pl-link-11223344-relay.service",
         "unit_sha256": "abcdef" * 10 + "1234",
         "ports": [8080],
         "state": "active",
     }
     # sha256 query matches
-    mock_ssh.execute.return_value = (0, ("abcdef" * 10 + "1234") + "  /etc/systemd/system/ldbp-pl-link-11223344-relay.service\n", "")
+    mock_ssh.execute.return_value = (0, ("abcdef" * 10 + "1234") + "  /etc/systemd/system/vxlb-pl-link-11223344-relay.service\n", "")
 
     ok, msg = forwarding.remove_forwarding_rules("link_test")
     assert ok
     assert "removed" in msg
 
     commands = " ".join(call.args[0] for call in mock_ssh.execute.call_args_list)
-    assert "systemctl stop ldbp-pl-link-11223344-relay.service" in commands
-    assert "rm -f -- /usr/local/bin/ldbp-pl-link-11223344-relay.py" in commands
+    assert "systemctl stop vxlb-pl-link-11223344-relay.service" in commands
+    assert "rm -f -- /usr/local/bin/vxlb-pl-link-11223344-relay.py" in commands
 
     assert data["custom_links"]["link_test"]["port_forwarding_rules"] == []
     assert "relay" not in data["custom_links"]["link_test"]["runtime"]
@@ -176,12 +176,12 @@ def test_remove_forwarding_guards_foreign_unit(active_link_state):
     link = data["custom_links"]["link_test"]
     link["port_forwarding_rules"] = [{"listen_port": 8080}]
     link["runtime"]["relay"] = {
-        "service": "ldbp-pl-link-11223344-relay.service",
-        "unit": "/etc/systemd/system/ldbp-pl-link-11223344-relay.service",
+        "service": "vxlb-pl-link-11223344-relay.service",
+        "unit": "/etc/systemd/system/vxlb-pl-link-11223344-relay.service",
         "unit_sha256": "111111" * 10 + "1234",
     }
     # sha256 mismatch (foreign file)
-    mock_ssh.execute.return_value = (0, ("999999" * 10 + "1234") + "  /etc/systemd/system/ldbp-pl-link-11223344-relay.service\n", "")
+    mock_ssh.execute.return_value = (0, ("999999" * 10 + "1234") + "  /etc/systemd/system/vxlb-pl-link-11223344-relay.service\n", "")
 
     ok, msg = forwarding.remove_forwarding_rules("link_test")
     assert not ok

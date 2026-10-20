@@ -1,4 +1,4 @@
-"""Unified adapter contract and abstract base class for LD-BP tunnel engines.
+"""Unified adapter contract and abstract base class for VX-LB tunnel engines.
 
 Standard lifecycle interface for installation, configuration,
 service start/stop, status reporting, active traffic probing, configuration modification,

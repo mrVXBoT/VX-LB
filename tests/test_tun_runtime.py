@@ -95,16 +95,16 @@ def test_firewall_removes_only_exact_owned_comment(monkeypatch):
     def run(*args, **kwargs):
         calls.append(args)
         chain = args[-1]
-        output = f'-A {chain} -p udp -m comment --comment ldbp-tun:lbt1234567890 -j ACCEPT\n-A {chain} -p udp -m comment --comment unrelated -j ACCEPT\n' if '-S' in args else ''
+        output = f'-A {chain} -p udp -m comment --comment vxlb-tun:lbt1234567890 -j ACCEPT\n-A {chain} -p udp -m comment --comment unrelated -j ACCEPT\n' if '-S' in args else ''
         return MagicMock(stdout=output, returncode=0)
     monkeypatch.setattr(firewall, 'command', run)
     firewall.remove(config)
     deleted = [args for args in calls if '-D' in args]
     assert len(deleted) == 3
-    assert all('ldbp-tun:lbt1234567890' in args and 'unrelated' not in args for args in deleted)
+    assert all('vxlb-tun:lbt1234567890' in args and 'unrelated' not in args for args in deleted)
     assert not any('-F' in args or 'iptables-restore' in args for args in calls)
     for table, chain, rule in firewall.rules(config):
         assert '--comment' in rule
-        assert 'ldbp-tun:lbt1234567890' in rule
+        assert 'vxlb-tun:lbt1234567890' in rule
         if table == 'mangle':
             assert rule[-1] == '1240'

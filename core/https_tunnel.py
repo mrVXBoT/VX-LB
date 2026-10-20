@@ -24,8 +24,8 @@ def execute(ssh,command,timeout=30):
         raise RuntimeError(str(error).replace("GRE remote command failed","فرمان انتقال HTTPS ناموفق بود؛ پیش‌نیازهای Xray، گواهی و systemd را بررسی کنید")) from error
 
 MODES = {'xhttp', 'xhttps', 'gre_xhttp', 'nova', 'reality'}
-DIRECTORY = '/etc/ldbp/https'
-HELPER = '/usr/local/libexec/ldbp-https-probe.py'
+DIRECTORY = '/etc/vxlb/https'
+HELPER = '/usr/local/libexec/vxlb-https-probe.py'
 
 
 def domain(value):
@@ -143,7 +143,7 @@ def unit(node): return Path(path(node)).stem+'.service'
 def service(node,iran=True):
     credentials='' if iran else 'LoadCredential=tls-cert:'+node['https']['profile']['certificate']+'\nLoadCredential=tls-key:'+node['https']['profile']['key']
     return f'''[Unit]
-Description=LD-BP authenticated HTTPS tunnel
+Description=VX-LB authenticated HTTPS tunnel
 After=network-online.target
 Wants=network-online.target
 [Service]

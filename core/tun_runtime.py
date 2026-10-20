@@ -17,8 +17,8 @@ from core.private_link_health import probe_pair
 from core.paqet_probe import reserve_probe_port
 
 DEFAULT_MTU = 1280
-DIRECTORY = '/etc/ldbp/tun'
-FIREWALL = '/usr/local/libexec/ldbp-tun-firewall.py'
+DIRECTORY = '/etc/vxlb/tun'
+FIREWALL = '/usr/local/libexec/vxlb-tun-firewall.py'
 
 
 def validate_mtu(value):
@@ -79,9 +79,9 @@ def artifacts(node, role, ports):
     base = f'{DIRECTORY}/{iface}'
     toml = config_text(mode='dial' if iran else 'listen', address=f'{remote if iran else local}:{meta["tunnel_port"]}',
                        token=meta['token'], interface=iface, local_private=private+'/30', peer_private=peer, mtu=meta['mtu'])
-    service = f'ldbp-tun-{iface}.service'
+    service = f'vxlb-tun-{iface}.service'
     unit = f'''[Unit]
-Description=LD-BP authenticated TUN link ({iface})
+Description=VX-LB authenticated TUN link ({iface})
 After=network-online.target
 Wants=network-online.target
 [Service]
@@ -99,9 +99,9 @@ WantedBy=multi-user.target
              peer_private=peer, port=meta['tunnel_port'], mtu=meta['mtu'])), '/etc/systemd/system/'+service: unit}
     services = [service]
     if iran and ports:
-        relay_service = f'ldbp-tun-{iface}-relay.service'
+        relay_service = f'vxlb-tun-{iface}-relay.service'
         script, relay = render_relay_service(relay_service, iface, peer, ports)
-        files[f'/etc/ldbp/{iface}-relay.py'] = script
+        files[f'/etc/vxlb/{iface}-relay.py'] = script
         files['/etc/systemd/system/'+relay_service] = relay
         services.append(relay_service)
     return files, services
@@ -200,7 +200,7 @@ def add(name, server, callback=None):
                 files, services = artifacts(node, role, pool['client_ports'])
                 deploy(ssh, files, services)
             if pool["client_ports"]:
-                verify_listeners(iran, f'ldbp-tun-{node["tun"]["interface"]}-relay.service', pool["client_ports"])
+                verify_listeners(iran, f'vxlb-tun-{node["tun"]["interface"]}-relay.service', pool["client_ports"])
             # A fresh Noise session needs time to complete its first handshake.
             result = None
             for attempt in range(3):

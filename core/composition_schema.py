@@ -1,4 +1,4 @@
-"""Unified Layer and Composition Data Model for LD-BP.
+"""Unified Layer and Composition Data Model for VX-LB.
 
 Refactor pool data modeling to explicitly separate:
 1. Network Layer (L3/Overlay routing: direct, GRE, IP6IP6, VXLAN, Geneve, WireGuard, Slipstream DNS)
@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple, Any
 import copy
 import logging
 
-logger = logging.getLogger("ldbp.composition_schema")
+logger = logging.getLogger("vxlb.composition_schema")
 
 
 @dataclass

@@ -1,4 +1,4 @@
-"""L2TP (Layer 2 Tunneling Protocol / L2TPv3 Ethernet Pseudowire) for LD-BP.
+"""L2TP (Layer 2 Tunneling Protocol / L2TPv3 Ethernet Pseudowire) for VX-LB.
 
 Coverage:
 - RFC 3931 L2TPv3 Ethernet pseudowire tunneling over UDP.
@@ -26,7 +26,7 @@ from core.ipv6_tunnel_tools import (
     validate_mtu,
 )
 
-logger = logging.getLogger("ldbp.l2tp")
+logger = logging.getLogger("vxlb.l2tp")
 
 ENGINE_ID = "l2tp"
 DEFAULT_MTU = 1380
@@ -82,7 +82,7 @@ def configure_l2tp_link(
         pool_config.get("ipv4_subnet") or "10.100.99.0/30",
     )
 
-    service_name = f"ldbp-l2tp-{iface}.service"
+    service_name = f"vxlb-l2tp-{iface}.service"
 
     ir_create_cmd = (
         f"ip l2tp add tunnel tunnel_id {iran_tid} peer_tunnel_id {kharej_tid} "
@@ -122,7 +122,7 @@ def configure_l2tp_link(
     target_ipv4 = addressing["kharej_ipv4"].split("/")[0]
 
     relay_script, relay_unit = render_relay_service(
-        service_name=f"ldbp-l2tp-{iface}-relay.service",
+        service_name=f"vxlb-l2tp-{iface}-relay.service",
         interface=iface,
         peer_ip=target_ipv4,
         ports=[int(p) for p in client_ports],

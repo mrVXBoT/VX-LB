@@ -5,10 +5,10 @@ import re
 from typing import Dict, Tuple, Optional
 from core.storage import load_data, atomic_update
 
-NGINX_CONF_PATH = "/etc/nginx/conf.d/ldbp_dashboard.conf"
+NGINX_CONF_PATH = "/etc/nginx/conf.d/vxlb_dashboard.conf"
 SSL_DIR = "/etc/nginx/ssl"
-SELFSIGNED_CERT = os.path.join(SSL_DIR, "ldbp_selfsigned.crt")
-SELFSIGNED_KEY = os.path.join(SSL_DIR, "ldbp_selfsigned.key")
+SELFSIGNED_CERT = os.path.join(SSL_DIR, "vxlb_selfsigned.crt")
+SELFSIGNED_KEY = os.path.join(SSL_DIR, "vxlb_selfsigned.key")
 
 # Cloudflare Supported Ports
 CF_HTTP_PORTS = [2052, 2082, 2086, 8880]
@@ -34,7 +34,7 @@ def ensure_selfsigned_cert() -> Tuple[bool, str]:
                 "-newkey", "rsa:2048",
                 "-keyout", SELFSIGNED_KEY,
                 "-out", SELFSIGNED_CERT,
-                "-subj", "/CN=ldbp-dashboard"
+                "-subj", "/CN=vxlb-dashboard"
             ]
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
             if res.returncode != 0:
@@ -45,7 +45,7 @@ def ensure_selfsigned_cert() -> Tuple[bool, str]:
 
 def apply_nginx_config(domain: str = "", ssl_mode: str = "cloudflare") -> Tuple[bool, str]:
     """
-    Configures Nginx reverse proxy for LD-BP dashboard.
+    Configures Nginx reverse proxy for VX-LB dashboard.
     Supports Cloudflare CDN ports (HTTP: 2052, 2082, 2086, 8880 / HTTPS: 8443, 2095).
     """
     ok, msg = ensure_selfsigned_cert()
@@ -66,7 +66,7 @@ def apply_nginx_config(domain: str = "", ssl_mode: str = "cloudflare") -> Tuple[
 
     server_names = "_" if not domain_clean else f"{domain_clean} _"
 
-    nginx_conf = f"""# LD-BP Dashboard CDN & Direct Ports
+    nginx_conf = f"""# VX-LB Dashboard CDN & Direct Ports
 server {{
     listen 2052 default_server;
     listen 2082 default_server;

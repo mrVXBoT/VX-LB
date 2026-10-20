@@ -49,7 +49,7 @@ def signature(config, stamp, nonce):
 
 def request(config):
     stamp=str(int(time.time()));nonce=secrets.token_hex(16)
-    auth=f'LDBP {stamp}:{nonce}:{signature(config,stamp,nonce)}'
+    auth=f'VXLB {stamp}:{nonce}:{signature(config,stamp,nonce)}'
     target=authority(config)
     return f'CONNECT {target} HTTP/1.1\r\nHost: {target}\r\nProxy-Authorization: {auth}\r\n\r\n'.encode('ascii')
 
@@ -79,7 +79,7 @@ def authorized(config, data, seen):
         line,fields=parse_headers(data)
         if line!=f'CONNECT {authority(config)} HTTP/1.1' or fields.get('host')!=authority(config):
             return False
-        match=re.fullmatch(r'LDBP ([0-9]{1,12}):([0-9a-f]{32}):([0-9a-f]{64})',fields.get('proxy-authorization',''))
+        match=re.fullmatch(r'VXLB ([0-9]{1,12}):([0-9a-f]{32}):([0-9a-f]{64})',fields.get('proxy-authorization',''))
         if not match:
             return False
         stamp,nonce,digest=match.groups();now=time.time()
@@ -171,7 +171,7 @@ async def open_remote(config, context):
     sock=tcp_socket()
     try:
         await asyncio.wait_for(asyncio.get_running_loop().sock_connect(sock,(config['remote_host'],int(config['remote_port']))),10)
-        options=dict(ssl=context,server_hostname=config.get('server_name','ldbp-http'),ssl_handshake_timeout=8) if context else {}
+        options=dict(ssl=context,server_hostname=config.get('server_name','vxlb-http'),ssl_handshake_timeout=8) if context else {}
         result=await asyncio.wait_for(asyncio.open_connection(sock=sock,limit=HEADER_LIMIT,**options),10)
         if context and result[1].get_extra_info('ssl_object').selected_alpn_protocol()!='http/1.1':
             await close(result[1]);raise RuntimeError('HTTPS carrier ALPN mismatch')
@@ -196,7 +196,7 @@ async def run(config):
             if is_server:
                 data=await asyncio.wait_for(reader.readuntil(b'\r\n\r\n'),5)
                 if not authorized(config,data,seen):
-                    writer.write(b'HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: LDBP realm="ldbp"\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
+                    writer.write(b'HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: VXLB realm="vxlb"\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
                     await writer.drain();return
                 remote_reader,remote_writer=await asyncio.wait_for(asyncio.open_connection('127.0.0.1',int(config['backend_port'])),5)
                 writer.write(b'HTTP/1.1 200 Connection Established\r\n\r\n')

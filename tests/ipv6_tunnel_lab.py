@@ -90,8 +90,8 @@ def main():
 
     print("Running live kernel netns lab for GRE6 and IP6IP6...")
     # Two namespaces: ns_ir and ns_kh
-    ns_ir = "ldbp_test_ir"
-    ns_kh = "ldbp_test_kh"
+    ns_ir = "vxlb_test_ir"
+    ns_kh = "vxlb_test_kh"
 
     try:
         # Cleanup any stale namespaces

@@ -141,10 +141,10 @@ class AllTunnelsAndLifecycleTests(unittest.TestCase):
             allowed_ports=[8443]
         )
         for r in rules:
-            self.assertIn("ldbp-alpha", r)
+            self.assertIn("vxlb-alpha", r)
 
         cleanup = ScopedFirewallManager.generate_cleanup_script("alpha")
-        self.assertIn("grep -v 'ldbp-alpha'", cleanup)
+        self.assertIn("grep -v 'vxlb-alpha'", cleanup)
 
         # Secret masking
         raw_log = 'Tunnel token="super_secret_token_12345" and password="my_password_xyz"'
@@ -231,11 +231,11 @@ class AllTunnelsAndLifecycleTests(unittest.TestCase):
         rules = ScopedFirewallManager.generate_ufw_rules("pool1", "198.51.100.1", "10.100.0.0/30", [51820, 8080])
         self.assertEqual(len(rules), 5)  # 2 ports * 2 protos (tcp/udp) + 1 subnet rule
         self.assertTrue(all("ufw allow" in r for r in rules))
-        self.assertTrue(all("ldbp-pool1" in r for r in rules))
+        self.assertTrue(all("vxlb-pool1" in r for r in rules))
 
         svc_name, unit = ScopedFirewallManager.generate_persistence_unit("pool1", rules)
-        self.assertEqual(svc_name, "ldbp-fw-pool1.service")
-        self.assertIn("Description=LD-BP Scoped Firewall Rules (pool1)", unit)
+        self.assertEqual(svc_name, "vxlb-fw-pool1.service")
+        self.assertIn("Description=VX-LB Scoped Firewall Rules (pool1)", unit)
         self.assertIn("RemainAfterExit=yes", unit)
 
     def test_dependency_preview_and_blocked_deletion(self):

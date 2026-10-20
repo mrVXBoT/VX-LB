@@ -18,10 +18,10 @@ def run(*args):
 
 
 def main():
-    if not os.environ.get('LD_BP_LAB_HOST_NETNS') or os.readlink('/proc/self/ns/net') == os.environ['LD_BP_LAB_HOST_NETNS'] or os.geteuid() != 0:
+    if not os.environ.get('VX_LB_LAB_HOST_NETNS') or os.readlink('/proc/self/ns/net') == os.environ['VX_LB_LAB_HOST_NETNS'] or os.geteuid() != 0:
         raise RuntimeError('This lab must run in an isolated user/network namespace')
     children=[];workers=[]
-    with tempfile.TemporaryDirectory(prefix='ldbp-gre-lab-') as folder:
+    with tempfile.TemporaryDirectory(prefix='vxlb-gre-lab-') as folder:
         try:
             for _ in range(2): children.append(subprocess.Popen(['unshare','-n','sleep','120']))
             pids=[str(p.pid) for p in children]
@@ -32,7 +32,7 @@ def main():
                     if os.readlink('/proc/'+pid+'/ns/net')!=os.readlink('/proc/self/ns/net'):break
                     time.sleep(.01)
                 else:raise RuntimeError('Child namespace did not start')
-            def ns(index,*args):return run('nsenter','-t',pids[index],'-n','--','env','LD_BP_VICI_SOCKET='+folder+'/run-'+str(index)+'/charon.vici',*args)
+            def ns(index,*args):return run('nsenter','-t',pids[index],'-n','--','env','VX_LB_VICI_SOCKET='+folder+'/run-'+str(index)+'/charon.vici',*args)
             run('ip','link','add','lab-a','type','veth','peer','name','lab-b')
             for index,link in enumerate(('lab-a','lab-b')):
                 run('ip','link','set',link,'netns',pids[index])
@@ -46,7 +46,7 @@ def main():
             # /etc/strongswan.conf (a trimmed standalone file is rejected).
             # Use the default /run/charon.vici inside each namespace's own
             # namespace filesystem instead of trying to move the socket.
-            bwrap=os.environ.get('LD_BP_LAB_BWRAP','bwrap')
+            bwrap=os.environ.get('VX_LB_LAB_BWRAP','bwrap')
             for index in range(2):
                 run_dir = folder+'/run-'+str(index)
                 pathlib.Path(run_dir).mkdir()
@@ -62,7 +62,7 @@ def main():
                     log.seek(0);raise RuntimeError('Private charon socket did not start: '+log.read())
             configs=[];paths=[];before=[]
             for index in range(2):
-                c=dict(owner='ldbp-gre-v1',interface='ldg0123456789',role='iran' if index==0 else 'kharej',
+                c=dict(owner='vxlb-gre-v1',interface='ldg0123456789',role='iran' if index==0 else 'kharej',
                        local='192.0.2.'+str(index+1),remote='192.0.2.'+str(2-index),
                        private='10.203.0.'+str(index+1),peer='10.203.0.'+str(2-index),key=123456,mtu=1400,ports=[22500],security={'mode':'ipsec','psk':'c'*64,'reqid':123456})
                 configs.append(c);paths.append(folder+'/'+str(index)+'.json');pathlib.Path(paths[-1]).write_text(json.dumps(c))
@@ -171,7 +171,7 @@ print('TCP+UDP forwarding passed')
             for index in range(2):
                 ns(index,'python3',AGENT,'down',paths[index]);ns(index,'python3',AGENT,'down',paths[index])
                 firewall=ns(index,'iptables','-S','INPUT')
-                assert 'unrelated-test-rule' in firewall and 'ldbp-gre-' not in firewall and 'ldbp-sec-' not in firewall
+                assert 'unrelated-test-rule' in firewall and 'vxlb-gre-' not in firewall and 'vxlb-sec-' not in firewall
             print('PASS: actual keyed GRE, large TCP + multi-packet UDP, scoped DROP-policy firewall, MTU update, counters, unchanged default route/ip_forward and idempotent cleanup')
         except Exception:
             for file in pathlib.Path(folder).glob('charon-*.log'):
@@ -188,5 +188,5 @@ if __name__=='__main__':
     import sys
     if '--inside' in sys.argv:main()
     else:
-        env=dict(os.environ,LD_BP_LAB_HOST_NETNS=os.readlink('/proc/self/ns/net'))
+        env=dict(os.environ,VX_LB_LAB_HOST_NETNS=os.readlink('/proc/self/ns/net'))
         sys.exit(subprocess.call(['unshare','-Urn',sys.executable,__file__,'--inside'],env=env))

@@ -1,4 +1,4 @@
-"""WireGuard and Obfuscated Hybrid Tunnel Adapters for LD-BP.
+"""WireGuard and Obfuscated Hybrid Tunnel Adapters for VX-LB.
 
 Covers:
 - WireGuard (peer/key/AllowedIPs, endpoint, keepalive, IPv4/IPv6 private addressing)
@@ -414,7 +414,7 @@ class WireGuardAdapter(BaseTunnelAdapter):
         """Tears down services, deletes interfaces, flushes scoped firewall rules, and deletes configs."""
         iface = identifier.replace("wg-quick@", "").replace(".service", "")
         svc = f"wg-quick@{iface}.service"
-        relay_svc = f"ldbp-wg-{iface}-relay.service"
+        relay_svc = f"vxlb-wg-{iface}-relay.service"
         conf_path = f"/etc/wireguard/{iface}.conf"
         bak_path = f"/etc/wireguard/{iface}.conf.bak"
         fw_tag = f"wg-{iface.replace('wg-', '')}"
@@ -426,7 +426,7 @@ class WireGuardAdapter(BaseTunnelAdapter):
             f"systemctl stop {svc} 2>/dev/null; "
             f"systemctl disable {svc} 2>/dev/null; "
             f"ip link del {iface} 2>/dev/null; "
-            f"rm -f {conf_path} {bak_path} /etc/systemd/system/{relay_svc} /usr/local/bin/ldbp-wg-{iface}-relay.py; "
+            f"rm -f {conf_path} {bak_path} /etc/systemd/system/{relay_svc} /usr/local/bin/vxlb-wg-{iface}-relay.py; "
             f"{cleanup_fw}; "
             f"systemctl daemon-reload"
         )
@@ -567,7 +567,7 @@ if __name__ == '__main__':
     asyncio.run(main())
 '''
     unit = f'''[Unit]
-Description=LD-BP WireGuard Client Ports Relay ({iface})
+Description=VX-LB WireGuard Client Ports Relay ({iface})
 After=network-online.target wg-quick@{iface}.service
 Wants=network-online.target
 Requires=wg-quick@{iface}.service
@@ -576,7 +576,7 @@ Requires=wg-quick@{iface}.service
 Type=simple
 Restart=on-failure
 RestartSec=3
-ExecStart=/usr/bin/python3 /usr/local/bin/ldbp-wg-{iface}-relay.py
+ExecStart=/usr/bin/python3 /usr/local/bin/vxlb-wg-{iface}-relay.py
 
 [Install]
 WantedBy=multi-user.target
@@ -760,8 +760,8 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
         if ports:
             progress("راه‌اندازی سرویس رله فورواردینگ پورت‌ها روی سرور ایران...")
             relay_py, relay_unit = generate_wireguard_relay(iface, clean_kh_ip, ports)
-            relay_script_path = f"/usr/local/bin/ldbp-wg-{iface}-relay.py"
-            relay_unit_name = f"ldbp-wg-{iface}-relay.service"
+            relay_script_path = f"/usr/local/bin/vxlb-wg-{iface}-relay.py"
+            relay_unit_name = f"vxlb-wg-{iface}-relay.service"
             relay_unit_path = f"/etc/systemd/system/{relay_unit_name}"
 
             if not ir_ssh.write_file(relay_script_path, relay_py):

@@ -28,7 +28,7 @@ def test_real_kernel_commands_and_private_families(carrier):
         assert 'type ip6gre' in unit and 'encaplimit none' in unit
     for role in ['iran','kharej']:
         for tool, table, chain, rule in firewall.rules(conf[role+'_firewall']):
-            assert 'ldbp-dc6:'+conf['interface'] in rule
+            assert 'vxlb-dc6:'+conf['interface'] in rule
             if table=='mangle':assert rule[-1] == '1220'
 
 
@@ -80,14 +80,14 @@ def test_firewall_cleanup_preserves_unrelated_ipv4_and_ipv6_rules(monkeypatch):
     def command(tool,*args,**kwargs):
         calls.append((tool,*args))
         chain=args[-1]
-        rows=f'-A {chain} -m comment --comment ldbp-dc6:{iface} -j ACCEPT\n-A {chain} -m comment --comment other-owner -j ACCEPT\n' if '-S' in args else ''
+        rows=f'-A {chain} -m comment --comment vxlb-dc6:{iface} -j ACCEPT\n-A {chain} -m comment --comment other-owner -j ACCEPT\n' if '-S' in args else ''
         return MagicMock(stdout=rows,returncode=0)
     monkeypatch.setattr(firewall,'command',command)
     firewall.remove({'interface':iface})
     deleted=[call for call in calls if '-D' in call]
     assert len(deleted)==6
     assert {call[0] for call in deleted}=={'iptables','ip6tables'}
-    assert all('ldbp-dc6:'+iface in call and 'other-owner' not in call for call in deleted)
+    assert all('vxlb-dc6:'+iface in call and 'other-owner' not in call for call in deleted)
     assert not any('-F' in call or 'iptables-restore' in call for call in calls)
 
 

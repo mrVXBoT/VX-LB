@@ -1,4 +1,4 @@
-"""IP6IP6 (IPv6-in-IPv6) Tunnel Engine and Tools for LD-BP.
+"""IP6IP6 (IPv6-in-IPv6) Tunnel Engine and Tools for VX-LB.
 
 Coverage:
 - Direct IPv6-in-IPv6 tunnel carried over native IPv6 underlay (RFC 2473)
@@ -34,7 +34,7 @@ from core.ipv6_tunnel_tools import (
 
 from core.ssh_client import SSHManager
 
-logger = logging.getLogger("ldbp.ip6ip6")
+logger = logging.getLogger("vxlb.ip6ip6")
 
 ENGINE_ID = "ip6ip6"
 TUNNEL_MODE = "ip6tnl"
@@ -128,8 +128,8 @@ def configure_ip6ip6_link(
         prefix_v6="fd00:1db0:66",
     )
 
-    svc_name = f"ldbp-ip6ip6-{iface}.service"
-    conf_path = f"/etc/ldbp/ip6ip6/{iface}.json"
+    svc_name = f"vxlb-ip6ip6-{iface}.service"
+    conf_path = f"/etc/vxlb/ip6ip6/{iface}.json"
 
     # Command for Iran endpoint: ip link add ... type ip6tnl mode ip6ip6 ...
     ir_create_cmd = (
@@ -344,7 +344,7 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
         atomic_update(append_node)
 
         # Deploy on Kharej
-        kh_ssh.execute("mkdir -p /etc/ldbp/ip6ip6")
+        kh_ssh.execute("mkdir -p /etc/vxlb/ip6ip6")
         publish(kh_ssh, f"/etc/systemd/system/{svc}", conf["kharej_service_unit"])
         publish(kh_ssh, conf["config_path"], json.dumps(conf, indent=2))
         ok_start_kh, msg_start_kh = adapter.start(kh_ssh, iface)
@@ -352,7 +352,7 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
             raise RuntimeError(f"Failed starting IP6IP6 on Kharej: {msg_start_kh}")
 
         # Deploy on Iran
-        ir_ssh.execute("mkdir -p /etc/ldbp/ip6ip6")
+        ir_ssh.execute("mkdir -p /etc/vxlb/ip6ip6")
         publish(ir_ssh, f"/etc/systemd/system/{svc}", conf["iran_service_unit"])
         publish(ir_ssh, conf["config_path"], json.dumps(conf, indent=2))
         ok_start_ir, msg_start_ir = adapter.start(ir_ssh, iface)
@@ -363,16 +363,16 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
         ports = pool.get("client_ports", [])
         if ports:
             target_priv = conf["private_addressing"]["kharej_ipv6"]
-            relay_code, relay_unit = render_relay_service(f"ldbp-ip6ip6-{iface}-relay.service", iface, target_priv, ports)
-            publish(ir_ssh, f"/etc/ldbp/{iface}-relay.py", relay_code)
-            publish(ir_ssh, f"/etc/systemd/system/ldbp-ip6ip6-{iface}-relay.service", relay_unit)
-            code, _, error = ir_ssh.execute(f"systemctl daemon-reload && systemctl enable --now ldbp-ip6ip6-{iface}-relay.service")
+            relay_code, relay_unit = render_relay_service(f"vxlb-ip6ip6-{iface}-relay.service", iface, target_priv, ports)
+            publish(ir_ssh, f"/etc/vxlb/{iface}-relay.py", relay_code)
+            publish(ir_ssh, f"/etc/systemd/system/vxlb-ip6ip6-{iface}-relay.service", relay_unit)
+            code, _, error = ir_ssh.execute(f"systemctl daemon-reload && systemctl enable --now vxlb-ip6ip6-{iface}-relay.service")
             if code:
                 raise RuntimeError("Native IPv6 relay startup failed: " + error)
 
         if ports:
             from core.kernel_relay_ports import verify_listeners
-            verify_listeners(ir_ssh, f"ldbp-ip6ip6-{iface}-relay.service", ports)
+            verify_listeners(ir_ssh, f"vxlb-ip6ip6-{iface}-relay.service", ports)
         from core.private_link_health import probe_pair
         result = probe_pair(ir_ssh, kh_ssh, node["ip6ip6"]["local_private"], node["ip6ip6"]["remote_private"], iface)
         def finalize(data):

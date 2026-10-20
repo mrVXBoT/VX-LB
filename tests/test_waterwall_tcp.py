@@ -2,7 +2,7 @@
 """
 Integration tests for WaterWall TCP tunnel (requires WaterWall binary).
 
-Run: LD_BP_WATERWALL_BINARY=/path/to/waterwall python3 -m pytest tests/test_waterwall_tcp.py -v -s
+Run: VX_LB_WATERWALL_BINARY=/path/to/waterwall python3 -m pytest tests/test_waterwall_tcp.py -v -s
 
 This suite tests:
 1. TCP basic tunnel data transmission and echo
@@ -30,9 +30,9 @@ from core import waterwall
 class WaterWallTcpIntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.binary = os.environ.get('LD_BP_WATERWALL_BINARY')
+        cls.binary = os.environ.get('VX_LB_WATERWALL_BINARY')
         if not cls.binary or not Path(cls.binary).exists():
-            raise unittest.SkipTest(f"LD_BP_WATERWALL_BINARY not set or not found: {cls.binary}")
+            raise unittest.SkipTest(f"VX_LB_WATERWALL_BINARY not set or not found: {cls.binary}")
 
     def free_port(self):
         """Find a free port."""
@@ -67,7 +67,7 @@ class WaterWallTcpIntegrationTest(unittest.TestCase):
             return str(unpacked_path)
 
         # Unpack via dynamic interception of execveat / syscall(SYS_execveat)
-        with tempfile.TemporaryDirectory(prefix='ldbp-ww-unpack-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-ww-unpack-') as tmpdir:
             tmpdir = Path(tmpdir)
             hook_c = tmpdir / 'dump.c'
             hook_so = tmpdir / 'dump.so'
@@ -231,7 +231,7 @@ long syscall(long number, ...) {
         node = self.node_config()
         entry_port = self.free_port()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
 
@@ -323,7 +323,7 @@ long syscall(long number, ...) {
         node = self.node_config()
         entry_port = self.free_port()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
 
@@ -399,7 +399,7 @@ long syscall(long number, ...) {
         """Test that sending raw plaintext to Kharej outer port fails closed."""
         node = self.node_config()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
 
@@ -467,7 +467,7 @@ long syscall(long number, ...) {
         node = self.node_config()
         entry_port = self.free_port()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
 
@@ -552,7 +552,7 @@ long syscall(long number, ...) {
             raise unittest.SkipTest("Public network connection to 1.1.1.1:443 unavailable or throttled")
 
         entry_port = self.free_port()
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-') as tmpdir:
             tmpdir = Path(tmpdir)
             chain = {
                 'name': 'test-valid-tls-verify',
@@ -626,7 +626,7 @@ long syscall(long number, ...) {
             raise unittest.SkipTest("Public network connection to 1.1.1.1:443 unavailable or throttled")
 
         entry_port = self.free_port()
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-') as tmpdir:
             tmpdir = Path(tmpdir)
             chain = {
                 'name': 'test-wrong-sni-rejected',
@@ -687,7 +687,7 @@ long syscall(long number, ...) {
         node = self.node_config()
         entry_port = self.free_port()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
             node['waterwall']['profile']['certificate'] = str(cert_file)
@@ -753,7 +753,7 @@ long syscall(long number, ...) {
         node = self.node_config()
         entry_port = self.free_port()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
             node['waterwall']['profile']['certificate'] = str(cert_file)
@@ -814,7 +814,7 @@ long syscall(long number, ...) {
         backend_port = self.free_port()
         node['waterwall']['backend_port'] = backend_port
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-') as tmpdir:
             tmpdir = Path(tmpdir)
             ca_cert, server_cert, server_key = self._generate_ca_and_cert(tmpdir, domain='tunnel.test')
             node['waterwall']['profile']['certificate'] = str(server_cert)
@@ -887,7 +887,7 @@ long syscall(long number, ...) {
         backend_port = self.free_port()
         node['waterwall']['backend_port'] = backend_port
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-') as tmpdir:
             tmpdir = Path(tmpdir)
             # Generate cert for wrong domain (impersonator.example.com)
             ca_cert, server_cert, server_key = self._generate_ca_and_cert(tmpdir, domain='impersonator.example.com')
@@ -941,7 +941,7 @@ long syscall(long number, ...) {
         backend_port = self.free_port()
         unauthorized_port = self.free_port()
 
-        with tempfile.TemporaryDirectory(prefix='ldbp-waterwall-') as tmpdir:
+        with tempfile.TemporaryDirectory(prefix='vxlb-waterwall-') as tmpdir:
             tmpdir = Path(tmpdir)
             cert_file, key_file = self._generate_cert(tmpdir)
             node['waterwall']['profile']['certificate'] = str(cert_file)

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock,patch
 import pytest
 from core import geneve_agent as agent
 
-CONFIG={'owner':'ldbp-geneve-v1','role':'iran','interface':'gni1234','local':'192.0.2.1','remote':'192.0.2.2','private':'10.205.0.1','peer':'10.205.0.2','vni':1000,'dst_port':6081,'mtu':1400,'ports':[443],'security':{'mode':'ipsec','psk':'c'*64,'reqid':123}}
+CONFIG={'owner':'vxlb-geneve-v1','role':'iran','interface':'gni1234','local':'192.0.2.1','remote':'192.0.2.2','private':'10.205.0.1','peer':'10.205.0.2','vni':1000,'dst_port':6081,'mtu':1400,'ports':[443],'security':{'mode':'ipsec','psk':'c'*64,'reqid':123}}
 
 
 def test_teardown_requests_detailed_link_kind_and_keeps_guard_until_deletion():

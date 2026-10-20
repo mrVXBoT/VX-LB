@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-logger = logging.getLogger("ldbp.spoof_engine")
+logger = logging.getLogger("vxlb.spoof_engine")
 
 # ---------------------------------------------------------------------------
 # Base32 & DNS Encoding Utilities (QS-Tunnel Compatible)

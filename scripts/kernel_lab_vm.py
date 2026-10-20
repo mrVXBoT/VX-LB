@@ -17,7 +17,7 @@ import subprocess
 import sys
 import tarfile
 
-CACHE=Path.home()/'.cache/ldbp-kernel-lab'
+CACHE=Path.home()/'.cache/vxlb-kernel-lab'
 ROOT=Path(__file__).resolve().parents[1]
 PORT=18766
 
@@ -36,14 +36,14 @@ def prepare():
     if actual!=expected:raise RuntimeError('Ubuntu image checksum mismatch (or incomplete download)')
     if source!=image:source.rename(image)
     if not (CACHE/'id_ed25519').exists():
-        run('ssh-keygen','-q','-t','ed25519','-N','','-C','ldbp-isolated-kernel-lab','-f',CACHE/'id_ed25519')
+        run('ssh-keygen','-q','-t','ed25519','-N','','-C','vxlb-isolated-kernel-lab','-f',CACHE/'id_ed25519')
     (CACHE/'id_ed25519').chmod(0o600)
     public=(CACHE/'id_ed25519.pub').read_text().strip()
     cloud=f'''#cloud-config
-hostname: ldbp-kernel-lab
+hostname: vxlb-kernel-lab
 manage_etc_hosts: true
 users:
-  - name: ldbp
+  - name: vxlb
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: true
@@ -70,12 +70,12 @@ packages:
   - iproute2
   - iputils-ping
 runcmd:
-  - [bash, -c, 'set -e; if ! modprobe geneve; then apt-get install -y linux-modules-extra-$(uname -r); fi; for m in geneve vxlan bridge wireguard ip6_gre ip6_tunnel; do modprobe "$m"; done; touch /var/lib/ldbp-lab-ready']
+  - [bash, -c, 'set -e; if ! modprobe geneve; then apt-get install -y linux-modules-extra-$(uname -r); fi; for m in geneve vxlan bridge wireguard ip6_gre ip6_tunnel; do modprobe "$m"; done; touch /var/lib/vxlb-lab-ready']
 '''
     sys.path.insert(0,str(CACHE/'python'))
     import pycdlib
     iso=pycdlib.PyCdlib();iso.new(interchange_level=3,joliet=3,rock_ridge='1.09',vol_ident='cidata')
-    for iso_name,rr_name,content in [('USER_DATA.;1','user-data',cloud),('META_DATA.;1','meta-data','instance-id: ldbp-kernel-lab-1\nlocal-hostname: ldbp-kernel-lab\n')]:
+    for iso_name,rr_name,content in [('USER_DATA.;1','user-data',cloud),('META_DATA.;1','meta-data','instance-id: vxlb-kernel-lab-1\nlocal-hostname: vxlb-kernel-lab\n')]:
         payload=content.encode();iso.add_fp(io.BytesIO(payload),len(payload),iso_path='/'+iso_name,rr_name=rr_name,joliet_path='/'+rr_name)
     iso.write(str(CACHE/'seed.iso'));iso.close()
     if not (CACHE/'disk.qcow2').exists():
@@ -95,7 +95,7 @@ def pid():
 
 def start():
     if pid():print('Already running PID',pid());return
-    run('qemu-system-x86_64','-name','ldbp-isolated-kernel-lab','-enable-kvm','-cpu','host','-m','1536','-smp','2','-drive',f'file={CACHE}/disk.qcow2,if=virtio,format=qcow2','-drive',f'file={CACHE}/seed.iso,media=cdrom,readonly=on','-netdev',f'user,id=labnet,hostfwd=tcp:127.0.0.1:{PORT}-:22','-device','virtio-net-pci,netdev=labnet','-display','none','-serial',f'file:{CACHE}/serial.log','-monitor',f'unix:{CACHE}/monitor.sock,server,nowait','-pidfile',CACHE/'vm.pid','-daemonize')
+    run('qemu-system-x86_64','-name','vxlb-isolated-kernel-lab','-enable-kvm','-cpu','host','-m','1536','-smp','2','-drive',f'file={CACHE}/disk.qcow2,if=virtio,format=qcow2','-drive',f'file={CACHE}/seed.iso,media=cdrom,readonly=on','-netdev',f'user,id=labnet,hostfwd=tcp:127.0.0.1:{PORT}-:22','-device','virtio-net-pci,netdev=labnet','-display','none','-serial',f'file:{CACHE}/serial.log','-monitor',f'unix:{CACHE}/monitor.sock,server,nowait','-pidfile',CACHE/'vm.pid','-daemonize')
     print('Started isolated VM PID',pid(),'SSH 127.0.0.1:'+str(PORT))
 
 
@@ -109,7 +109,7 @@ def ssh():
         def missing_host_key(self,client,hostname,key):
             client.get_host_keys().add(hostname,key.get_name(),key);client.save_host_keys(str(known));known.chmod(0o600)
     client.set_missing_host_key_policy(LabFirstUse())
-    client.connect('127.0.0.1',port=PORT,username='ldbp',key_filename=str(CACHE/'id_ed25519'),allow_agent=False,look_for_keys=False,timeout=5,banner_timeout=5,auth_timeout=5)
+    client.connect('127.0.0.1',port=PORT,username='vxlb',key_filename=str(CACHE/'id_ed25519'),allow_agent=False,look_for_keys=False,timeout=5,banner_timeout=5,auth_timeout=5)
     return client
 
 
@@ -120,7 +120,7 @@ def execute(command):
         output=stdout.read().decode(errors='replace');error=stderr.read().decode(errors='replace')
         code=stdout.channel.recv_exit_status()
         print(output,end='');print(error,end='',file=sys.stderr)
-        name=os.environ.get('LD_BP_LAB_CAPTURE')
+        name=os.environ.get('VX_LB_LAB_CAPTURE')
         if name:
             if Path(name).name!=name:raise ValueError('Capture must be a filename')
             folder=CACHE/'logs';folder.mkdir(mode=0o700,exist_ok=True)
@@ -142,8 +142,8 @@ def sync():
                         tar.add(path,arcname=str(path.relative_to(ROOT)))
         payload.seek(0)
         with client.open_sftp() as sftp:
-            sftp.putfo(payload,'/tmp/ldbp-lab-source.tar.gz')
-        stdin,stdout,stderr=client.exec_command('sudo mkdir -p /opt/ldbp-lab && sudo tar -xzf /tmp/ldbp-lab-source.tar.gz -C /opt/ldbp-lab',timeout=30)
+            sftp.putfo(payload,'/tmp/vxlb-lab-source.tar.gz')
+        stdin,stdout,stderr=client.exec_command('sudo mkdir -p /opt/vxlb-lab && sudo tar -xzf /tmp/vxlb-lab-source.tar.gz -C /opt/vxlb-lab',timeout=30)
         error=stderr.read().decode();code=stdout.channel.recv_exit_status()
         if code:raise RuntimeError(error)
         print('Synced core/ and tests/ only; no inventory, credentials or production data')
@@ -156,7 +156,7 @@ def main():
     elif args.action=='start':start()
     elif args.action=='status':
         print('Managed VM PID:',pid())
-        if pid():return execute('test -f /var/lib/ldbp-lab-ready && echo LAB_READY; cloud-init status; uname -r')
+        if pid():return execute('test -f /var/lib/vxlb-lab-ready && echo LAB_READY; cloud-init status; uname -r')
     elif args.action=='exec':return execute(' '.join(args.command))
     elif args.action=='sync':sync()
     elif args.action=='stop':

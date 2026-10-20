@@ -70,7 +70,7 @@ def cleanup(ssh,files,services):
 def queue_status(iran,node):
     identity=node['http_connect']['id']
     if len(identity)!=32 or any(c not in '0123456789abcdef' for c in identity):raise ValueError('Invalid packet ownership identity')
-    base='/etc/ldbp/spoof/'+identity
+    base='/etc/vxlb/spoof/'+identity
     return json.loads(execute(iran,'python3 '+shlex.quote(base+'/queue-agent.py')+' status '+shlex.quote(base+'/queue.json')))
 
 
@@ -90,7 +90,7 @@ def verify(iran,kharej,node):
             streams.append((stdin,stdout.channel));stdout.channel.settimeout(10)
             if stdout.readline().strip()!=str(port):raise RuntimeError('Packet probe echo could not bind')
             before=queue_status(iran,node)
-            base='/etc/ldbp/spoof/'+meta['id']
+            base='/etc/vxlb/spoof/'+meta['id']
             trace_in,trace_out,_=iran.client.exec_command('python3 -u '+shlex.quote(base+'/wire.py')+' '+shlex.quote(base+'/wire.json'),timeout=10)
             streams.append((trace_in,trace_out.channel));trace_out.channel.settimeout(25)
             if trace_out.readline().strip()!='READY':raise RuntimeError('Packet wire observer did not start')
@@ -118,7 +118,7 @@ def create(name, kharej, servers, ports, transport='fake-sni', callback=None, fa
             fake_sni=hostname(fake_sni);delta=number(auto_ttl_delta,1,15,'TTL delta')
             if transport!='hop-ttl-injection' and delta!=3:raise ValueError('TTL delta applies only to the Hop profile')
             if transport not in ('fake-sni','hop-ttl-injection') and fake_sni!='www.shaparak.ir':raise ValueError('Selected profile does not inject a fake SNI')
-            if transport=='hop-ttl-injection' and fake_sni=='ldbp-http':raise ValueError('Fake SNI must differ from the authenticated carrier identity')
+            if transport=='hop-ttl-injection' and fake_sni=='vxlb-http':raise ValueError('Fake SNI must differ from the authenticated carrier identity')
             if any(kwargs.get(key) for key in ['spoof_ips','peer_spoof_ip','dns_resolvers','send_domains','fake_send_ip','fake_send_port','info_encryption_pass','knock_key','mode']):raise ValueError('Raw source/DNS options do not apply to this packet profile')
             if transport not in MODES or not ports or not servers or name in get_pools():
                 raise ValueError('Select a packet profile mode, unused pool name, ports and Iran servers')

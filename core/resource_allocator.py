@@ -1,4 +1,4 @@
-"""Central resource allocator and reservation manager for LD-BP multi-tunnel platform.
+"""Central resource allocator and reservation manager for VX-LB multi-tunnel platform.
 
 Unified transactional reservation and conflict detection across all
 engines for:

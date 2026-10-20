@@ -57,7 +57,7 @@ def test_configure_sit_link():
     cfg = sit.configure_sit_link(iran, kharej, pool_config)
     assert cfg["engine"] == "sit"
     assert cfg["interface"] == "sit-test"
-    assert cfg["service_name"] == "ldbp-sit-sit-test.service"
+    assert cfg["service_name"] == "vxlb-sit-sit-test.service"
     assert cfg["mtu"] == 1440
     assert cfg["underlay"]["iran_ip"] == "192.0.2.10"
     assert cfg["underlay"]["kharej_ip"] == "198.51.100.20"
@@ -81,14 +81,14 @@ def test_sit_adapter_lifecycle():
     ok, _ = adapter.start(mock_ssh, "sit-test")
     assert ok
     commands = " ".join(call.args[0] for call in mock_ssh.execute.call_args_list)
-    assert "systemctl restart ldbp-sit-sit-test.service" in commands
+    assert "systemctl restart vxlb-sit-sit-test.service" in commands
 
     mock_ssh.reset_mock()
     mock_ssh.execute.return_value = (0, "", "")
     ok, _ = adapter.stop(mock_ssh, "sit-test")
     assert ok
     commands = " ".join(call.args[0] for call in mock_ssh.execute.call_args_list)
-    assert "systemctl stop ldbp-sit-sit-test.service" in commands
+    assert "systemctl stop vxlb-sit-sit-test.service" in commands
 
     mock_ssh.reset_mock()
     mock_ssh.execute.return_value = (0, "", "")
@@ -96,7 +96,7 @@ def test_sit_adapter_lifecycle():
     assert ok
     commands = " ".join(call.args[0] for call in mock_ssh.execute.call_args_list)
     assert "ip link del sit-test" in commands
-    assert "rm -f /etc/systemd/system/ldbp-sit-sit-test.service" in commands
+    assert "rm -f /etc/systemd/system/vxlb-sit-sit-test.service" in commands
 
 
 def test_sit_status():

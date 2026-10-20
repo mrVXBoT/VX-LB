@@ -41,7 +41,7 @@ from core.validation import (
     validate_ports,
 )
 
-logger = logging.getLogger("ldbp.spoof_adapter")
+logger = logging.getLogger("vxlb.spoof_adapter")
 
 ENGINE_ID = "spoof"
 
@@ -110,7 +110,7 @@ class QSTunnelConfig(BaseModel):
     send_domains: List[str] = Field(default_factory=lambda: ["cdn.shaparak.ir", "cloud.cloudflare.com"])
     fake_send_ip: str = "4.2.2.4"
     fake_send_port: int = 443
-    info_encryption_pass: str = "ldbp-qs-secret"
+    info_encryption_pass: str = "vxlb-qs-secret"
     max_domain_len: int = 253
     max_sub_len: int = 63
 
@@ -273,7 +273,7 @@ class SpoofDedicatedAdapter(BaseTunnelAdapter):
         except Exception as error:return False,str(error)
 
     def status(self,ssh,identifier):
-        if not re.fullmatch(r'ldbp-(?:http|spoof)-[0-9a-f]{32}-(?:client|server|nfq|queue|records)(?:-carrier|-firewall)?\.service',str(identifier)):
+        if not re.fullmatch(r'vxlb-(?:http|spoof)-[0-9a-f]{32}-(?:client|server|nfq|queue|records)(?:-carrier|-firewall)?\.service',str(identifier)):
             return {'status':'DOWN','details':{'path_verified':False,'error':'Owned managed service identifier required'}}
         code,out,error=ssh.execute('systemctl is-active '+shlex.quote(identifier))
         return {'status':'UP' if code==0 and out.strip()=='active' else 'DOWN','details':{'path_verified':False,'error':error}}

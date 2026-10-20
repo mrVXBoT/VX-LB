@@ -154,14 +154,14 @@ def free_port():
     with socket.socket() as sock:sock.bind(('127.0.0.1',0));return sock.getsockname()[1]
 
 
-@unittest.skipUnless(os.environ.get('LD_BP_XRAY_BINARY'),'Set LD_BP_XRAY_BINARY to run actual TLS data tests')
+@unittest.skipUnless(os.environ.get('VX_LB_XRAY_BINARY'),'Set VX_LB_XRAY_BINARY to run actual TLS data tests')
 class HttpsNetworkTests(unittest.TestCase):
     def test_xhttp_tls_and_identity_failure(self):self.exercise('xhttp')
 
     def exercise(self,mode):
-        binary=os.environ['LD_BP_XRAY_BINARY'];workers=[];sockets=[];capture=bytearray();stop=threading.Event()
+        binary=os.environ['VX_LB_XRAY_BINARY'];workers=[];sockets=[];capture=bytearray();stop=threading.Event()
         root=Path(__file__).resolve().parents[1]
-        with tempfile.TemporaryDirectory(prefix='ldbp-https-') as folder:
+        with tempfile.TemporaryDirectory(prefix='vxlb-https-') as folder:
             folder=Path(folder)
             probe_script=root/'core/https_probe.py'
             subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(folder/'key.pem'),'-out',str(folder/'cert.pem'),

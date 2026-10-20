@@ -32,7 +32,7 @@ def test_private_probe_and_peer_keys_have_correct_ownership(mode):
     for role in ['server','client']:
         carrier=json.loads(config[role+'_files'][base+'/'+role+'-carrier.json'])
         assert carrier['tls'] is (mode=='https')
-        assert carrier['server_name']=='ldbp-http'
+        assert carrier['server_name']=='vxlb-http'
         assert len(config[role+'_services'])==3
     client_fw=json.loads(config['client_files'][base+'/client-firewall.json'])
     rules=list(firewall.rules(client_fw))
@@ -111,7 +111,7 @@ def test_cleanup_removes_only_exact_owned_firewall_rules(monkeypatch):
     calls=[]
     def run(*args,**kwargs):
         calls.append(args)
-        rows='-A INPUT -m comment --comment ldbp-http:'+('1'*32)+' -j ACCEPT\n-A INPUT -m comment --comment other-owner -j ACCEPT\n' if '-S' in args else ''
+        rows='-A INPUT -m comment --comment vxlb-http:'+('1'*32)+' -j ACCEPT\n-A INPUT -m comment --comment other-owner -j ACCEPT\n' if '-S' in args else ''
         return MagicMock(stdout=rows,returncode=0)
     monkeypatch.setattr(firewall,'command',run)
     firewall.remove({'id':'1'*32})
@@ -198,5 +198,5 @@ def test_extra_owned_cleanup_failure_prevents_file_deletion():
     ssh=MagicMock()
     def cleanup(session):raise RuntimeError('owned rule remains')
     with pytest.raises(RuntimeError,match='owned rule remains'):
-        http.cleanup(ssh,{'/etc/ldbp/http/owned/config.json':'{}'},[],extra_cleanup=cleanup)
+        http.cleanup(ssh,{'/etc/vxlb/http/owned/config.json':'{}'},[],extra_cleanup=cleanup)
     ssh.execute.assert_not_called()

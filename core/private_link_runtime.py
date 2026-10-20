@@ -59,18 +59,18 @@ def spec(link):
     cfg = WireGuardAdapter().configure({'ip': link['iran_server']['ip'], 'node_name': iface},
         {'ip': link['kharej_server']['ip']}, dict(interface=iface, ipv4_subnet=subnet,
         tunnel_port=link['tunnel_port'], mtu=link['mtu'], enable_psk=True))
-    guard_path='/etc/wireguard/ldbp-'+identity+'-guard.py'
-    guard_service='ldbp-'+identity+'-route-guard.service'
-    dropin='/etc/systemd/system/'+cfg['service_name']+'.d/ldbp-route-guard.conf'
+    guard_path='/etc/wireguard/vxlb-'+identity+'-guard.py'
+    guard_service='vxlb-'+identity+'-route-guard.service'
+    dropin='/etc/systemd/system/'+cfg['service_name']+'.d/vxlb-route-guard.conf'
     guard_source=Path(__file__).with_name('private_route_guard.py').read_text()
-    guard_unit=('[Unit]\nDescription=LD-BP private route guard\nBefore=network-pre.target\n'
+    guard_unit=('[Unit]\nDescription=VX-LB private route guard\nBefore=network-pre.target\n'
                 '[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/bin/python3 '+guard_path+' ensure '+subnet+'\n'
                 '[Install]\nWantedBy=multi-user.target\n')
     cfg['guard_files']={guard_path:guard_source, '/etc/systemd/system/'+guard_service:guard_unit,
                         dropin:'[Unit]\nRequires='+guard_service+'\nAfter='+guard_service+'\n'}
     cfg['guard_service']=guard_service
     cfg['guard_subnet']=subnet
-    tag = 'ldbp-pl:'+identity
+    tag = 'vxlb-pl:'+identity
     for role, peer in (('iran', 'kharej'), ('kharej', 'iran')):
         remote = link[peer+'_server']
         rules = [f'-p udp -s {remote["ip"]} --dport {cfg["tunnel_port"]} -m comment --comment {tag} -j ACCEPT',
@@ -189,7 +189,7 @@ def delete(name):
                 if not re.fullmatch(r'[a-zA-Z0-9_-]{1,15}', iface) or not re.fullmatch(r'link-[0-9a-f]{8}', identity):
                     raise ValueError('Invalid private-link cleanup identity')
                 path, service = '/etc/wireguard/'+iface+'.conf', 'wg-quick@'+iface+'.service'
-                tag = 'ldbp-pl:'+identity
+                tag = 'vxlb-pl:'+identity
                 for role in ('iran','kharej'):
                     owner = runtime['endpoints'][role]
                     if owner.get('state') == 'cleaned':
@@ -217,9 +217,9 @@ def delete(name):
                             if position+1 < len(args) and args[position+1] == tag:
                                 checked(ssh, 'iptables -w 5 -t '+table+' -D '+ ' '.join(map(shlex.quote,args[1:])))
                     if owner.get('guard_service'):
-                        guard_service='ldbp-'+identity+'-route-guard.service'
-                        guard_path='/etc/wireguard/ldbp-'+identity+'-guard.py'
-                        expected={guard_path,'/etc/systemd/system/'+guard_service,'/etc/systemd/system/'+service+'.d/ldbp-route-guard.conf'}
+                        guard_service='vxlb-'+identity+'-route-guard.service'
+                        guard_path='/etc/wireguard/vxlb-'+identity+'-guard.py'
+                        expected={guard_path,'/etc/systemd/system/'+guard_service,'/etc/systemd/system/'+service+'.d/vxlb-route-guard.conf'}
                         if owner['guard_service']!=guard_service or set(owner.get('guard_files',{}))!=expected or owner.get('guard_subnet')!=link['private_subnet']:
                             raise ValueError('Private route guard ownership is invalid')
                         for artifact,digest in owner['guard_files'].items():

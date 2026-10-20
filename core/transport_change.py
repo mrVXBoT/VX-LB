@@ -215,7 +215,7 @@ def install_and_verify(iran, kharej, unit, path, contents, diagnostics=None):
     return restored
 
 def apply_file(ssh, path, content):
-    staged = path + '.ldbp-new'
+    staged = path + '.vxlb-new'
     if not ssh.write_file(staged, content): raise RuntimeError('نوشتن تنظیمات جدید ناموفق بود')
     check(ssh, 'chmod 600 ' + shlex.quote(staged) + ' && mv -- ' + shlex.quote(staged) + ' ' + shlex.quote(path))
 
@@ -507,7 +507,7 @@ def _run_backpack_rolling_change(name, pool, job, recovering):
             sessions.append(ir)
             unit = unit_name(node)
             path = '/etc/backpack/' + node['node_name'] + '.toml'
-            backup = path + '.ldbp-' + job['id'] + '.bak'
+            backup = path + '.vxlb-' + job['id'] + '.bak'
             if not active(ir, unit) or not active(kh, unit):
                 raise RuntimeError('سرویس قبلی یکی از نودها فعال نیست؛ قبل از تغییر آن را اصلاح کنید')
             contents = []

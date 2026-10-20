@@ -26,7 +26,7 @@ class HttpConnectAdapter(BaseTunnelAdapter):
         return False,'Stop requires the complete owned HTTP endpoint plan'
 
     def status(self, ssh, identifier):
-        if not re.fullmatch(r'ldbp-http-[0-9a-f]{32}-(client|server)(-carrier|-firewall)?\.service',str(identifier)):
+        if not re.fullmatch(r'vxlb-http-[0-9a-f]{32}-(client|server)(-carrier|-firewall)?\.service',str(identifier)):
             return {'status':'DOWN','details':{'error':'Invalid owned HTTP service'}}
         code,out,error=ssh.execute('systemctl is-active '+shlex.quote(identifier))
         return {'status':'UP' if code==0 and out.strip()=='active' else 'DOWN','details':{'path_verified':False,'error':error}}

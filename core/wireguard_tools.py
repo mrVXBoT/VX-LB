@@ -1,4 +1,4 @@
-"""Dedicated WireGuard Tools and Utilities for LD-BP.
+"""Dedicated WireGuard Tools and Utilities for VX-LB.
 
 Covers:
 - WireGuard peer/key/AllowedIPs, endpoint, keepalive, and IPv4/IPv6 private addressing.
@@ -451,9 +451,9 @@ end = time.monotonic() + 15
 while time.monotonic() < end:
     try:
         data, addr = sock.recvfrom(2048)
-        if data.startswith(b"LD-BP-WG:"):
+        if data.startswith(b"VX-LB-WG:"):
             nonce = data[9:]
-            sock.sendto(b"LD-BP-WG-OK:" + nonce, addr)
+            sock.sendto(b"VX-LB-WG-OK:" + nonce, addr)
             break
     except (TimeoutError, OSError):
         pass
@@ -466,7 +466,7 @@ target_port = int(sys.argv[2])
 nonce = sys.argv[3].encode("ascii")
 # Large TCP data must cross the link: a handshake and small UDP nonce miss
 # path-MTU black holes that stall ordinary application streams.
-large = ((b"LD-BP-WG:" + nonce) * 2048)[:65536]
+large = ((b"VX-LB-WG:" + nonce) * 2048)[:65536]
 with socket.create_connection((target_ip, target_port), timeout=5) as tcp:
     tcp.settimeout(5); tcp.sendall(large); received = b""
     while len(received) < len(large):
@@ -476,8 +476,8 @@ with socket.create_connection((target_ip, target_port), timeout=5) as tcp:
     if received != large: raise RuntimeError("WireGuard TCP 64KiB nonce mismatch")
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.settimeout(2.5)
-payload = b"LD-BP-WG:" + nonce
-expected = b"LD-BP-WG-OK:" + nonce
+payload = b"VX-LB-WG:" + nonce
+expected = b"VX-LB-WG-OK:" + nonce
 
 t0 = time.monotonic()
 success = False

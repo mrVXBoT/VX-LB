@@ -81,9 +81,9 @@ class LocalMockSSH:
             return (0, self.journal_error, '')
 
         # Real command execution for python probe / echo
-        if 'waterwall_probe' in cmd or 'bp-waterwall-probe' in cmd:
+        if 'waterwall_probe' in cmd or 'vxlb-waterwall-probe' in cmd:
             # Replace helper with local script path
-            cmd_run = cmd.replace('/usr/local/bin/bp-waterwall-probe', HELPER_SCRIPT)
+            cmd_run = cmd.replace('/usr/local/bin/vxlb-waterwall-probe', HELPER_SCRIPT)
             if 'probe' in cmd and self.mock_tunnel and LocalMockSSH.last_echo_port:
                 parts = cmd_run.split()
                 for i, p in enumerate(parts):
@@ -108,7 +108,7 @@ class LocalMockSSH:
                 if p == 'echo' and i + 1 < len(parts) and parts[i+1].isdigit():
                     LocalMockSSH.last_echo_port = int(parts[i+1])
                     break
-        cmd_run = cmd.replace('/usr/local/bin/bp-waterwall-probe', HELPER_SCRIPT)
+        cmd_run = cmd.replace('/usr/local/bin/vxlb-waterwall-probe', HELPER_SCRIPT)
         proc = subprocess.Popen(
             cmd_run,
             shell=True,
@@ -128,7 +128,7 @@ class LocalMockSSH:
 
 class WaterWallOpsTests(unittest.TestCase):
     def setUp(self):
-        self.tmpdir = tempfile.TemporaryDirectory(prefix='ldbp-ops-test-')
+        self.tmpdir = tempfile.TemporaryDirectory(prefix='vxlb-ops-test-')
         self.tmp_path = Path(self.tmpdir.name)
 
         # Free ports for testing
@@ -190,7 +190,7 @@ class WaterWallOpsTests(unittest.TestCase):
         iran_ssh = LocalMockSSH(service_active=True)
         kharej_ssh = LocalMockSSH(service_active=True)
 
-        with patch.dict(os.environ, {'LD_BP_WATERWALL_PROBE_HELPER': HELPER_SCRIPT}):
+        with patch.dict(os.environ, {'VX_LB_WATERWALL_PROBE_HELPER': HELPER_SCRIPT}):
             waterwall.verify(iran_ssh, kharej_ssh, self.node, ports=[self.backend_port])
 
         # Verify commands were executed
@@ -236,14 +236,14 @@ class WaterWallOpsTests(unittest.TestCase):
                 app_server.bind(('127.0.0.1', self.backend_port))
                 app_server.listen(1)
 
-                with patch.dict(os.environ, {'LD_BP_WATERWALL_PROBE_HELPER': HELPER_SCRIPT}):
+                with patch.dict(os.environ, {'VX_LB_WATERWALL_PROBE_HELPER': HELPER_SCRIPT}):
                     status, reason, details = waterwall.health(self.pool_name, self.node, [self.backend_port])
 
                 self.assertEqual(status, 'HEALTHY')
                 self.assertEqual(details[str(self.backend_port)]['status'], 'HEALTHY')
 
             # 2. Application port closed -> DEGRADED (tunnel probe ok, but backend port inactive)
-            with patch.dict(os.environ, {'LD_BP_WATERWALL_PROBE_HELPER': HELPER_SCRIPT}):
+            with patch.dict(os.environ, {'VX_LB_WATERWALL_PROBE_HELPER': HELPER_SCRIPT}):
                 status, reason, details = waterwall.health(self.pool_name, self.node, [self.backend_port])
 
             self.assertEqual(status, 'DEGRADED')
@@ -402,7 +402,7 @@ class WaterWallAdapterLifecycleTests(unittest.TestCase):
         self.assertEqual(cfg["engine"], "waterwall")
         self.assertTrue(re.fullmatch(r"ldw[0-9a-f]{16}", cfg["node_name"]))
         self.assertEqual(cfg["service_name"], f"{cfg['node_name']}.service")
-        self.assertEqual(cfg["config_path"], f"/etc/ldbp/waterwall/{cfg['node_name']}.json")
+        self.assertEqual(cfg["config_path"], f"/etc/vxlb/waterwall/{cfg['node_name']}.json")
 
         node = cfg["node"]
         service_name = cfg["service_name"]
@@ -439,7 +439,7 @@ class WaterWallAdapterLifecycleTests(unittest.TestCase):
 
         # 5. Probe using node and ports directly produced by configure()
         ports_to_probe = [int(p) for p in configured_client_ports]
-        with patch.dict(os.environ, {"LD_BP_WATERWALL_PROBE_HELPER": HELPER_SCRIPT}):
+        with patch.dict(os.environ, {"VX_LB_WATERWALL_PROBE_HELPER": HELPER_SCRIPT}):
             # Probe with explicit ports from configure
             probe_res = self.adapter.probe(iran_ssh, kharej_ssh, ports=ports_to_probe, node=node)
             self.assertTrue(probe_res["passed"], f"Probe failed: {probe_res}")
@@ -630,7 +630,7 @@ class WaterWallRealBinaryExecutionTests(unittest.TestCase):
 
     def test_real_binary_probe_and_fail_closed_on_tunnel_stop(self):
         """Execute real WaterWall processes from configure() output with active TLS verify, pass adapter.probe, and verify fail-closed causality."""
-        with tempfile.TemporaryDirectory(prefix="ldbp-ww-real-") as tmpdir_str:
+        with tempfile.TemporaryDirectory(prefix="vxlb-ww-real-") as tmpdir_str:
             tmpdir = Path(tmpdir_str)
             ca_cert, server_cert, server_key = self._generate_ca_and_cert(tmpdir, domain="tunnel.test")
 

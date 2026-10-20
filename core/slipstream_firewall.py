@@ -27,7 +27,7 @@ def validated(config):
 
 def arguments(config):
     token, port, rate = validated(config)
-    return ['-p', 'udp', '--dport', str(port), '-m', 'comment', '--comment', 'ldbp-slipstream:'+token,
+    return ['-p', 'udp', '--dport', str(port), '-m', 'comment', '--comment', 'vxlb-slipstream:'+token,
             '-m', 'hashlimit', '--hashlimit-above', str(rate)+'/second',
             '--hashlimit-burst', str(rate * 2), '--hashlimit-mode', 'srcip',
             '--hashlimit-name', 'ls'+token[:12], '--hashlimit-htable-max', '4096',
@@ -41,7 +41,7 @@ def command(*values):
 
 def remove(config, preserve_backend=False):
     token, _, _ = validated(config)
-    tag = 'ldbp-slipstream:'+token
+    tag = 'vxlb-slipstream:'+token
     for row in command('-S', 'INPUT').splitlines():
         parts = shlex.split(row)
         if len(parts) < 2 or parts[:2] != ['-A', 'INPUT']:
@@ -62,7 +62,7 @@ def apply(config):
     if config.get('backend_port'):
         token, _, _ = validated(config)
         backend = ['!', '-i', 'lo', '-p', 'udp', '--dport', str(config['backend_port']),
-                   '-m', 'comment', '--comment', 'ldbp-slipstream:'+token, '-j', 'DROP']
+                   '-m', 'comment', '--comment', 'vxlb-slipstream:'+token, '-j', 'DROP']
         try:
             command('-C', 'INPUT', *backend)
         except subprocess.CalledProcessError as error:

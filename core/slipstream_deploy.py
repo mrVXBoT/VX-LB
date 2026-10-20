@@ -12,7 +12,7 @@ from core.slipstream_runtime import domain_name, resolver_address, server_argv, 
 from core.validation import validate_port, validate_ports, validate_tunnel_name
 
 
-def identity_material(common_name="ldbp-slipstream"):
+def identity_material(common_name="vxlb-slipstream"):
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
@@ -44,7 +44,7 @@ def unit(name, command, requires=None, pre=None, post=None):
     encoded = ' '.join('"' + str(value).replace('\\', '\\\\').replace('"', '\\"').replace('%', '%%') + '"' for value in command)
     hooks = ''.join(key + '=' + ' '.join(shlex.quote(str(value)) for value in values) + '\n'
                     for key, values in (('ExecStartPre', pre), ('ExecStopPost', post)) if values)
-    return (f'[Unit]\nDescription=LD-BP Slipstream {name}\nAfter=network-online.target\nWants=network-online.target\n{dependency}'
+    return (f'[Unit]\nDescription=VX-LB Slipstream {name}\nAfter=network-online.target\nWants=network-online.target\n{dependency}'
             f'[Service]\nType=simple\n{hooks}ExecStart={encoded}\nRestart=always\nRestartSec=2\n'
             'UMask=0077\nNoNewPrivileges=true\nPrivateTmp=true\nProtectHome=true\nProtectSystem=strict\n'
             'Environment=SSLKEYLOGFILE=\n[Install]\nWantedBy=multi-user.target\n')
@@ -55,7 +55,7 @@ def plan(node, outside, pool):
     if not re.fullmatch(r'[0-9a-f]{16}', token):
         raise ValueError('Slipstream resource identity is invalid')
     node_id = token + '-' + hashlib.sha256(node['ip'].encode()).hexdigest()[:10]
-    base = f'/etc/ldbp/slipstream/{token}'
+    base = f'/etc/vxlb/slipstream/{token}'
     domain = domain_name(pool.get('domain'))
     resolvers = pool.get('resolvers')
     if not isinstance(resolvers, list) or not resolvers:
@@ -69,10 +69,10 @@ def plan(node, outside, pool):
                          cert=base+'/server.crt', key=base+'/server.key', peer_cert=base+'/client.crt')
     client_config = dict(role='client', carrier_port=carrier_port, ports=ports,
                          cert=base+'/client.crt', key=base+'/client.key', peer_cert=base+'/server.crt')
-    server_relay = f'ldbp-slipstream-{token}-secure.service'
-    server_dns = f'ldbp-slipstream-{token}-dns.service'
-    client_dns = f'ldbp-slipstream-{node_id}-dns.service'
-    client_relay = f'ldbp-slipstream-{node_id}-secure.service'
+    server_relay = f'vxlb-slipstream-{token}-secure.service'
+    server_dns = f'vxlb-slipstream-{token}-dns.service'
+    client_dns = f'vxlb-slipstream-{node_id}-dns.service'
+    client_relay = f'vxlb-slipstream-{node_id}-secure.service'
     agent = Path(__file__).with_name('slipstream_secure_relay.py').read_text()
     server_files = {base+'/server.crt': security['server_cert'], base+'/server.key': security['server_key'],
                     base+'/client.crt': security['client_cert'], base+'/relay.py': agent,
@@ -96,7 +96,7 @@ def plan(node, outside, pool):
             post=['/usr/bin/python3', base+'/firewall.py', 'remove', base+'/firewall.json'])
     if int(pool.get('slipstream_runtime_version', 1)) >= 3:
         backend = int(validate_port(pool['slipstream_dns_backend_port']))
-        guard = f'ldbp-slipstream-{token}-guard.service'
+        guard = f'vxlb-slipstream-{token}-guard.service'
         server_files[base+'/guard.py'] = Path(__file__).with_name('slipstream_dns_guard.py').read_text()
         server_files[base+'/guard.json'] = json.dumps(dict(listen_host=outside['ip'], listen_port=pool['dns_port'], backend_port=backend, domain=domain))
         firewall['backend_port'] = backend

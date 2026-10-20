@@ -11,7 +11,7 @@ import os
 import glob
 import re
 
-LOG_PATH = "/var/log/bp-user-connections.log"
+LOG_PATH = "/var/log/vxlb-user-connections.log"
 MAX_LOG_SIZE = 10 * 1024 * 1024  # 10 MB
 
 def _rotate_log_if_needed():

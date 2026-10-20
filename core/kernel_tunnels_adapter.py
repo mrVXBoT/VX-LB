@@ -1,4 +1,4 @@
-"""Kernel and Network Layer Tunnel Adapters for LD-BP.
+"""Kernel and Network Layer Tunnel Adapters for VX-LB.
 
 Coverage:
 - IP6IP6
@@ -52,24 +52,24 @@ class KernelTunnelBaseAdapter(BaseTunnelAdapter):
             "local_ip": ir_ip,
             "remote_ip": kh_ip,
             "private_subnet": priv_net,
-            "service_name": f"ldbp-{iface}.service",
+            "service_name": f"vxlb-{iface}.service",
             "unit_script": f"ip link add {iface} type {self.tunnel_mode} local {ir_ip} remote {kh_ip} && ip link set {iface} mtu {mtu} up"
         }
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {svc} && systemctl restart {svc}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-{identifier}.service"
         cmd = f"systemctl stop {svc} && systemctl disable {svc}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-{identifier}.service"
         ok, out, _ = ssh.execute(f"systemctl is-active {svc}")
         is_active = (ok == 0 and out.strip() == "active")
         return {
@@ -92,8 +92,8 @@ class KernelTunnelBaseAdapter(BaseTunnelAdapter):
         return False, f"Rollback is unsupported for kernel tunnel '{self.engine_id}'"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-", "").replace(".service", "")
-        svc = f"ldbp-{iface}.service"
+        iface = identifier.replace("vxlb-", "").replace(".service", "")
+        svc = f"vxlb-{iface}.service"
         cmd = f"systemctl stop {svc} 2>/dev/null; ip link del {iface} 2>/dev/null; rm -f /etc/systemd/system/{svc}; systemctl daemon-reload"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
@@ -118,20 +118,20 @@ class Gre6Adapter(BaseTunnelAdapter):
         return configure_gre6_link(iran_node, kharej_server, pool_config)
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre6-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre6-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre6-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre6-{identifier}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre6-{identifier}.service"
-        iface = identifier.replace("ldbp-gre6-", "").replace(".service", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre6-{identifier}.service"
+        iface = identifier.replace("vxlb-gre6-", "").replace(".service", "")
 
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         is_active = (ok_svc == 0 and out_svc.strip() == "active")
@@ -209,7 +209,7 @@ class Gre6Adapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Dynamic modify unsupported for pool '{pool_name}' without active gre6 context"
 
-        iface = raw_iface.replace("ldbp-gre6-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-gre6-", "").replace(".service", "")
 
         if "mtu" in updates:
             try:
@@ -221,7 +221,7 @@ class Gre6Adapter(BaseTunnelAdapter):
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            svc = f"ldbp-gre6-{iface}.service"
+            svc = f"vxlb-gre6-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
             code, _, error = ssh.execute(f"cp {unit_file} {unit_bak}")
@@ -249,7 +249,7 @@ class Gre6Adapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Rollback unsupported for pool '{pool_name}' without previous gre6 snapshot"
 
-        iface = raw_iface.replace("ldbp-gre6-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-gre6-", "").replace(".service", "")
 
         if prev_mtu:
             try:
@@ -257,7 +257,7 @@ class Gre6Adapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            svc = f"ldbp-gre6-{iface}.service"
+            svc = f"vxlb-gre6-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
 
@@ -273,11 +273,11 @@ class Gre6Adapter(BaseTunnelAdapter):
         return True, "Rollback completed"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-gre6-", "").replace(".service", "")
-        svc = f"ldbp-gre6-{iface}.service"
+        iface = identifier.replace("vxlb-gre6-", "").replace(".service", "")
+        svc = f"vxlb-gre6-{iface}.service"
         unit_file = f"/etc/systemd/system/{svc}"
         unit_bak = f"/etc/systemd/system/{svc}.bak"
-        conf_file = f"/etc/ldbp/gre6/{iface}.json"
+        conf_file = f"/etc/vxlb/gre6/{iface}.json"
 
         cmd = (
             f"systemctl stop {shlex.quote(svc)} 2>/dev/null || true; "
@@ -318,20 +318,20 @@ class Ip6Ip6Adapter(BaseTunnelAdapter):
         return configure_ip6ip6_link(iran_node, kharej_server, pool_config)
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-ip6ip6-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-ip6ip6-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-ip6ip6-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-ip6ip6-{identifier}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-ip6ip6-{identifier}.service"
-        iface = identifier.replace("ldbp-ip6ip6-", "").replace(".service", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-ip6ip6-{identifier}.service"
+        iface = identifier.replace("vxlb-ip6ip6-", "").replace(".service", "")
 
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         is_active = (ok_svc == 0 and out_svc.strip() == "active")
@@ -413,7 +413,7 @@ class Ip6Ip6Adapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Dynamic modify unsupported for pool '{pool_name}' without active ip6ip6 context"
 
-        iface = raw_iface.replace("ldbp-ip6ip6-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-ip6ip6-", "").replace(".service", "")
 
         if "mtu" in updates:
             try:
@@ -425,7 +425,7 @@ class Ip6Ip6Adapter(BaseTunnelAdapter):
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            svc = f"ldbp-ip6ip6-{iface}.service"
+            svc = f"vxlb-ip6ip6-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
             code, _, error = ssh.execute(f"cp {unit_file} {unit_bak}")
@@ -453,7 +453,7 @@ class Ip6Ip6Adapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Rollback unsupported for pool '{pool_name}' without previous ip6ip6 snapshot"
 
-        iface = raw_iface.replace("ldbp-ip6ip6-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-ip6ip6-", "").replace(".service", "")
 
         if prev_mtu:
             try:
@@ -461,7 +461,7 @@ class Ip6Ip6Adapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            svc = f"ldbp-ip6ip6-{iface}.service"
+            svc = f"vxlb-ip6ip6-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
 
@@ -477,11 +477,11 @@ class Ip6Ip6Adapter(BaseTunnelAdapter):
         return True, "Rollback completed"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-ip6ip6-", "").replace(".service", "")
-        svc = f"ldbp-ip6ip6-{iface}.service"
+        iface = identifier.replace("vxlb-ip6ip6-", "").replace(".service", "")
+        svc = f"vxlb-ip6ip6-{iface}.service"
         unit_file = f"/etc/systemd/system/{svc}"
         unit_bak = f"/etc/systemd/system/{svc}.bak"
-        conf_file = f"/etc/ldbp/ip6ip6/{iface}.json"
+        conf_file = f"/etc/vxlb/ip6ip6/{iface}.json"
 
         cmd = (
             f"systemctl stop {shlex.quote(svc)} 2>/dev/null || true; "
@@ -518,20 +518,20 @@ class GreTapAdapter(BaseTunnelAdapter):
         return configure_gretap_link(iran_node, kharej_server, pool_config, engine_id="gretap")
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gretap-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gretap-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gretap-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gretap-{identifier}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gretap-{identifier}.service"
-        iface = identifier.replace("ldbp-gretap-", "").replace(".service", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gretap-{identifier}.service"
+        iface = identifier.replace("vxlb-gretap-", "").replace(".service", "")
 
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         is_active = (ok_svc == 0 and out_svc.strip() == "active")
@@ -614,12 +614,12 @@ class GreTapAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid MTU: {e}"
 
-            iface = raw_iface.replace("ldbp-gretap-", "").replace(".service", "")
+            iface = raw_iface.replace("vxlb-gretap-", "").replace(".service", "")
             ok_cur, out_cur, _ = ssh.execute(f"ip link show {shlex.quote(iface)}")
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            svc = f"ldbp-gretap-{iface}.service"
+            svc = f"vxlb-gretap-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
             ssh.execute(f"cp {unit_file} {unit_bak} 2>/dev/null || true")
@@ -643,7 +643,7 @@ class GreTapAdapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Rollback unsupported for pool '{pool_name}' without previous gretap snapshot"
 
-        iface = raw_iface.replace("ldbp-gretap-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-gretap-", "").replace(".service", "")
 
         if prev_mtu:
             try:
@@ -651,7 +651,7 @@ class GreTapAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            svc = f"ldbp-gretap-{iface}.service"
+            svc = f"vxlb-gretap-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
 
@@ -667,10 +667,10 @@ class GreTapAdapter(BaseTunnelAdapter):
         return True, "Rollback completed"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-gretap-", "").replace("ldbp-", "").replace(".service", "")
-        svc = f"ldbp-gretap-{iface}.service"
-        relay_svc = f"ldbp-gretap-{iface}-relay.service"
-        relay_script = f"/etc/ldbp/{iface}-relay.py"
+        iface = identifier.replace("vxlb-gretap-", "").replace("vxlb-", "").replace(".service", "")
+        svc = f"vxlb-gretap-{iface}.service"
+        relay_svc = f"vxlb-gretap-{iface}-relay.service"
+        relay_script = f"/etc/vxlb/{iface}-relay.py"
 
         cmd = (
             f"systemctl stop {shlex.quote(relay_svc)} {shlex.quote(svc)} 2>/dev/null; "
@@ -699,20 +699,20 @@ class Gre6TapAdapter(BaseTunnelAdapter):
         return configure_gretap_link(iran_node, kharej_server, pool_config, engine_id="gre6tap")
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre6tap-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre6tap-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre6tap-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre6tap-{identifier}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre6tap-{identifier}.service"
-        iface = identifier.replace("ldbp-gre6tap-", "").replace(".service", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre6tap-{identifier}.service"
+        iface = identifier.replace("vxlb-gre6tap-", "").replace(".service", "")
 
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         is_active = (ok_svc == 0 and out_svc.strip() == "active")
@@ -796,12 +796,12 @@ class Gre6TapAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid MTU: {e}"
 
-            iface = raw_iface.replace("ldbp-gre6tap-", "").replace(".service", "")
+            iface = raw_iface.replace("vxlb-gre6tap-", "").replace(".service", "")
             ok_cur, out_cur, _ = ssh.execute(f"ip link show {shlex.quote(iface)}")
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            svc = f"ldbp-gre6tap-{iface}.service"
+            svc = f"vxlb-gre6tap-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
             ssh.execute(f"cp {unit_file} {unit_bak} 2>/dev/null || true")
@@ -825,7 +825,7 @@ class Gre6TapAdapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Rollback unsupported for pool '{pool_name}' without previous gre6tap snapshot"
 
-        iface = raw_iface.replace("ldbp-gre6tap-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-gre6tap-", "").replace(".service", "")
 
         if prev_mtu:
             try:
@@ -833,7 +833,7 @@ class Gre6TapAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            svc = f"ldbp-gre6tap-{iface}.service"
+            svc = f"vxlb-gre6tap-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
 
@@ -849,10 +849,10 @@ class Gre6TapAdapter(BaseTunnelAdapter):
         return True, "Rollback completed"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-gre6tap-", "").replace("ldbp-", "").replace(".service", "")
-        svc = f"ldbp-gre6tap-{iface}.service"
-        relay_svc = f"ldbp-gre6tap-{iface}-relay.service"
-        relay_script = f"/etc/ldbp/{iface}-relay.py"
+        iface = identifier.replace("vxlb-gre6tap-", "").replace("vxlb-", "").replace(".service", "")
+        svc = f"vxlb-gre6tap-{iface}.service"
+        relay_svc = f"vxlb-gre6tap-{iface}-relay.service"
+        relay_script = f"/etc/vxlb/{iface}-relay.py"
 
         cmd = (
             f"systemctl stop {shlex.quote(relay_svc)} {shlex.quote(svc)} 2>/dev/null; "
@@ -881,20 +881,20 @@ class Gre6TapIpsecAdapter(BaseTunnelAdapter):
         return configure_gretap_link(iran_node, kharej_server, pool_config, engine_id="gre6tap_ipsec")
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre6tap_ipsec-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre6tap_ipsec-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre6tap_ipsec-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre6tap_ipsec-{identifier}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre6tap_ipsec-{identifier}.service"
-        iface = identifier.replace("ldbp-gre6tap_ipsec-", "").replace(".service", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre6tap_ipsec-{identifier}.service"
+        iface = identifier.replace("vxlb-gre6tap_ipsec-", "").replace(".service", "")
 
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         is_active = (ok_svc == 0 and out_svc.strip() == "active")
@@ -981,12 +981,12 @@ class Gre6TapIpsecAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid MTU: {e}"
 
-            iface = raw_iface.replace("ldbp-gre6tap_ipsec-", "").replace(".service", "")
+            iface = raw_iface.replace("vxlb-gre6tap_ipsec-", "").replace(".service", "")
             ok_cur, out_cur, _ = ssh.execute(f"ip link show {shlex.quote(iface)}")
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            svc = f"ldbp-gre6tap_ipsec-{iface}.service"
+            svc = f"vxlb-gre6tap_ipsec-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
             ssh.execute(f"cp {unit_file} {unit_bak} 2>/dev/null || true")
@@ -1010,7 +1010,7 @@ class Gre6TapIpsecAdapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Rollback unsupported for pool '{pool_name}' without previous gre6tap_ipsec snapshot"
 
-        iface = raw_iface.replace("ldbp-gre6tap_ipsec-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-gre6tap_ipsec-", "").replace(".service", "")
 
         if prev_mtu:
             try:
@@ -1018,7 +1018,7 @@ class Gre6TapIpsecAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            svc = f"ldbp-gre6tap_ipsec-{iface}.service"
+            svc = f"vxlb-gre6tap_ipsec-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
 
@@ -1034,10 +1034,10 @@ class Gre6TapIpsecAdapter(BaseTunnelAdapter):
         return True, "Rollback completed"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-gre6tap_ipsec-", "").replace("ldbp-", "").replace(".service", "")
-        svc = f"ldbp-gre6tap_ipsec-{iface}.service"
-        relay_svc = f"ldbp-gre6tap_ipsec-{iface}-relay.service"
-        relay_script = f"/etc/ldbp/{iface}-relay.py"
+        iface = identifier.replace("vxlb-gre6tap_ipsec-", "").replace("vxlb-", "").replace(".service", "")
+        svc = f"vxlb-gre6tap_ipsec-{iface}.service"
+        relay_svc = f"vxlb-gre6tap_ipsec-{iface}-relay.service"
+        relay_script = f"/etc/vxlb/{iface}-relay.py"
 
         cmd = (
             f"systemctl stop {shlex.quote(relay_svc)} {shlex.quote(svc)} 2>/dev/null; "
@@ -1067,20 +1067,20 @@ class SitAdapter(BaseTunnelAdapter):
         return configure_sit_link(iran_node, kharej_server, pool_config)
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-sit-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-sit-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-sit-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-sit-{identifier}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-sit-{identifier}.service"
-        iface = identifier.replace("ldbp-sit-", "").replace(".service", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-sit-{identifier}.service"
+        iface = identifier.replace("vxlb-sit-", "").replace(".service", "")
 
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         is_active = (ok_svc == 0 and out_svc.strip() == "active")
@@ -1163,12 +1163,12 @@ class SitAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid MTU: {e}"
 
-            iface = raw_iface.replace("ldbp-sit-", "").replace(".service", "")
+            iface = raw_iface.replace("vxlb-sit-", "").replace(".service", "")
             ok_cur, out_cur, _ = ssh.execute(f"ip link show {shlex.quote(iface)}")
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            svc = f"ldbp-sit-{iface}.service"
+            svc = f"vxlb-sit-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
             ssh.execute(f"cp {unit_file} {unit_bak} 2>/dev/null || true")
@@ -1192,7 +1192,7 @@ class SitAdapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Rollback unsupported for pool '{pool_name}' without previous sit snapshot"
 
-        iface = raw_iface.replace("ldbp-sit-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-sit-", "").replace(".service", "")
 
         if prev_mtu:
             try:
@@ -1200,7 +1200,7 @@ class SitAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            svc = f"ldbp-sit-{iface}.service"
+            svc = f"vxlb-sit-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
 
@@ -1217,10 +1217,10 @@ class SitAdapter(BaseTunnelAdapter):
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
 
-        iface = identifier.replace("ldbp-sit-", "").replace("ldbp-", "").replace(".service", "")
-        svc = f"ldbp-sit-{iface}.service"
-        relay_svc = f"ldbp-sit-{iface}-relay.service"
-        relay_script = f"/etc/ldbp/{iface}-relay.py"
+        iface = identifier.replace("vxlb-sit-", "").replace("vxlb-", "").replace(".service", "")
+        svc = f"vxlb-sit-{iface}.service"
+        relay_svc = f"vxlb-sit-{iface}-relay.service"
+        relay_script = f"/etc/vxlb/{iface}-relay.py"
 
         cmd = (
             f"systemctl stop {shlex.quote(relay_svc)} {shlex.quote(svc)} 2>/dev/null; "
@@ -1249,20 +1249,20 @@ class SixToFourUnicastAdapter(BaseTunnelAdapter):
         return configure_6to4_unicast_link(iran_node, kharej_server, pool_config)
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-6to4-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-6to4-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-6to4-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-6to4-{identifier}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-6to4-{identifier}.service"
-        iface = identifier.replace("ldbp-6to4-", "").replace(".service", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-6to4-{identifier}.service"
+        iface = identifier.replace("vxlb-6to4-", "").replace(".service", "")
 
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         is_active = (ok_svc == 0 and out_svc.strip() == "active")
@@ -1346,12 +1346,12 @@ class SixToFourUnicastAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid MTU: {e}"
 
-            iface = raw_iface.replace("ldbp-6to4-", "").replace(".service", "")
+            iface = raw_iface.replace("vxlb-6to4-", "").replace(".service", "")
             ok_cur, out_cur, _ = ssh.execute(f"ip link show {shlex.quote(iface)}")
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            svc = f"ldbp-6to4-{iface}.service"
+            svc = f"vxlb-6to4-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
             ssh.execute(f"cp {unit_file} {unit_bak} 2>/dev/null || true")
@@ -1375,7 +1375,7 @@ class SixToFourUnicastAdapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Rollback unsupported for pool '{pool_name}' without previous 6to4 snapshot"
 
-        iface = raw_iface.replace("ldbp-6to4-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-6to4-", "").replace(".service", "")
 
         if prev_mtu:
             try:
@@ -1383,7 +1383,7 @@ class SixToFourUnicastAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            svc = f"ldbp-6to4-{iface}.service"
+            svc = f"vxlb-6to4-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
 
@@ -1399,10 +1399,10 @@ class SixToFourUnicastAdapter(BaseTunnelAdapter):
         return True, "Rollback completed"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-6to4-", "").replace("ldbp-", "").replace(".service", "")
-        svc = f"ldbp-6to4-{iface}.service"
-        relay_svc = f"ldbp-6to4-{iface}-relay.service"
-        relay_script = f"/etc/ldbp/{iface}-relay.py"
+        iface = identifier.replace("vxlb-6to4-", "").replace("vxlb-", "").replace(".service", "")
+        svc = f"vxlb-6to4-{iface}.service"
+        relay_svc = f"vxlb-6to4-{iface}-relay.service"
+        relay_script = f"/etc/vxlb/{iface}-relay.py"
 
         cmd = (
             f"systemctl stop {shlex.quote(relay_svc)} {shlex.quote(svc)} 2>/dev/null; "
@@ -1431,20 +1431,20 @@ class ErspanIpsecAdapter(BaseTunnelAdapter):
         return configure_erspan_link(iran_node, kharej_server, pool_config)
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-erspan-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-erspan-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-erspan-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-erspan-{identifier}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-erspan-{identifier}.service"
-        iface = identifier.replace("ldbp-erspan-", "").replace(".service", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-erspan-{identifier}.service"
+        iface = identifier.replace("vxlb-erspan-", "").replace(".service", "")
 
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         is_active = (ok_svc == 0 and out_svc.strip() == "active")
@@ -1531,12 +1531,12 @@ class ErspanIpsecAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid MTU: {e}"
 
-            iface = raw_iface.replace("ldbp-erspan-", "").replace(".service", "")
+            iface = raw_iface.replace("vxlb-erspan-", "").replace(".service", "")
             ok_cur, out_cur, _ = ssh.execute(f"ip link show {shlex.quote(iface)}")
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            svc = f"ldbp-erspan-{iface}.service"
+            svc = f"vxlb-erspan-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
             ssh.execute(f"cp {unit_file} {unit_bak} 2>/dev/null || true")
@@ -1560,7 +1560,7 @@ class ErspanIpsecAdapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Rollback unsupported for pool '{pool_name}' without previous erspan snapshot"
 
-        iface = raw_iface.replace("ldbp-erspan-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-erspan-", "").replace(".service", "")
 
         if prev_mtu:
             try:
@@ -1568,7 +1568,7 @@ class ErspanIpsecAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            svc = f"ldbp-erspan-{iface}.service"
+            svc = f"vxlb-erspan-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
 
@@ -1584,10 +1584,10 @@ class ErspanIpsecAdapter(BaseTunnelAdapter):
         return True, "Rollback completed"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-erspan-", "").replace("ldbp-", "").replace(".service", "")
-        svc = f"ldbp-erspan-{iface}.service"
-        relay_svc = f"ldbp-erspan-{iface}-relay.service"
-        relay_script = f"/etc/ldbp/{iface}-relay.py"
+        iface = identifier.replace("vxlb-erspan-", "").replace("vxlb-", "").replace(".service", "")
+        svc = f"vxlb-erspan-{iface}.service"
+        relay_svc = f"vxlb-erspan-{iface}-relay.service"
+        relay_script = f"/etc/vxlb/{iface}-relay.py"
 
         cmd = (
             f"systemctl stop {shlex.quote(relay_svc)} {shlex.quote(svc)} 2>/dev/null; "
@@ -1617,20 +1617,20 @@ class EoipAdapter(BaseTunnelAdapter):
         return configure_eoip_link(iran_node, kharej_server, pool_config)
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-eoip-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-eoip-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-eoip-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-eoip-{identifier}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-eoip-{identifier}.service"
-        iface = identifier.replace("ldbp-eoip-", "").replace(".service", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-eoip-{identifier}.service"
+        iface = identifier.replace("vxlb-eoip-", "").replace(".service", "")
 
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         is_active = (ok_svc == 0 and out_svc.strip() == "active")
@@ -1713,12 +1713,12 @@ class EoipAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid MTU: {e}"
 
-            iface = raw_iface.replace("ldbp-eoip-", "").replace(".service", "")
+            iface = raw_iface.replace("vxlb-eoip-", "").replace(".service", "")
             ok_cur, out_cur, _ = ssh.execute(f"ip link show {shlex.quote(iface)}")
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            svc = f"ldbp-eoip-{iface}.service"
+            svc = f"vxlb-eoip-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
             ssh.execute(f"cp {unit_file} {unit_bak} 2>/dev/null || true")
@@ -1742,7 +1742,7 @@ class EoipAdapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Rollback unsupported for pool '{pool_name}' without previous eoip snapshot"
 
-        iface = raw_iface.replace("ldbp-eoip-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-eoip-", "").replace(".service", "")
 
         if prev_mtu:
             try:
@@ -1750,7 +1750,7 @@ class EoipAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            svc = f"ldbp-eoip-{iface}.service"
+            svc = f"vxlb-eoip-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
 
@@ -1766,10 +1766,10 @@ class EoipAdapter(BaseTunnelAdapter):
         return True, "Rollback completed"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-eoip-", "").replace("ldbp-", "").replace(".service", "")
-        svc = f"ldbp-eoip-{iface}.service"
-        relay_svc = f"ldbp-eoip-{iface}-relay.service"
-        relay_script = f"/etc/ldbp/{iface}-relay.py"
+        iface = identifier.replace("vxlb-eoip-", "").replace("vxlb-", "").replace(".service", "")
+        svc = f"vxlb-eoip-{iface}.service"
+        relay_svc = f"vxlb-eoip-{iface}-relay.service"
+        relay_script = f"/etc/vxlb/{iface}-relay.py"
 
         cmd = (
             f"systemctl stop {shlex.quote(relay_svc)} {shlex.quote(svc)} 2>/dev/null; "
@@ -1798,20 +1798,20 @@ class L2tpAdapter(BaseTunnelAdapter):
         return configure_l2tp_link(iran_node, kharej_server, pool_config)
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-l2tp-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-l2tp-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-l2tp-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-l2tp-{identifier}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-l2tp-{identifier}.service"
-        iface = identifier.replace("ldbp-l2tp-", "").replace(".service", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-l2tp-{identifier}.service"
+        iface = identifier.replace("vxlb-l2tp-", "").replace(".service", "")
 
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         is_active = (ok_svc == 0 and out_svc.strip() == "active")
@@ -1894,12 +1894,12 @@ class L2tpAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid MTU: {e}"
 
-            iface = raw_iface.replace("ldbp-l2tp-", "").replace(".service", "")
+            iface = raw_iface.replace("vxlb-l2tp-", "").replace(".service", "")
             ok_cur, out_cur, _ = ssh.execute(f"ip link show {shlex.quote(iface)}")
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            svc = f"ldbp-l2tp-{iface}.service"
+            svc = f"vxlb-l2tp-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
             ssh.execute(f"cp {unit_file} {unit_bak} 2>/dev/null || true")
@@ -1923,7 +1923,7 @@ class L2tpAdapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Rollback unsupported for pool '{pool_name}' without previous l2tp snapshot"
 
-        iface = raw_iface.replace("ldbp-l2tp-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-l2tp-", "").replace(".service", "")
 
         if prev_mtu:
             try:
@@ -1931,7 +1931,7 @@ class L2tpAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            svc = f"ldbp-l2tp-{iface}.service"
+            svc = f"vxlb-l2tp-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
 
@@ -1947,10 +1947,10 @@ class L2tpAdapter(BaseTunnelAdapter):
         return True, "Rollback completed"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-l2tp-", "").replace("ldbp-", "").replace(".service", "")
-        svc = f"ldbp-l2tp-{iface}.service"
-        relay_svc = f"ldbp-l2tp-{iface}-relay.service"
-        relay_script = f"/etc/ldbp/{iface}-relay.py"
+        iface = identifier.replace("vxlb-l2tp-", "").replace("vxlb-", "").replace(".service", "")
+        svc = f"vxlb-l2tp-{iface}.service"
+        relay_svc = f"vxlb-l2tp-{iface}-relay.service"
+        relay_script = f"/etc/vxlb/{iface}-relay.py"
 
         cmd = (
             f"systemctl stop {shlex.quote(relay_svc)} {shlex.quote(svc)} 2>/dev/null; "
@@ -1979,20 +1979,20 @@ class IsatapAdapter(BaseTunnelAdapter):
         return configure_isatap_link(iran_node, kharej_server, pool_config)
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-isatap-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-isatap-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-isatap-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-isatap-{identifier}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-isatap-{identifier}.service"
-        iface = identifier.replace("ldbp-isatap-", "").replace(".service", "")
+        svc = identifier if identifier.endswith(".service") else f"vxlb-isatap-{identifier}.service"
+        iface = identifier.replace("vxlb-isatap-", "").replace(".service", "")
 
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         is_active = (ok_svc == 0 and out_svc.strip() == "active")
@@ -2075,12 +2075,12 @@ class IsatapAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid MTU: {e}"
 
-            iface = raw_iface.replace("ldbp-isatap-", "").replace(".service", "")
+            iface = raw_iface.replace("vxlb-isatap-", "").replace(".service", "")
             ok_cur, out_cur, _ = ssh.execute(f"ip link show {shlex.quote(iface)}")
             if ok_cur != 0:
                 return False, f"Interface {iface} not found on host"
 
-            svc = f"ldbp-isatap-{iface}.service"
+            svc = f"vxlb-isatap-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
             ssh.execute(f"cp {unit_file} {unit_bak} 2>/dev/null || true")
@@ -2104,7 +2104,7 @@ class IsatapAdapter(BaseTunnelAdapter):
         if not ssh or not raw_iface or not hasattr(ssh, "execute"):
             return False, f"Rollback unsupported for pool '{pool_name}' without previous isatap snapshot"
 
-        iface = raw_iface.replace("ldbp-isatap-", "").replace(".service", "")
+        iface = raw_iface.replace("vxlb-isatap-", "").replace(".service", "")
 
         if prev_mtu:
             try:
@@ -2112,7 +2112,7 @@ class IsatapAdapter(BaseTunnelAdapter):
             except ValueError as e:
                 return False, f"Invalid rollback MTU: {e}"
 
-            svc = f"ldbp-isatap-{iface}.service"
+            svc = f"vxlb-isatap-{iface}.service"
             unit_file = f"/etc/systemd/system/{svc}"
             unit_bak = f"/etc/systemd/system/{svc}.bak"
 
@@ -2128,10 +2128,10 @@ class IsatapAdapter(BaseTunnelAdapter):
         return True, "Rollback completed"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        iface = identifier.replace("ldbp-isatap-", "").replace("ldbp-", "").replace(".service", "")
-        svc = f"ldbp-isatap-{iface}.service"
-        relay_svc = f"ldbp-isatap-{iface}-relay.service"
-        relay_script = f"/etc/ldbp/{iface}-relay.py"
+        iface = identifier.replace("vxlb-isatap-", "").replace("vxlb-", "").replace(".service", "")
+        svc = f"vxlb-isatap-{iface}.service"
+        relay_svc = f"vxlb-isatap-{iface}-relay.service"
+        relay_script = f"/etc/vxlb/{iface}-relay.py"
 
         cmd = (
             f"systemctl stop {shlex.quote(relay_svc)} {shlex.quote(svc)} 2>/dev/null; "

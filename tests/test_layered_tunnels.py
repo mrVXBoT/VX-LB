@@ -78,7 +78,7 @@ class TestGeneveGre6Native:
         assert ok is True
         # Verify Geneve stopped before GRE6
         cmd = ssh.execute.call_args[0][0]
-        assert cmd.index("ldbp-layer-geneve-") < cmd.index("ldbp-layer-gre6-")
+        assert cmd.index("vxlb-layer-geneve-") < cmd.index("vxlb-layer-gre6-")
 
 
 class TestGeneveGre6Ipv4:
@@ -125,9 +125,9 @@ class TestGeneveGre6Ipv4:
         assert ok is True
         clean_cmd = ssh.execute.call_args[0][0]
         # Geneve before GRE6, GRE6 before SIT
-        idx_gnv = clean_cmd.index("ldbp-layer-geneve-")
-        idx_g6 = clean_cmd.index("ldbp-layer-gre6-")
-        idx_sit = clean_cmd.index("ldbp-layer-sit-")
+        idx_gnv = clean_cmd.index("vxlb-layer-geneve-")
+        idx_g6 = clean_cmd.index("vxlb-layer-gre6-")
+        idx_sit = clean_cmd.index("vxlb-layer-sit-")
         assert idx_gnv < idx_g6 < idx_sit
 
 
@@ -182,7 +182,7 @@ class TestWireGuardHybrids:
         assert ok is True
         stop_cmd = ssh.execute.call_args[0][0]
         # WireGuard must be stopped before udp2raw carrier
-        assert stop_cmd.index("ldbp-wg-") < stop_cmd.index("ldbp-udp2raw-")
+        assert stop_cmd.index("vxlb-wg-") < stop_cmd.index("vxlb-udp2raw-")
 
 
 class TestDependencyTeardownSafety:

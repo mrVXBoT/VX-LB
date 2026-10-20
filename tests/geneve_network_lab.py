@@ -37,7 +37,7 @@ AGENT = str(ROOT / "core" / "geneve_agent.py")
 def check_prerequisites():
     issues = []
     # 1. Check charon binary
-    charon_bin = os.environ.get("LD_BP_CHARON_BIN")
+    charon_bin = os.environ.get("VX_LB_CHARON_BIN")
     if not charon_bin:
         for candidate in ["/usr/lib/ipsec/charon", "/usr/libexec/ipsec/charon", shutil.which("charon")]:
             if candidate and os.path.exists(candidate):
@@ -73,7 +73,7 @@ def run(*args):
 
 
 def main():
-    if not os.environ.get("LD_BP_LAB_HOST_NETNS") or os.readlink("/proc/self/ns/net") == os.environ["LD_BP_LAB_HOST_NETNS"] or os.geteuid() != 0:
+    if not os.environ.get("VX_LB_LAB_HOST_NETNS") or os.readlink("/proc/self/ns/net") == os.environ["VX_LB_LAB_HOST_NETNS"] or os.geteuid() != 0:
         charon_bin, issues = check_prerequisites()
         if issues:
             print("================================================================================")
@@ -89,7 +89,7 @@ def main():
             sys.exit(77)
 
         # Re-execute in isolated user/network namespace if permitted
-        env = dict(os.environ, LD_BP_LAB_HOST_NETNS=os.readlink("/proc/self/ns/net"))
+        env = dict(os.environ, VX_LB_LAB_HOST_NETNS=os.readlink("/proc/self/ns/net"))
         sys.exit(subprocess.call(["unshare", "-Urn", sys.executable, __file__, "--inside"], env=env))
 
     # Inside isolated namespace
@@ -100,7 +100,7 @@ def main():
 
     children = []
     workers = []
-    with tempfile.TemporaryDirectory(prefix="ldbp-geneve-lab-") as folder:
+    with tempfile.TemporaryDirectory(prefix="vxlb-geneve-lab-") as folder:
         try:
             print("1. Creating isolated child namespaces...")
             for _ in range(2):
@@ -118,7 +118,7 @@ def main():
             def ns(index, *args):
                 return run(
                     "nsenter", "-t", pids[index], "-n", "--",
-                    "env", "LD_BP_VICI_SOCKET=" + folder + "/run-" + str(index) + "/charon.vici",
+                    "env", "VX_LB_VICI_SOCKET=" + folder + "/run-" + str(index) + "/charon.vici",
                     *args
                 )
 
@@ -133,7 +133,7 @@ def main():
                 ns(index, "iptables", "-P", "INPUT", "DROP")
 
             print("2. Spawning isolated charon instances...")
-            bwrap = os.environ.get("LD_BP_LAB_BWRAP", "bwrap")
+            bwrap = os.environ.get("VX_LB_LAB_BWRAP", "bwrap")
             for index in range(2):
                 run_dir = folder + "/run-" + str(index)
                 pathlib.Path(run_dir).mkdir()
@@ -172,7 +172,7 @@ def main():
             paths = []
             for index in range(2):
                 c = dict(
-                    owner="ldbp-geneve-v1",
+                    owner="vxlb-geneve-v1",
                     interface="gni0123456789",
                     role="iran" if index == 0 else "kharej",
                     local="192.0.2." + str(index + 1),

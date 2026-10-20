@@ -28,7 +28,7 @@ function element(id) {
 }
 const context = vm.createContext({
   Intl, console, setTimeout, clearTimeout, setInterval, clearInterval,
-  localStorage: {getItem: key => key === 'ld_bp_token' ? 'test-only' : 'dark', removeItem() {}, setItem() {}},
+  localStorage: {getItem: key => key === 'vx_lb_token' ? 'test-only' : 'dark', removeItem() {}, setItem() {}},
   window: {panelCopy: {}, matchMedia: () => ({matches: false})},
   document: {
     body: element('body'), documentElement: {dataset: {}}, activeElement: null,

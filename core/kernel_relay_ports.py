@@ -22,15 +22,15 @@ def relay_spec(engine, node, ports):
     if engine == 'wireguard':
         from core.wireguard_adapter import generate_wireguard_relay
         script, _ = generate_wireguard_relay(iface, peer, ports)
-        return f'/usr/local/bin/ldbp-wg-{iface}-relay.py', f'ldbp-wg-{iface}-relay.service', script
+        return f'/usr/local/bin/vxlb-wg-{iface}-relay.py', f'vxlb-wg-{iface}-relay.service', script
     if engine == 'vxlan':
         from core.vxlan_adapter import generate_relay_script_and_unit
         script, _ = generate_relay_script_and_unit(iface, peer, ports)
-        return f'/usr/local/bin/ldbp-{iface}-relay.py', f'ldbp-vxlan-{iface}-relay.service', script
+        return f'/usr/local/bin/vxlb-{iface}-relay.py', f'vxlb-vxlan-{iface}-relay.service', script
     from core.ipv6_tunnel_tools import render_relay_service
-    service = f'ldbp-{engine}-{iface}-relay.service'
+    service = f'vxlb-{engine}-{iface}-relay.service'
     script, _ = render_relay_service(service, iface, peer, ports)
-    return f'/etc/ldbp/{iface}-relay.py', service, script
+    return f'/etc/vxlb/{iface}-relay.py', service, script
 
 
 def node_credentials(node):

@@ -16,7 +16,7 @@ class FakeSSH:
         for segment in command.split(' && '):
             parts=shlex.split(segment)
             if parts[0]=='cp':
-                if self.bad_restore and parts[-1].endswith('.ldbp-restore'):raise RuntimeError('restore unavailable')
+                if self.bad_restore and parts[-1].endswith('.vxlb-restore'):raise RuntimeError('restore unavailable')
                 self.files[parts[-1]]=self.files[parts[-2]]
             elif parts[0]=='mv':self.files[parts[-1]]=self.files.pop(parts[-2])
         return ''

@@ -42,7 +42,7 @@ def number(value,name):
 
 
 def rules(config):
-    tag='ldbp-nfq:'+identity(config)
+    tag='vxlb-nfq:'+identity(config)
     peer=str(ipaddress.IPv4Address(config['peer']))
     port=str(number(config['carrier_port'],'carrier port'))
     queue=str(number(config['queue'],'queue'))
@@ -83,7 +83,7 @@ def owns_netlink_socket(pid,portid,procroot='/proc'):
 
 
 def inspect(config,procroot='/proc'):
-    unit='ldbp-spoof-'+identity(config)+'-nfq.service'
+    unit='vxlb-spoof-'+identity(config)+'-nfq.service'
     queue=number(config['queue'],'queue')
     binary=config.get('binary','')
     if not isinstance(binary,str) or not binary.startswith('/') or Path(binary).name!='nfqws2':
@@ -132,7 +132,7 @@ def apply(config):
 
 
 def remove(config):
-    tag='ldbp-nfq:'+identity(config)
+    tag='vxlb-nfq:'+identity(config)
     for chain in ['OUTPUT','INPUT']:
         for row in iptables('-S',chain).stdout.splitlines():
             parts=shlex.split(row)

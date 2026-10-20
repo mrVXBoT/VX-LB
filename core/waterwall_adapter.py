@@ -205,7 +205,7 @@ class WaterWallAdapter(BaseTunnelAdapter):
         if isinstance(identifier, dict):
             node = identifier.get("node", identifier)
         else:
-            name = str(identifier).replace(".service", "").replace("ldbp-waterwall-", "")
+            name = str(identifier).replace(".service", "").replace("vxlb-waterwall-", "")
             node = {"node_name": name}
         try:
             clean(ssh, node, iran=True)

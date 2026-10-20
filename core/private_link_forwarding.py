@@ -17,7 +17,7 @@ from core.storage import load_data, atomic_update
 from core.transport_change import mutation_lock, busy, connect
 from core.validation import validate_port
 
-logger = logging.getLogger("ldbp.private_link_forwarding")
+logger = logging.getLogger("vxlb.private_link_forwarding")
 
 
 def validate_rule(rule: dict) -> dict:
@@ -56,7 +56,7 @@ def validate_forwarding_rules(rules: List[dict], excluded_ports: Optional[List[i
 def render_relay_script(peer_ip: str, rules: List[dict]) -> str:
     rules_json = json.dumps(rules)
     return f'''#!/usr/bin/env python3
-"""LD-BP standalone private link port forwarding daemon."""
+"""VX-LB standalone private link port forwarding daemon."""
 import asyncio, json, sys, time
 
 PEER = {peer_ip!r}
@@ -178,7 +178,7 @@ if __name__ == "__main__":
 
 def render_relay_unit(service_name: str, script_path: str, interface: str) -> str:
     return f"""[Unit]
-Description=LD-BP Private Link Port Forwarding Relay ({service_name})
+Description=VX-LB Private Link Port Forwarding Relay ({service_name})
 After=network.target wg-quick@{interface}.service
 Requires=wg-quick@{interface}.service
 
@@ -211,8 +211,8 @@ def apply_forwarding_rules(link_name: str, rules: List[dict]) -> Tuple[bool, str
         identity = link["link_id"]
         iface = link["interface"]
         peer_private_ip = link["kharej_server"]["private_ip"]
-        service_name = f"ldbp-pl-{identity}-relay.service"
-        script_path = f"/usr/local/bin/ldbp-pl-{identity}-relay.py"
+        service_name = f"vxlb-pl-{identity}-relay.service"
+        script_path = f"/usr/local/bin/vxlb-pl-{identity}-relay.py"
         unit_path = f"/etc/systemd/system/{service_name}"
 
         script_code = render_relay_script(peer_private_ip, validated)
@@ -298,8 +298,8 @@ def remove_forwarding_rules(link_name: str) -> Tuple[bool, str]:
 
         relay_meta = link.get("runtime", {}).get("relay")
         identity = link["link_id"]
-        service_name = relay_meta.get("service") if relay_meta else f"ldbp-pl-{identity}-relay.service"
-        script_path = relay_meta.get("script") if relay_meta else f"/usr/local/bin/ldbp-pl-{identity}-relay.py"
+        service_name = relay_meta.get("service") if relay_meta else f"vxlb-pl-{identity}-relay.service"
+        script_path = relay_meta.get("script") if relay_meta else f"/usr/local/bin/vxlb-pl-{identity}-relay.py"
         unit_path = relay_meta.get("unit") if relay_meta else f"/etc/systemd/system/{service_name}"
 
         servers = data.get("iran_servers", [])

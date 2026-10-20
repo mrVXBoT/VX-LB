@@ -76,7 +76,7 @@ def test_standalone_config_uses_reserved_interface_subnet_and_owned_firewall(sta
     assert cfg['interface']=='pl_aabbccdd'
     assert 'Address = 10.100.0.1/30' in cfg['iran_config']
     assert 'AllowedIPs = 10.100.0.2/32' in cfg['iran_config']
-    assert 'ldbp-pl:link-aabbccdd' in cfg['iran_config']
+    assert 'vxlb-pl:link-aabbccdd' in cfg['iran_config']
     assert 'MASQUERADE' not in cfg['iran_config']
     assert cfg['iran_config'].index('PostUp') < cfg['iran_config'].index('[Peer]')
 

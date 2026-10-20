@@ -33,11 +33,11 @@ def plan(node,pool):
     shadow=copy.deepcopy(node)
     shadow['transport']=shadow['engine']='http' if profile.carrier=='http_connect' else 'https'
     result=http_transport.plan(shadow,pool)
-    files=result['client_files'];base=result['base'];directory='/etc/ldbp/spoof/'+identity
-    if mode=='hop-ttl-injection' and spec.get('fake_sni','www.shaparak.ir').lower()=='ldbp-http':
+    files=result['client_files'];base=result['base'];directory='/etc/vxlb/spoof/'+identity
+    if mode=='hop-ttl-injection' and spec.get('fake_sni','www.shaparak.ir').lower()=='vxlb-http':
         raise ValueError('Fake SNI must differ from the authenticated carrier identity')
-    queue_service='ldbp-spoof-'+identity+'-nfq.service'
-    rules_service='ldbp-spoof-'+identity+'-queue.service'
+    queue_service='vxlb-spoof-'+identity+'-nfq.service'
+    rules_service='vxlb-spoof-'+identity+'-queue.service'
     client_firewall,client_carrier,client_relay=result['client_services']
     files[directory+'/queue-agent.py']=Path(__file__).with_name('nfqws2_queue_agent.py').read_text()
     queue=dict(id=identity,peer=peer,carrier_port=node['http_connect']['public_port'],queue=spec['queue'],
@@ -47,7 +47,7 @@ def plan(node,pool):
     files[directory+'/wire.json']=json.dumps(dict(id=identity,profile=mode,local=node['ip'],peer=peer,carrier_port=node['http_connect']['public_port'],fake_sni=spec.get('fake_sni','www.shaparak.ir'),duration=20))
     arguments=[LIBRARY+'/nfqws2',*profile.arguments]
     nfq_unit=f'''[Unit]
-Description=LD-BP owned packet engine
+Description=VX-LB owned packet engine
 After=network-online.target
 Wants=network-online.target
 [Service]
@@ -63,7 +63,7 @@ WantedBy=multi-user.target
 '''
     files['/etc/systemd/system/'+queue_service]=requires(nfq_unit,[client_firewall])
     files['/etc/systemd/system/'+rules_service]=f'''[Unit]
-Description=LD-BP owned peer-specific queue rules
+Description=VX-LB owned peer-specific queue rules
 After={queue_service}
 Requires={queue_service}
 PartOf={queue_service}
@@ -86,7 +86,7 @@ WantedBy=multi-user.target
         if record_port in reserved:raise ValueError('TLS record helper port overlaps an owned listener')
         files[directory+'/records.py']=Path(__file__).with_name('tls_record_carrier.py').read_text()
         files[directory+'/records.json']=json.dumps(dict(listen_host='127.0.0.1',listen_port=record_port,remote_host=peer,remote_port=node['http_connect']['public_port']))
-        record_service='ldbp-spoof-'+identity+'-records.service'
+        record_service='vxlb-spoof-'+identity+'-records.service'
         files['/etc/systemd/system/'+record_service]=http_transport.unit(record_service,directory+'/records.py',directory+'/records.json',rules_service)
         services.append(record_service);parents.append(record_service)
         carrier=json.loads(files[base+'/client-carrier.json'])

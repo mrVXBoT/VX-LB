@@ -1,4 +1,4 @@
-"""6TO4 Unicast (RFC 3056) Tunnel Engine and Tools for LD-BP.
+"""6TO4 Unicast (RFC 3056) Tunnel Engine and Tools for VX-LB.
 
 Coverage:
 - Point-to-point unicast 6TO4 transition mechanism based on RFC 3056.
@@ -29,7 +29,7 @@ from core.ipv6_tunnel_tools import (
     validate_mtu,
 )
 
-logger = logging.getLogger("ldbp.6to4")
+logger = logging.getLogger("vxlb.6to4")
 
 ENGINE_ID = "6to4_unicast"
 TUNNEL_MODE = "sit"
@@ -141,7 +141,7 @@ def configure_6to4_unicast_link(
             iran_ipv4 = f"{hosts[0]}/{v4_net.prefixlen}"
             kharej_ipv4 = f"{hosts[1]}/{v4_net.prefixlen}"
 
-    service_name = f"ldbp-6to4-{iface}.service"
+    service_name = f"vxlb-6to4-{iface}.service"
 
     # Explicit point-to-point sit tunnel (RFC 3056 unicast)
     ir_create_cmd = f"ip link add {iface} type {TUNNEL_MODE} local {iran_ip} remote {kharej_ip} ttl 64"
@@ -175,7 +175,7 @@ def configure_6to4_unicast_link(
     from core.ipv6_tunnel_tools import render_relay_service
 
     relay_script, relay_unit = render_relay_service(
-        service_name=f"ldbp-6to4-{iface}-relay.service",
+        service_name=f"vxlb-6to4-{iface}-relay.service",
         interface=iface,
         peer_ip=target_ipv6,
         ports=[int(p) for p in client_ports],
@@ -212,9 +212,9 @@ def configure_6to4_unicast_link(
             "unit": iran_unit,
             "unit_path": f"/etc/systemd/system/{service_name}",
             "relay_unit": relay_unit,
-            "relay_unit_path": f"/etc/systemd/system/ldbp-6to4-{iface}-relay.service",
+            "relay_unit_path": f"/etc/systemd/system/vxlb-6to4-{iface}-relay.service",
             "relay_script": relay_script,
-            "relay_script_path": f"/etc/ldbp/{iface}-relay.py",
+            "relay_script_path": f"/etc/vxlb/{iface}-relay.py",
         },
         "kharej_config": {
             "unit": kharej_unit,

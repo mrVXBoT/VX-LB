@@ -62,7 +62,7 @@ def run(client, server):
     thread = threading.Thread(target=echo, daemon=True)
     thread.start()
     try:
-        with tempfile.TemporaryDirectory(prefix='ldbp-slipstream-lab-') as folder:
+        with tempfile.TemporaryDirectory(prefix='vxlb-slipstream-lab-') as folder:
             root = Path(folder)
             cert, key = root / 'cert.pem', root / 'key.pem'
             subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',

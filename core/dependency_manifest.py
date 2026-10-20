@@ -1,4 +1,4 @@
-"""Dependency and binary authenticity manifests for LD-BP tunnel platform.
+"""Dependency and binary authenticity manifests for VX-LB tunnel platform.
 
 Machine-readable dependency manifest specifying pinned versions,
 architectures (x86_64, aarch64), cryptographic SHA-256 checksums, licenses,

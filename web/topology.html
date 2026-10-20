@@ -725,8 +725,8 @@
 </div>
 
 <script>
-let authToken = localStorage.getItem("ld_bp_token") || "";
-document.documentElement.dataset.theme = localStorage.getItem("ld_bp_theme") || "dark";
+let authToken = localStorage.getItem("vx_lb_token") || "";
+document.documentElement.dataset.theme = localStorage.getItem("vx_lb_theme") || "dark";
 let poolsData = [];
 let privateLinks = {};
 let viewMode = "pools"; // "pools" | "links"
@@ -1209,7 +1209,7 @@ function renderLinks(forceFit = false) {
 function toggleGraphTheme() {
   const theme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
   document.documentElement.dataset.theme = theme;
-  localStorage.setItem("ld_bp_theme", theme);
+  localStorage.setItem("vx_lb_theme", theme);
 }
 
 function fitGraph() {

@@ -547,7 +547,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             elif eng == 'waterwall':
                 node_name = target_node.get("node_name", "")
                 svc = f"{node_name}.service" if node_name else "ldw*.service"
-                alt_svc = f"ldbp-waterwall-{node_name}.service" if node_name else "ldbp-waterwall*.service"
+                alt_svc = f"vxlb-waterwall-{node_name}.service" if node_name else "vxlb-waterwall*.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {alt_svc} 2>/dev/null || journalctl --no-pager -n 80 | grep -i waterwall")
             elif eng == 'paqet':
                 node_name = target_node.get("node_name", "")
@@ -555,37 +555,37 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc}")
             elif eng in ('gre', 'gre_ipv4'):
                 node_name = target_node.get("node_name", "")
-                svc = f"ldbp-gre-{node_name}.service" if node_name else "ldbp-gre*.service"
+                svc = f"vxlb-gre-{node_name}.service" if node_name else "vxlb-gre*.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc}")
             elif eng in ('geneve', 'geneve_ipsec'):
                 node_name = target_node.get("node_name", "")
-                svc = f"ldbp-geneve-{node_name}.service" if node_name else "ldbp-geneve*.service"
-                relay_svc = f"ldbp-geneve-{node_name}-relay.service" if node_name else "ldbp-geneve*-relay.service"
+                svc = f"vxlb-geneve-{node_name}.service" if node_name else "vxlb-geneve*.service"
+                relay_svc = f"vxlb-geneve-{node_name}-relay.service" if node_name else "vxlb-geneve*-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
             elif eng == 'gre6':
                 node_name = target_node.get("node_name", "")
-                svc = f"ldbp-gre6-{node_name}.service" if node_name else "ldbp-gre6*.service"
-                relay_svc = f"ldbp-gre6-{node_name}-relay.service" if node_name else "ldbp-gre6*-relay.service"
+                svc = f"vxlb-gre6-{node_name}.service" if node_name else "vxlb-gre6*.service"
+                relay_svc = f"vxlb-gre6-{node_name}-relay.service" if node_name else "vxlb-gre6*-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
             elif eng == 'ip6ip6':
                 node_name = target_node.get("node_name", "")
-                svc = f"ldbp-ip6ip6-{node_name}.service" if node_name else "ldbp-ip6ip6*.service"
-                relay_svc = f"ldbp-ip6ip6-{node_name}-relay.service" if node_name else "ldbp-ip6ip6*-relay.service"
+                svc = f"vxlb-ip6ip6-{node_name}.service" if node_name else "vxlb-ip6ip6*.service"
+                relay_svc = f"vxlb-ip6ip6-{node_name}-relay.service" if node_name else "vxlb-ip6ip6*-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
             elif eng == 'wireguard':
                 node_name = target_node.get("node_name", "")
                 iface = target_node.get("wireguard", {}).get("interface") or f"wg-{node_name}"
                 svc = f"wg-quick@{iface}.service"
-                relay_svc = f"ldbp-wg-{iface}-relay.service"
+                relay_svc = f"vxlb-wg-{iface}-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
             elif eng == 'vxlan':
                 node_name = target_node.get("node_name", "")
                 iface = target_node.get("vxlan", {}).get("iface") or f"vx-{node_name}"
-                svc = f"ldbp-vxlan-{iface}.service"
-                relay_svc = f"ldbp-{iface}-relay.service"
+                svc = f"vxlb-vxlan-{iface}.service"
+                relay_svc = f"vxlb-{iface}-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
             else:
-                _, log_text, _ = ssh.execute("tail -n 60 /var/log/bp-user-connections.log 2>/dev/null || echo 'No connection logs yet.'")
+                _, log_text, _ = ssh.execute("tail -n 60 /var/log/vxlb-user-connections.log 2>/dev/null || echo 'No connection logs yet.'")
             ssh.close()
             lines = [l.strip() for l in log_text.strip().split("\n") if l.strip()]
             return self._send_json({"ip": ip, "logs": lines})
@@ -714,10 +714,10 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             stored_pass = data.get("web_password")
 
             # Security: NEVER let the first visitor claim the dashboard.
-            # Bootstrap the password via the LD_BP_WEB_PASSWORD env var on
+            # Bootstrap the password via the VX_LB_WEB_PASSWORD env var on
             # first run (min 8 chars); otherwise fail closed with guidance.
             if not stored_pass:
-                bootstrap = os.environ.get("LD_BP_WEB_PASSWORD", "")
+                bootstrap = os.environ.get("VX_LB_WEB_PASSWORD", "")
                 if bootstrap and len(bootstrap) >= 8 and hmac.compare_digest(password_input, bootstrap):
                     def _set_p(d: dict):
                         d["web_password"] = _hash_password(bootstrap)
@@ -726,7 +726,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 else:
                     _record_failed_login(client_ip)
                     return self._send_json(
-                        {"error": "رمز داشبورد تنظیم نشده. ابتدا LD_BP_WEB_PASSWORD را ست کنید و دوباره تلاش کنید"},
+                        {"error": "رمز داشبورد تنظیم نشده. ابتدا VX_LB_WEB_PASSWORD را ست کنید و دوباره تلاش کنید"},
                         503,
                     )
 
@@ -1665,9 +1665,9 @@ def run_web_server(host: str = None, port: int = 8088):
     import signal
     # Security: bind localhost by default. The dashboard holds SSH credentials
     # for the whole fleet -- it must not be on 0.0.0.0 unless the operator
-    # explicitly opts in via LD_BP_WEB_HOST (prefer an SSH tunnel instead).
+    # explicitly opts in via VX_LB_WEB_HOST (prefer an SSH tunnel instead).
     if host is None:
-        host = os.environ.get("LD_BP_WEB_HOST", "127.0.0.1")
+        host = os.environ.get("VX_LB_WEB_HOST", "127.0.0.1")
     if host == "0.0.0.0":
         print("[!] WARNING: web dashboard bound to 0.0.0.0 -- ensure the dashboard password is set and the port is firewalled.")
     
@@ -1690,7 +1690,7 @@ def run_web_server(host: str = None, port: int = 8088):
     recover_interrupted()
     recover_changes()
     server = ThreadedHTTPServer((host, port), LDWebRequestHandler)
-    print(f"[*] LD-BP Mobile Web Dashboard running on http://{host}:{port} (PID: {os.getpid()})")
+    print(f"[*] VX-LB Mobile Web Dashboard running on http://{host}:{port} (PID: {os.getpid()})")
     
     def _cleanup_and_exit(sig=None, frame=None):
         try:

@@ -1,4 +1,4 @@
-"""GRE6 (Generic Routing Encapsulation over IPv6) Tunnel Engine and Tools for LD-BP.
+"""GRE6 (Generic Routing Encapsulation over IPv6) Tunnel Engine and Tools for VX-LB.
 
 Coverage:
 - Direct GRE tunneling carried over native IPv6 underlay (RFC 7676 / RFC 2784)
@@ -33,7 +33,7 @@ from core.ipv6_tunnel_tools import (
     validate_mtu,
 )
 
-logger = logging.getLogger("ldbp.gre6")
+logger = logging.getLogger("vxlb.gre6")
 
 ENGINE_ID = "gre6"
 TUNNEL_MODE = "ip6gre"
@@ -117,8 +117,8 @@ def configure_gre6_link(
         prefix_v6="fd00:1db0:6",
     )
 
-    svc_name = f"ldbp-gre6-{iface}.service"
-    conf_path = f"/etc/ldbp/gre6/{iface}.json"
+    svc_name = f"vxlb-gre6-{iface}.service"
+    conf_path = f"/etc/vxlb/gre6/{iface}.json"
 
     # Command for Iran endpoint
     ir_create_cmd = (
@@ -330,7 +330,7 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
         atomic_update(append_node)
 
         # Deploy on Kharej
-        kh_ssh.execute("mkdir -p /etc/ldbp/gre6")
+        kh_ssh.execute("mkdir -p /etc/vxlb/gre6")
         publish(kh_ssh, f"/etc/systemd/system/{svc}", conf["kharej_service_unit"])
         publish(kh_ssh, conf["config_path"], json.dumps(conf, indent=2))
         ok_start_kh, msg_start_kh = adapter.start(kh_ssh, iface)
@@ -338,7 +338,7 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
             raise RuntimeError(f"Failed starting GRE6 on Kharej: {msg_start_kh}")
 
         # Deploy on Iran
-        ir_ssh.execute("mkdir -p /etc/ldbp/gre6")
+        ir_ssh.execute("mkdir -p /etc/vxlb/gre6")
         publish(ir_ssh, f"/etc/systemd/system/{svc}", conf["iran_service_unit"])
         publish(ir_ssh, conf["config_path"], json.dumps(conf, indent=2))
         ok_start_ir, msg_start_ir = adapter.start(ir_ssh, iface)
@@ -349,16 +349,16 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
         ports = pool.get("client_ports", [])
         if ports:
             target_priv = conf["private_addressing"]["kharej_ipv4"]
-            relay_code, relay_unit = render_relay_service(f"ldbp-gre6-{iface}-relay.service", iface, target_priv, ports)
-            publish(ir_ssh, f"/etc/ldbp/{iface}-relay.py", relay_code)
-            publish(ir_ssh, f"/etc/systemd/system/ldbp-gre6-{iface}-relay.service", relay_unit)
-            code, _, error = ir_ssh.execute(f"systemctl daemon-reload && systemctl enable --now ldbp-gre6-{iface}-relay.service")
+            relay_code, relay_unit = render_relay_service(f"vxlb-gre6-{iface}-relay.service", iface, target_priv, ports)
+            publish(ir_ssh, f"/etc/vxlb/{iface}-relay.py", relay_code)
+            publish(ir_ssh, f"/etc/systemd/system/vxlb-gre6-{iface}-relay.service", relay_unit)
+            code, _, error = ir_ssh.execute(f"systemctl daemon-reload && systemctl enable --now vxlb-gre6-{iface}-relay.service")
             if code:
                 raise RuntimeError("Native IPv6 relay startup failed: " + error)
 
         if ports:
             from core.kernel_relay_ports import verify_listeners
-            verify_listeners(ir_ssh, f"ldbp-gre6-{iface}-relay.service", ports)
+            verify_listeners(ir_ssh, f"vxlb-gre6-{iface}-relay.service", ports)
         from core.private_link_health import probe_pair
         result = probe_pair(ir_ssh, kh_ssh, node["gre6"]["local_private"], node["gre6"]["remote_private"], iface)
         def finalize(data):

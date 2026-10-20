@@ -170,7 +170,7 @@ class GeneveIpsecTests(unittest.TestCase):
 
         # Check tagged rule comments
         for chain, r in rules:
-            self.assertIn("ldbp-sec-" + c["interface"], " ".join(r))
+            self.assertIn("vxlb-sec-" + c["interface"], " ".join(r))
 
     def test_private_ip_allocation_and_no_collision(self):
         """Distinct /30 private subnets allocated per tunnel."""
@@ -203,7 +203,7 @@ class GeneveIpsecTests(unittest.TestCase):
         self.assertEqual(cfg["vni"], 2000)
         self.assertEqual(cfg["mtu"], 1380)
         self.assertEqual(cfg["dst_port"], 6081)
-        self.assertIn("ldbp-geneve-", cfg["service_name"])
+        self.assertIn("vxlb-geneve-", cfg["service_name"])
 
         # Start and Stop
         ok_start, _ = adapter.start(ssh_mock, cfg["interface"])

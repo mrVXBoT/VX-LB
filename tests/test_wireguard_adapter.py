@@ -243,7 +243,7 @@ class TestWireGuardAdapterLifecycle(unittest.TestCase):
         # Scoped firewall rules generated
         self.assertIn("iran", cfg["firewall_rules"])
         self.assertIn("kharej", cfg["firewall_rules"])
-        self.assertTrue(any("ldbp-wg-node_teh_1" in r for r in cfg["firewall_rules"]["iran"]))
+        self.assertTrue(any("vxlb-wg-node_teh_1" in r for r in cfg["firewall_rules"]["iran"]))
 
     def test_start_success(self):
         self.mock_ssh.execute.side_effect = [
@@ -293,7 +293,7 @@ class TestWireGuardAdapterLifecycle(unittest.TestCase):
         self.assertIn("systemctl stop wg-quick@wg-node_teh_1.service", called_cmd)
         self.assertIn("ip link del wg-node_teh_1", called_cmd)
         self.assertIn("rm -f /etc/wireguard/wg-node_teh_1.conf", called_cmd)
-        self.assertIn("grep -v 'ldbp-wg-node_teh_1'", called_cmd)
+        self.assertIn("grep -v 'vxlb-wg-node_teh_1'", called_cmd)
 
     def test_modify_and_rollback(self):
         # Without context -> unsupported (guard)

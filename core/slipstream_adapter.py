@@ -1,4 +1,4 @@
-"""Slipstream DNS-tunneling emergency fallback adapter for LD-BP.
+"""Slipstream DNS-tunneling emergency fallback adapter for VX-LB.
 
 Slipstream DNS tunnel with delegated subdomain configuration,
 recursive resolver pool, client/server configuration generation, rate-limiting,
@@ -19,7 +19,7 @@ from core.dependency_manifest import get_dependency_manifest, validate_binary_pr
 from core.ssh_client import SSHManager
 from core.validation import validate_pool_name, validate_tunnel_name, validate_port, validate_ports
 
-logger = logging.getLogger("ldbp.slipstream_adapter")
+logger = logging.getLogger("vxlb.slipstream_adapter")
 
 DEFAULT_DNS_RESOLVERS = [
     "1.1.1.1:53",
@@ -30,8 +30,8 @@ DEFAULT_DNS_RESOLVERS = [
 
 def _service_name(identifier):
     stem = str(identifier).removesuffix(".service")
-    if not stem.startswith("ldbp-slipstream-"):
-        stem = "ldbp-slipstream-" + stem
+    if not stem.startswith("vxlb-slipstream-"):
+        stem = "vxlb-slipstream-" + stem
     return validate_tunnel_name(stem) + ".service"
 
 
@@ -68,7 +68,7 @@ if os.path.isfile(destination):
  if current==expected:
   os.chmod(destination,0o755);sys.exit(0)
 os.makedirs(os.path.dirname(destination),exist_ok=True)
-fd,path=tempfile.mkstemp(prefix='.ldbp-slipstream-',dir=os.path.dirname(destination))
+fd,path=tempfile.mkstemp(prefix='.vxlb-slipstream-',dir=os.path.dirname(destination))
 try:
  with os.fdopen(fd,'wb') as target, urllib.request.urlopen(url,timeout=60) as response:
   digest=hashlib.sha256()
@@ -150,7 +150,7 @@ finally:
         path = kwargs.get("config_path") or node.get("slipstream_config_path")
         if path and hasattr(endpoint_ir, "execute"):
             import re
-            if re.fullmatch(r"/etc/ldbp/slipstream/[0-9a-f]{16}/[0-9a-f]{16}-[0-9a-f]{10}\.json", str(path)):
+            if re.fullmatch(r"/etc/vxlb/slipstream/[0-9a-f]{16}/[0-9a-f]{16}-[0-9a-f]{10}\.json", str(path)):
                 return probe(endpoint_ir, path)
         return {"passed": False, "status": "UNVERIFIED", "latency_ms": None,
                 "protocols": [], "error": "Slipstream node has no verified runtime configuration"}

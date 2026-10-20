@@ -25,9 +25,9 @@ def execute(ssh, command, timeout=30):
         raise RuntimeError(error.strip() or out.strip() or 'WaterWall command failed')
 
 MODES = {'waterwall'}
-DIRECTORY = '/etc/ldbp/waterwall'
+DIRECTORY = '/etc/vxlb/waterwall'
 BINARY_DEFAULT = '/usr/local/bin/waterwall'
-HELPER = os.environ.get('LD_BP_WATERWALL_PROBE_HELPER') or '/usr/local/bin/bp-waterwall-probe'
+HELPER = os.environ.get('VX_LB_WATERWALL_PROBE_HELPER') or '/usr/local/bin/vxlb-waterwall-probe'
 
 def domain(value):
     """Validate TLS domain name for SNI."""
@@ -480,7 +480,7 @@ def chain_configs(node, outside_ip, ports):
 def core_config(chain_file):
     """Generate WaterWall core.json."""
     return {
-        'log': {'path': '/var/log/ldbp-waterwall/', 'level': 'warning'},
+        'log': {'path': '/var/log/vxlb-waterwall/', 'level': 'warning'},
         'misc': {'workers': 4, 'ram-profile': 'server', 'mtu': 1500},
         'dns': {'domain-strategy': 'prefer-ipv4'},
         'configs': [chain_file]
@@ -502,14 +502,14 @@ def service(node):
     binary = shlex.quote(node['waterwall']['profile']['binary'])
     config_dir = Path(path(node)).parent
     return f'''[Unit]
-Description=LD-BP WaterWall tunneling node
+Description=VX-LB WaterWall tunneling node
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory={config_dir}
-LogsDirectory=ldbp-waterwall
+LogsDirectory=vxlb-waterwall
 ExecStart={binary} --config:{path(node)}
 Restart=on-failure
 RestartSec=3

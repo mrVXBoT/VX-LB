@@ -1,4 +1,4 @@
-"""ERSPAN + IPsec (Encapsulated Remote Switch Port Analyzer with IPsec) for LD-BP.
+"""ERSPAN + IPsec (Encapsulated Remote Switch Port Analyzer with IPsec) for VX-LB.
 
 Coverage:
 - ERSPAN protocol (Ethernet over GRE with ERSPAN session header).
@@ -25,7 +25,7 @@ from core.ipv6_tunnel_tools import (
     validate_mtu,
 )
 
-logger = logging.getLogger("ldbp.erspan")
+logger = logging.getLogger("vxlb.erspan")
 
 ENGINE_ID = "erspan"
 DEFAULT_MTU = 1340
@@ -85,7 +85,7 @@ def configure_erspan_link(
         pool_config.get("ipv4_subnet") or "10.100.66.0/30",
     )
 
-    service_name = f"ldbp-erspan-{iface}.service"
+    service_name = f"vxlb-erspan-{iface}.service"
 
     ir_create_cmd = (
         f"ip link add {iface} type erspan local {iran_ip} remote {kharej_ip} seq "
@@ -122,7 +122,7 @@ def configure_erspan_link(
     target_ipv4 = addressing["kharej_ipv4"].split("/")[0]
 
     relay_script, relay_unit = render_relay_service(
-        service_name=f"ldbp-erspan-{iface}-relay.service",
+        service_name=f"vxlb-erspan-{iface}-relay.service",
         interface=iface,
         peer_ip=target_ipv4,
         ports=[int(p) for p in client_ports],

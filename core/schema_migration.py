@@ -1,4 +1,4 @@
-"""Schema versioning and migrations for LD-BP persistent storage.
+"""Schema versioning and migrations for VX-LB persistent storage.
 
 Schema versioning, persistent migrations, stable engine attribution
 for legacy records, and rollback protection.
@@ -7,7 +7,7 @@ import copy
 import logging
 from typing import Dict, Tuple, Callable
 
-logger = logging.getLogger("ldbp.schema_migration")
+logger = logging.getLogger("vxlb.schema_migration")
 
 CURRENT_SCHEMA_VERSION = 3
 

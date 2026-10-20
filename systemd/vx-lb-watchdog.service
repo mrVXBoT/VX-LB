@@ -1,5 +1,5 @@
 [Unit]
-Description=LD-BP Automated Telemetry Watchdog & DNS Failover Service
+Description=VX-LB Telemetry Watchdog & DNS Failover Service
 After=network.target
 
 [Service]

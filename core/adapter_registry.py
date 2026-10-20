@@ -1,4 +1,4 @@
-"""Central registry for tunnel engine adapters in LD-BP.
+"""Central registry for tunnel engine adapters in VX-LB.
 
 Provides unified registration, lookup, and dispatch
 for all tunnel adapters adhering to BaseTunnelAdapter.
@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 from core.adapter_interface import BaseTunnelAdapter
 from core.capabilities import get_capability
 
-logger = logging.getLogger("ldbp.adapter_registry")
+logger = logging.getLogger("vxlb.adapter_registry")
 
 _ADAPTER_REGISTRY: Dict[str, BaseTunnelAdapter] = {}
 

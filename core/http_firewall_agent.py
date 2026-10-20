@@ -15,7 +15,7 @@ def command(*args, allowed=(0,)):
 
 def tag(config):
     if not re.fullmatch(r'[0-9a-f]{32}',config['id']):raise ValueError('Invalid HTTP firewall identity')
-    return 'ldbp-http:'+config['id']
+    return 'vxlb-http:'+config['id']
 
 
 def port(value):

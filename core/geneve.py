@@ -1,4 +1,4 @@
-"""Geneve + IPsec pool manager and orchestrator for LD-BP.
+"""Geneve + IPsec pool manager and orchestrator for VX-LB.
 
 Manages two-server and multi-node Geneve + IPsec links:
 - Allocates VNI, /30 private IP subnets, MTU, and authenticated IPsec credentials.
@@ -21,8 +21,8 @@ from core.storage import load_data, atomic_update, get_pools, save_pool, delete_
 from core.validation import validate_pool_name, validate_ports
 from core.transport_change import connect
 
-AGENT = "/usr/local/libexec/ldbp-geneve-v1.py"
-CONFIG_DIR = "/etc/ldbp/geneve"
+AGENT = "/usr/local/libexec/vxlb-geneve-v1.py"
+CONFIG_DIR = "/etc/vxlb/geneve"
 DEFAULT_DST_PORT = 6081
 
 
@@ -90,10 +90,10 @@ def install_agent(ssh, node=None):
     vici_dir = Path(__file__).resolve().parent / "vendor" / "vici"
     if vici_dir.exists():
         for file in vici_dir.glob("*.py"):
-            write(ssh, "/usr/local/libexec/ldbp-geneve-vici/vici/" + file.name, file.read_text())
+            write(ssh, "/usr/local/libexec/vxlb-geneve-vici/vici/" + file.name, file.read_text())
         lic = vici_dir / "LICENSE"
         if lic.exists():
-            write(ssh, "/usr/local/libexec/ldbp-geneve-vici/LICENSE", lic.read_text())
+            write(ssh, "/usr/local/libexec/vxlb-geneve-vici/LICENSE", lic.read_text())
 
     agent_code = (Path(__file__).resolve().parent / "geneve_agent.py").read_text()
     write(ssh, AGENT, agent_code)
@@ -120,7 +120,7 @@ def path(node) -> str:
 
 
 def unit(node, relay=False) -> str:
-    return "ldbp-geneve-" + validate(node["geneve"]["configs"][0])["interface"] + ("-relay" if relay else "") + ".service"
+    return "vxlb-geneve-" + validate(node["geneve"]["configs"][0])["interface"] + ("-relay" if relay else "") + ".service"
 
 
 def run_agent(ssh, node, action, *args) -> str:
@@ -143,7 +143,7 @@ def service(node, relay=False) -> str:
     link_unit = unit(node)
     ipsec_unit = node.get("geneve", {}).get("ipsec_unit") or "strongswan.service"
     return f"""[Unit]
-Description=LD-BP Geneve {'TCP/UDP relay' if relay else 'private link + IPsec'}
+Description=VX-LB Geneve {'TCP/UDP relay' if relay else 'private link + IPsec'}
 After=network-online.target {ipsec_unit} {link_unit if relay else ''}
 Requires={ipsec_unit}
 PartOf={ipsec_unit}
@@ -223,7 +223,7 @@ def allocate(server: dict, kharej: dict, ports: list, mtu: int = 1280, vni: Opti
 
     common = dict(
         security=security,
-        owner="ldbp-geneve-v1",
+        owner="vxlb-geneve-v1",
         interface=interface,
         vni=vni,
         dst_port=DEFAULT_DST_PORT,
@@ -312,14 +312,14 @@ def cleanup_endpoint(ssh, node, iran: bool):
 
 
 def cleanup_geneve_node(ssh, identifier: str) -> Tuple[bool, str]:
-    iface = identifier.replace("ldbp-geneve-", "").replace(".service", "").replace("-relay", "")
-    svc = f"ldbp-geneve-{iface}.service"
-    relay_svc = f"ldbp-geneve-{iface}-relay.service"
+    iface = identifier.replace("vxlb-geneve-", "").replace(".service", "").replace("-relay", "")
+    svc = f"vxlb-geneve-{iface}.service"
+    relay_svc = f"vxlb-geneve-{iface}-relay.service"
     cmd = (
         f"systemctl stop {relay_svc} {svc} 2>/dev/null; "
         f"systemctl disable {relay_svc} {svc} 2>/dev/null; "
         f"ip link del {iface} 2>/dev/null; "
-        f"rm -f /etc/systemd/system/{svc} /etc/systemd/system/{relay_svc} /etc/ldbp/geneve/{iface}.json; "
+        f"rm -f /etc/systemd/system/{svc} /etc/systemd/system/{relay_svc} /etc/vxlb/geneve/{iface}.json; "
         f"systemctl daemon-reload"
     )
     ok, out, err = ssh.execute(cmd)

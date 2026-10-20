@@ -46,13 +46,13 @@ class NamespaceSSH:
 
 def main():
     if os.geteuid()!=0:raise RuntimeError('Run only as root inside a disposable VM')
-    if not os.environ.get('LD_BP_WG_LAB_INSIDE'):
-        env=dict(os.environ,LD_BP_WG_LAB_INSIDE='1')
+    if not os.environ.get('VX_LB_WG_LAB_INSIDE'):
+        env=dict(os.environ,VX_LB_WG_LAB_INSIDE='1')
         return subprocess.call(['unshare','-n',sys.executable,__file__],env=env)
     suffix=secrets.token_hex(3);names=['wgir-'+suffix,'wgkh-'+suffix]
     adapter=WireGuardAdapter();config=adapter.configure({'ip':'192.0.2.1','node_name':'labtest'},{'ip':'192.0.2.2'},{'enable_psk':True,'tunnel_port':51820})
     iface=config['interface'];created=[]
-    with tempfile.TemporaryDirectory(prefix='ldbp-wg-kernel-') as folder:
+    with tempfile.TemporaryDirectory(prefix='vxlb-wg-kernel-') as folder:
         try:
             for name in names:run('ip','netns','add',name);created.append(name)
             run('ip','link','add','wg-lab-a','type','veth','peer','name','wg-lab-b')

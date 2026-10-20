@@ -14,7 +14,7 @@ from core.watchdog import TelemetryWatchdog
 
 
 SPEC = importlib.util.spec_from_file_location(
-    "connection_monitor", Path(__file__).resolve().parents[1] / "scripts/bp-conn-monitor.py"
+    "connection_monitor", Path(__file__).resolve().parents[1] / "scripts/vxlb-conn-monitor.py"
 )
 monitor = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(monitor)

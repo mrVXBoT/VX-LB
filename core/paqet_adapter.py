@@ -1,5 +1,5 @@
 """
-Paqet Adapter for LD-BP.
+Paqet Adapter for VX-LB.
 
 Provides configuration generation, firewall rule synthesis, systemd unit definitions,
 and deployment lifecycle management for the Paqet raw-packet KCP proxy.
@@ -599,7 +599,7 @@ WantedBy=multi-user.target
         return True, f"Paqet tunnel {t_name} torn down cleanly"
 
 
-DEFAULT_PAQET_BIN = os.environ.get("LD_BP_PAQET_BINARY") or (
+DEFAULT_PAQET_BIN = os.environ.get("VX_LB_PAQET_BINARY") or (
     "/tmp/paqet_test/paqet_linux_amd64"
     if os.path.exists("/tmp/paqet_test/paqet_linux_amd64")
     else "/usr/local/bin/paqet"

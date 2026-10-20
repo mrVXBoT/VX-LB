@@ -61,7 +61,7 @@ def test_failed_binary_upload_never_publishes_package_and_checks_stage_cleanup(m
 
 
 def test_actual_official_archive_matches_all_component_pins():
-    source=os.environ.get('LDBP_NFQWS2_QA_ARCHIVE')
+    source=os.environ.get('VXLB_NFQWS2_QA_ARCHIVE')
     if not source:pytest.skip('Set explicit pinned release archive for package validation')
     bundle=installer.archive_bundle(source)
     assert set(bundle)=={'nfqws2','zapret-lib.lua','zapret-antidpi.lua','LICENSE.txt'}

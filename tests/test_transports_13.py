@@ -1,4 +1,4 @@
-"""Unit tests for LD-BP 13 Advanced Transports Engine and kernel-based telemetry.
+"""Unit tests for VX-LB 13 Advanced Transports Engine and kernel-based telemetry.
 
 Verifies:
 1. Complete catalog registration and metadata for all 13 transports.

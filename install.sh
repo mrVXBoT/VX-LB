@@ -111,7 +111,7 @@ mkdir -p "$SCRIPT_DIR/data"
 chmod 700 "$SCRIPT_DIR/data"
 find "$SCRIPT_DIR/data" -maxdepth 1 -type f -exec chmod 600 {} + 2>/dev/null || true
 
-chmod +x "$SCRIPT_DIR/scripts/bp-conn-monitor.py" 2>/dev/null || true
+chmod +x "$SCRIPT_DIR/scripts/vxlb-conn-monitor.py" 2>/dev/null || true
 chmod +x "$SCRIPT_DIR/daemon.py"
 chmod +x "$SCRIPT_DIR/main.py"
 chmod +x "$SCRIPT_DIR/run.sh"
@@ -132,10 +132,10 @@ else
 fi
 
 # 5. Setup Systemd Watchdog Service
-SERVICE_NAME="ld-bp-watchdog"
+SERVICE_NAME="vx-lb-watchdog"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
-if [ -f "$SCRIPT_DIR/systemd/ld-bp-watchdog.service" ]; then
+if [ -f "$SCRIPT_DIR/systemd/vx-lb-watchdog.service" ]; then
     CAN_INSTALL_SERVICE=0
     if [ "$EUID" -eq 0 ]; then
         CAN_INSTALL_SERVICE=1
@@ -151,7 +151,7 @@ if [ -f "$SCRIPT_DIR/systemd/ld-bp-watchdog.service" ]; then
 from pathlib import Path
 import sys
 root = Path(sys.argv[1])
-template = (root / "systemd/ld-bp-watchdog.service").read_text()
+template = (root / "systemd/vx-lb-watchdog.service").read_text()
 Path(sys.argv[2]).write_text(template.replace("%WORKING_DIR%", str(root)))
 PY
 

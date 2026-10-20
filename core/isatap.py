@@ -1,4 +1,4 @@
-"""ISATAP (Intra-Site Automatic Tunnel Addressing Protocol) Engine for LD-BP.
+"""ISATAP (Intra-Site Automatic Tunnel Addressing Protocol) Engine for VX-LB.
 
 Coverage:
 - RFC 5214 IPv6-over-IPv4 transition mechanism.
@@ -25,7 +25,7 @@ from core.ipv6_tunnel_tools import (
     validate_mtu,
 )
 
-logger = logging.getLogger("ldbp.isatap")
+logger = logging.getLogger("vxlb.isatap")
 
 ENGINE_ID = "isatap"
 DEFAULT_MTU = 1440
@@ -93,7 +93,7 @@ def configure_isatap_link(
         "kharej_ipv4": None,
     }
 
-    service_name = f"ldbp-isatap-{iface}.service"
+    service_name = f"vxlb-isatap-{iface}.service"
 
     ir_create_cmd = f"ip link add {iface} type sit local {iran_ip} remote {kharej_ip} ttl 64"
     kh_create_cmd = f"ip link add {iface} type sit local {kharej_ip} remote {iran_ip} ttl 64"
@@ -124,7 +124,7 @@ def configure_isatap_link(
     target_ipv6 = kharej_v6
 
     relay_script, relay_unit = render_relay_service(
-        service_name=f"ldbp-isatap-{iface}-relay.service",
+        service_name=f"vxlb-isatap-{iface}-relay.service",
         interface=iface,
         peer_ip=target_ipv6,
         ports=[int(p) for p in client_ports],

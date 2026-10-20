@@ -11,8 +11,8 @@ from core.storage import load_data, atomic_update, get_pools, save_pool, delete_
 from core.validation import validate_pool_name, validate_ports
 from core.transport_change import connect
 
-AGENT = '/usr/local/libexec/ldbp-gre-v1.py'
-CONFIG_DIR = '/etc/ldbp/gre'
+AGENT = '/usr/local/libexec/vxlb-gre-v1.py'
+CONFIG_DIR = '/etc/vxlb/gre'
 
 
 def validate_mtu(value):
@@ -32,8 +32,8 @@ def install_agent(ssh):
     except RuntimeError as error:
         raise RuntimeError('GRE امن به root، iproute2، iptables و سرویس فعال strongswan.service با VICI نیاز دارد؛ هیچ حالت خامی فعال نشد. '+str(error)) from error
     for file in Path(__file__).with_name('vendor').joinpath('vici').glob('*.py'):
-        write(ssh, '/usr/local/libexec/ldbp-gre-vici/vici/'+file.name, file.read_text())
-    write(ssh, '/usr/local/libexec/ldbp-gre-vici/LICENSE', Path(__file__).with_name('vendor').joinpath('vici/LICENSE').read_text())
+        write(ssh, '/usr/local/libexec/vxlb-gre-vici/vici/'+file.name, file.read_text())
+    write(ssh, '/usr/local/libexec/vxlb-gre-vici/LICENSE', Path(__file__).with_name('vendor').joinpath('vici/LICENSE').read_text())
     write(ssh, AGENT, Path(__file__).with_name('gre_agent.py').read_text())
 
 
@@ -51,7 +51,7 @@ def path(node): return CONFIG_DIR + '/' + validate(node['gre']['configs'][0])['i
 
 
 def unit(node, relay=False):
-    return 'ldbp-gre-' + validate(node['gre']['configs'][0])['interface'] + ('-relay' if relay else '') + '.service'
+    return 'vxlb-gre-' + validate(node['gre']['configs'][0])['interface'] + ('-relay' if relay else '') + '.service'
 
 
 def run_agent(ssh, node, action, *args):
@@ -61,7 +61,7 @@ def run_agent(ssh, node, action, *args):
 def service(node, relay=False):
     config = path(node); helper = 'python3 ' + AGENT; link_unit = unit(node)
     return f'''[Unit]
-Description=LD-BP GRE {'TCP/UDP relay' if relay else 'private link'}
+Description=VX-LB GRE {'TCP/UDP relay' if relay else 'private link'}
 After=network-online.target strongswan.service {link_unit if relay else ''}
 Requires=strongswan.service
 PartOf=strongswan.service
@@ -102,7 +102,7 @@ def allocate(server, kharej, ports, mtu):
                 if {c['local'], c['remote']} == {local, remote}:
                     raise ValueError('Only one managed IPsec GRE link per endpoint pair is currently supported')
     security = {'mode':'ipsec', 'psk':secrets.token_hex(32), 'reqid':secrets.randbelow(2147483647)+1}
-    common = dict(security=security, owner='ldbp-gre-v1', interface=interface, key=key, mtu=validate_mtu(mtu), ports=validate_ports(ports))
+    common = dict(security=security, owner='vxlb-gre-v1', interface=interface, key=key, mtu=validate_mtu(mtu), ports=validate_ports(ports))
     configs = [validate(dict(common, role='iran', local=local, remote=remote, private=private, peer=peer)),
                validate(dict(common, role='kharej', local=remote, remote=local, private=peer, peer=private))]
     return dict(server, server_name=server['name'], node_name=interface, engine='gre', transport='gre',

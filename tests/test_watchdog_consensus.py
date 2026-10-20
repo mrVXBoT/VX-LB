@@ -64,7 +64,7 @@ class ConsensusTests(unittest.TestCase):
             base.write_text('\n'.join(f'[{stamp}] SESSION_CLOSED_STALLED | port=8443 | client=192.0.2.10:1000 | bytes_ack=0' for _ in range(600)))
             def execute(command):
                 if command.startswith('ss '): return 0,'',''
-                script=shlex.split(command)[2].replace('/var/log/bp-user-connections.log',str(base))
+                script=shlex.split(command)[2].replace('/var/log/vxlb-user-connections.log',str(base))
                 result=subprocess.run(['python3','-c',script],capture_output=True,text=True,check=True)
                 return 0,result.stdout,result.stderr
             w=TelemetryWatchdog()

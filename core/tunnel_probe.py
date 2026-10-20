@@ -17,7 +17,7 @@ while time.monotonic()<end:
     chunk=c.recv(min(65536,65537-len(data)))
     if not chunk:break
     data+=chunk
-   c.sendall(b"LD-BP-PROBE:"+data)
+   c.sendall(b"VX-LB-PROBE:"+data)
  except (OSError,TimeoutError):pass
 '''
 
@@ -51,7 +51,7 @@ class TunnelProbe:
         script='''import socket,sys
 try:
  with socket.create_connection(("127.0.0.1",int(sys.argv[1])),timeout=3) as s:
-  s.settimeout(10);seed=sys.argv[2].encode();payload=(seed*1366)[:65536]+b"\\n";s.sendall(payload);expected=b"LD-BP-PROBE:"+payload;data=b""
+  s.settimeout(10);seed=sys.argv[2].encode();payload=(seed*1366)[:65536]+b"\\n";s.sendall(payload);expected=b"VX-LB-PROBE:"+payload;data=b""
   while len(data)<len(expected):
    chunk=s.recv(len(expected)-len(data))
    if not chunk:break

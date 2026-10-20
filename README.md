@@ -47,7 +47,7 @@ cd VX-LB
 vx-lb                         # Open the management CLI
 vx-lb --set-web-password       # Set the dashboard password
 vx-lb --web                    # Start the dashboard in the background
-sudo systemctl status ld-bp-watchdog
+sudo systemctl status vx-lb-watchdog
 ```
 
 The dashboard normally listens on `127.0.0.1:8088`. For remote access, forward the port over SSH:
@@ -56,7 +56,7 @@ The dashboard normally listens on `127.0.0.1:8088`. For remote access, forward t
 ssh -L 8088:127.0.0.1:8088 root@YOUR_SERVER
 ```
 
-Then open `http://127.0.0.1:8088` locally. `LD_BP_WEB_HOST` changes the bind address; protect the dashboard with a firewall if exposing it beyond localhost. `LD_BP_WEB_PASSWORD` can bootstrap the password on first run.
+Then open `http://127.0.0.1:8088` locally. `VX_LB_WEB_HOST` changes the bind address; protect the dashboard with a firewall if exposing it beyond localhost. `VX_LB_WEB_PASSWORD` can bootstrap the password on first run.
 
 ## Project layout
 

@@ -68,12 +68,12 @@ def run(client, server):
     for thread in threads:
         thread.start()
     try:
-        with tempfile.TemporaryDirectory(prefix='ldbp-slipstream-secure-') as folder:
+        with tempfile.TemporaryDirectory(prefix='vxlb-slipstream-secure-') as folder:
             root = Path(folder)
             for name in ('server', 'client', 'wrong'):
                 subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
                                 '-keyout', str(root / f'{name}.key'), '-out', str(root / f'{name}.crt'),
-                                '-days', '1', '-subj', '/CN=ldbp-slipstream'], check=True,
+                                '-days', '1', '-subj', '/CN=vxlb-slipstream'], check=True,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 os.chmod(root / f'{name}.key', 0o600)
             def launch(command):

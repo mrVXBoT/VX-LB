@@ -1,4 +1,4 @@
-"""Dedicated VXLAN (Virtual Extensible LAN) tunnel adapter for LD-BP.
+"""Dedicated VXLAN (Virtual Extensible LAN) tunnel adapter for VX-LB.
 
 Coverage:
 - VXLAN Single-Server: Three Reference Methods
@@ -54,25 +54,25 @@ from core.vxlan_tools import (
     generate_vxlan_scripts,
 )
 
-logger = logging.getLogger("ldbp.vxlan_adapter")
+logger = logging.getLogger("vxlb.vxlan_adapter")
 
 
 def _normalize_identifier(identifier: Any) -> Tuple[str, str, str]:
     """Normalize identifier into (clean_id, iface, service_name).
 
     Accepts:
-    - 'node1' -> ('node1', 'vx-node1', 'ldbp-vxlan-vx-node1.service')
-    - 'vx-node1' -> ('node1', 'vx-node1', 'ldbp-vxlan-vx-node1.service')
-    - 'ldbp-vxlan-vx-node1.service' -> ('node1', 'vx-node1', 'ldbp-vxlan-vx-node1.service')
-    - 'ldbp-vx-node1.service' -> ('node1', 'vx-node1', 'ldbp-vxlan-vx-node1.service')
-    - 'ldbp-vxlan-node1.service' -> ('node1', 'vx-node1', 'ldbp-vxlan-vx-node1.service')
+    - 'node1' -> ('node1', 'vx-node1', 'vxlb-vxlan-vx-node1.service')
+    - 'vx-node1' -> ('node1', 'vx-node1', 'vxlb-vxlan-vx-node1.service')
+    - 'vxlb-vxlan-vx-node1.service' -> ('node1', 'vx-node1', 'vxlb-vxlan-vx-node1.service')
+    - 'vxlb-vx-node1.service' -> ('node1', 'vx-node1', 'vxlb-vxlan-vx-node1.service')
+    - 'vxlb-vxlan-node1.service' -> ('node1', 'vx-node1', 'vxlb-vxlan-vx-node1.service')
     """
     raw = str(identifier).strip()
     if raw.endswith(".service"):
         raw = raw[:-8]
-    if raw.startswith("ldbp-vxlan-"):
+    if raw.startswith("vxlb-vxlan-"):
         raw = raw[11:]
-    elif raw.startswith("ldbp-"):
+    elif raw.startswith("vxlb-"):
         raw = raw[5:]
     if raw.startswith("vx-"):
         raw_core = raw[3:]
@@ -81,7 +81,7 @@ def _normalize_identifier(identifier: Any) -> Tuple[str, str, str]:
     clean_candidate = re.sub(r"^[^a-z0-9]+", "", raw_core.lower())
     clean_id = validate_tunnel_name(clean_candidate[:12] if clean_candidate else "node")
     iface = make_vxlan_iface(clean_id)
-    svc = f"ldbp-vxlan-{iface}.service"
+    svc = f"vxlb-vxlan-{iface}.service"
     return clean_id, iface, svc
 
 
@@ -190,18 +190,18 @@ class VxlanDedicatedAdapter(BaseTunnelAdapter):
             nolearning=nolearning,
         )
 
-        svc_name = f"ldbp-vxlan-{iface}.service"
+        svc_name = f"vxlb-vxlan-{iface}.service"
         ir_unit = build_systemd_unit(
             service_name=svc_name,
-            description=f"LD-BP VXLAN Overlay Tunnel ({iface})",
-            start_script_path=f"/usr/local/bin/ldbp-{iface}-start.sh",
-            stop_script_path=f"/usr/local/bin/ldbp-{iface}-stop.sh",
+            description=f"VX-LB VXLAN Overlay Tunnel ({iface})",
+            start_script_path=f"/usr/local/bin/vxlb-{iface}-start.sh",
+            stop_script_path=f"/usr/local/bin/vxlb-{iface}-stop.sh",
         )
         kh_unit = build_systemd_unit(
             service_name=svc_name,
-            description=f"LD-BP VXLAN Overlay Tunnel ({iface})",
-            start_script_path=f"/usr/local/bin/ldbp-{iface}-start.sh",
-            stop_script_path=f"/usr/local/bin/ldbp-{iface}-stop.sh",
+            description=f"VX-LB VXLAN Overlay Tunnel ({iface})",
+            start_script_path=f"/usr/local/bin/vxlb-{iface}-start.sh",
+            stop_script_path=f"/usr/local/bin/vxlb-{iface}-stop.sh",
         )
 
         return {
@@ -223,16 +223,16 @@ class VxlanDedicatedAdapter(BaseTunnelAdapter):
                 "start": ir_start,
                 "stop": ir_stop,
                 "unit": ir_unit,
-                "start_path": f"/usr/local/bin/ldbp-{iface}-start.sh",
-                "stop_path": f"/usr/local/bin/ldbp-{iface}-stop.sh",
+                "start_path": f"/usr/local/bin/vxlb-{iface}-start.sh",
+                "stop_path": f"/usr/local/bin/vxlb-{iface}-stop.sh",
                 "unit_path": f"/etc/systemd/system/{svc_name}",
             },
             "kharej_scripts": {
                 "start": kh_start,
                 "stop": kh_stop,
                 "unit": kh_unit,
-                "start_path": f"/usr/local/bin/ldbp-{iface}-start.sh",
-                "stop_path": f"/usr/local/bin/ldbp-{iface}-stop.sh",
+                "start_path": f"/usr/local/bin/vxlb-{iface}-start.sh",
+                "stop_path": f"/usr/local/bin/vxlb-{iface}-stop.sh",
                 "unit_path": f"/etc/systemd/system/{svc_name}",
             },
             "security_disclaimer": "RAW_UNENCRYPTED_OVERLAY",
@@ -475,8 +475,8 @@ class VxlanDedicatedAdapter(BaseTunnelAdapter):
             )
 
         cmd = (
-            f"systemctl stop ldbp-vxlan-{iface}-relay.service 2>/dev/null || true; "
-            f"systemctl disable ldbp-vxlan-{iface}-relay.service 2>/dev/null || true; "
+            f"systemctl stop vxlb-vxlan-{iface}-relay.service 2>/dev/null || true; "
+            f"systemctl disable vxlb-vxlan-{iface}-relay.service 2>/dev/null || true; "
             f"systemctl stop {svc} 2>/dev/null || true; "
             f"systemctl disable {svc} 2>/dev/null || true; "
             f"ip link set dev {shlex.quote(iface)} nomaster 2>/dev/null || true; "
@@ -484,10 +484,10 @@ class VxlanDedicatedAdapter(BaseTunnelAdapter):
             f"ip link del {shlex.quote(iface)} 2>/dev/null || true; "
             f"{bridge_cleanup_cmd}"
             f"rm -f /etc/systemd/system/{svc} "
-            f"/etc/systemd/system/ldbp-vxlan-{iface}-relay.service "
-            f"/usr/local/bin/ldbp-{iface}-relay.py "
-            f"/usr/local/bin/ldbp-{shlex.quote(iface)}-start.sh "
-            f"/usr/local/bin/ldbp-{shlex.quote(iface)}-stop.sh; "
+            f"/etc/systemd/system/vxlb-vxlan-{iface}-relay.service "
+            f"/usr/local/bin/vxlb-{iface}-relay.py "
+            f"/usr/local/bin/vxlb-{shlex.quote(iface)}-start.sh "
+            f"/usr/local/bin/vxlb-{shlex.quote(iface)}-stop.sh; "
             f"systemctl daemon-reload"
         )
         ok, out, err = ssh.execute(cmd)
@@ -643,16 +643,16 @@ if __name__ == '__main__':
     asyncio.run(main())
 '''
     unit = f'''[Unit]
-Description=LD-BP VXLAN Client Ports Relay ({iface})
-After=network-online.target ldbp-vxlan-{iface}.service
+Description=VX-LB VXLAN Client Ports Relay ({iface})
+After=network-online.target vxlb-vxlan-{iface}.service
 Wants=network-online.target
-Requires=ldbp-vxlan-{iface}.service
+Requires=vxlb-vxlan-{iface}.service
 
 [Service]
 Type=simple
 Restart=on-failure
 RestartSec=3
-ExecStart=/usr/bin/python3 /usr/local/bin/ldbp-{iface}-relay.py
+ExecStart=/usr/bin/python3 /usr/local/bin/vxlb-{iface}-relay.py
 
 [Install]
 WantedBy=multi-user.target
@@ -855,19 +855,19 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
         if client_ports:
             progress("استقرار سرویس فوروارد پورت‌های کلاینت...")
             relay_py, relay_unit = generate_relay_script_and_unit(iface, kh_cidr.split("/")[0], client_ports)
-            publish(ir_ssh, f"/usr/local/bin/ldbp-{iface}-relay.py", relay_py)
-            publish(ir_ssh, f"/etc/systemd/system/ldbp-vxlan-{iface}-relay.service", relay_unit)
+            publish(ir_ssh, f"/usr/local/bin/vxlb-{iface}-relay.py", relay_py)
+            publish(ir_ssh, f"/etc/systemd/system/vxlb-vxlan-{iface}-relay.service", relay_unit)
             code, _, error = ir_ssh.execute(
-                f"chmod 755 /usr/local/bin/ldbp-{iface}-relay.py && "
+                f"chmod 755 /usr/local/bin/vxlb-{iface}-relay.py && "
                 f"systemctl daemon-reload && "
-                f"systemctl enable --now ldbp-vxlan-{iface}-relay.service"
+                f"systemctl enable --now vxlb-vxlan-{iface}-relay.service"
             )
             if code:
                 raise RuntimeError("VXLAN relay startup failed: " + error)
 
         if client_ports:
             from core.kernel_relay_ports import verify_listeners
-            verify_listeners(ir_ssh, f"ldbp-vxlan-{iface}-relay.service", client_ports)
+            verify_listeners(ir_ssh, f"vxlb-vxlan-{iface}-relay.service", client_ports)
         from core.private_link_health import probe_pair
         result = probe_pair(ir_ssh, kh_ssh, node["vxlan"]["local_private"], node["vxlan"]["remote_private"], config_payload["bridge_name"] or iface)
         def finalize(data):
@@ -971,7 +971,7 @@ for device in devices:
  pattern=r'(?m)^(ip link set dev '+re.escape(device)+r' mtu )\d+$'
  text,count=re.subn(pattern,lambda match:match.group(1)+str(mtu),text)
  if count!=1:raise RuntimeError('Owned VXLAN start script has an unexpected MTU directive')
-fd,temporary=tempfile.mkstemp(prefix='.ldbp-mtu-',dir=os.path.dirname(path))
+fd,temporary=tempfile.mkstemp(prefix='.vxlb-mtu-',dir=os.path.dirname(path))
 try:
  with os.fdopen(fd,'w') as destination:destination.write(text);destination.flush();os.fsync(destination.fileno())
  os.chmod(temporary,os.stat(path).st_mode & 0o777)
@@ -994,7 +994,7 @@ def _set_vxlan_endpoint_mtu(ssh, node, mtu):
         code, _, error = ssh.execute(f'ip link set dev {shlex.quote(device)} mtu {validate_mtu(mtu)}')
         if code:
             raise RuntimeError('Applying VXLAN MTU failed: ' + error)
-    command = 'python3 -c ' + shlex.quote(VXLAN_MTU_SCRIPT) + ' ' + shlex.quote(f'/usr/local/bin/ldbp-{iface}-start.sh') + ' ' + str(mtu) + ' ' + shlex.quote(json.dumps(devices))
+    command = 'python3 -c ' + shlex.quote(VXLAN_MTU_SCRIPT) + ' ' + shlex.quote(f'/usr/local/bin/vxlb-{iface}-start.sh') + ' ' + str(mtu) + ' ' + shlex.quote(json.dumps(devices))
     code, _, error = ssh.execute(command)
     if code:
         raise RuntimeError('Persisting VXLAN MTU failed: ' + error)

@@ -1,4 +1,4 @@
-"""Panel-controllable reconfigure bot and service for LD-BP.
+"""Panel-controllable reconfigure bot and service for VX-LB.
 
 Provides:
 - Panel & CLI controllable state: IDLE, RUNNING, PAUSED, COMPLETED, ROLLED_BACK, ERROR.
@@ -18,7 +18,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from core.storage import atomic_update, load_data
 
-logger = logging.getLogger("ldbp.reconfig_bot")
+logger = logging.getLogger("vxlb.reconfig_bot")
 
 BOT_STATE_IDLE = "IDLE"
 BOT_STATE_RUNNING = "RUNNING"

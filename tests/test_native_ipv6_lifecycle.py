@@ -12,8 +12,8 @@ def test_failed_data_probe_never_marks_native_node_healthy(engine, cleanup_fails
     target = {'ip': '2001:db8::2', 'password': 'test'}
     data = {'pools': {'qa': {'kharej_server': target, 'client_ports': [443], 'nodes': []}}}
     iface = 'native-test'
-    conf = dict(interface=iface, service_name=f'ldbp-{engine}-{iface}.service',
-                config_path=f'/etc/ldbp/{engine}/{iface}.json',
+    conf = dict(interface=iface, service_name=f'vxlb-{engine}-{iface}.service',
+                config_path=f'/etc/vxlb/{engine}/{iface}.json',
                 iran_service_unit='test unit', kharej_service_unit='test unit', mtu=1280,
                 local_ip=source['ip'], remote_ip=target['ip'],
                 private_addressing=dict(iran_ipv4='10.206.1.1', kharej_ipv4='10.206.1.2',

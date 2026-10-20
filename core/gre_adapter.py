@@ -30,19 +30,19 @@ class GreIpv4Adapter(BaseTunnelAdapter):
         }
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {svc} && systemctl restart {svc}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre-{identifier}.service"
         cmd = f"systemctl stop {svc} && systemctl disable {svc}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-gre-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-gre-{identifier}.service"
         ok, out, _ = ssh.execute(f"systemctl is-active {svc}")
         is_active = (ok == 0 and out.strip() == "active")
         return {

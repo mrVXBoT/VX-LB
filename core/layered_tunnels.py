@@ -1,4 +1,4 @@
-"""Layered and Hybrid Tunnel Lifecycle Manager for LD-BP.
+"""Layered and Hybrid Tunnel Lifecycle Manager for VX-LB.
 
 Covers:
 - Geneve + GRE6 with Native IPv6 (order-aware 2-layer setup and teardown)
@@ -119,7 +119,7 @@ def build_geneve_gre6_native_plan(
     remote_ipv6 = kharej_ipv6 if role == "iran" else iran_ipv6
 
     # Layer 0: GRE6 underlay
-    gre6_svc = f"ldbp-layer-gre6-{gre6_iface}.service"
+    gre6_svc = f"vxlb-layer-gre6-{gre6_iface}.service"
     gre6_up = f"""#!/bin/bash
 set -euo pipefail
 modprobe ip6_gre 2>/dev/null || true
@@ -133,14 +133,14 @@ ip link set {shlex.quote(gre6_iface)} down 2>/dev/null || true
 ip link del {shlex.quote(gre6_iface)} 2>/dev/null || true
 """
     gre6_unit = f"""[Unit]
-Description=LD-BP Layer 0 Underlay GRE6 ({gre6_iface})
+Description=VX-LB Layer 0 Underlay GRE6 ({gre6_iface})
 After=network.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash /etc/ldbp/layer-up-{gre6_iface}.sh
-ExecStop=/bin/bash /etc/ldbp/layer-down-{gre6_iface}.sh
+ExecStart=/bin/bash /etc/vxlb/layer-up-{gre6_iface}.sh
+ExecStop=/bin/bash /etc/vxlb/layer-down-{gre6_iface}.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -158,7 +158,7 @@ WantedBy=multi-user.target
     )
 
     # Layer 1: Geneve overlay (uses GRE6 carrier endpoint or direct carrier IPv6)
-    geneve_svc = f"ldbp-layer-geneve-{geneve_iface}.service"
+    geneve_svc = f"vxlb-layer-geneve-{geneve_iface}.service"
     geneve_up = f"""#!/bin/bash
 set -euo pipefail
 modprobe geneve 2>/dev/null || true
@@ -172,15 +172,15 @@ ip link set {shlex.quote(geneve_iface)} down 2>/dev/null || true
 ip link del {shlex.quote(geneve_iface)} 2>/dev/null || true
 """
     geneve_unit = f"""[Unit]
-Description=LD-BP Layer 1 Overlay Geneve ({geneve_iface})
+Description=VX-LB Layer 1 Overlay Geneve ({geneve_iface})
 After=network.target {gre6_svc}
 Requires={gre6_svc}
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash /etc/ldbp/layer-up-{geneve_iface}.sh
-ExecStop=/bin/bash /etc/ldbp/layer-down-{geneve_iface}.sh
+ExecStart=/bin/bash /etc/vxlb/layer-up-{geneve_iface}.sh
+ExecStop=/bin/bash /etc/vxlb/layer-down-{geneve_iface}.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -263,7 +263,7 @@ def build_geneve_gre6_ipv4_plan(
     remote_sit_v6 = f"{sit_ipv6_prefix}2" if role == "iran" else f"{sit_ipv6_prefix}1"
 
     # Layer 0: SIT IPv6 carrier over IPv4
-    sit_svc = f"ldbp-layer-sit-{sit_iface}.service"
+    sit_svc = f"vxlb-layer-sit-{sit_iface}.service"
     sit_up = f"""#!/bin/bash
 set -euo pipefail
 modprobe sit 2>/dev/null || true
@@ -278,14 +278,14 @@ ip link set {shlex.quote(sit_iface)} down 2>/dev/null || true
 ip link del {shlex.quote(sit_iface)} 2>/dev/null || true
 """
     sit_unit = f"""[Unit]
-Description=LD-BP Layer 0 SIT Carrier ({sit_iface})
+Description=VX-LB Layer 0 SIT Carrier ({sit_iface})
 After=network.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash /etc/ldbp/layer-up-{sit_iface}.sh
-ExecStop=/bin/bash /etc/ldbp/layer-down-{sit_iface}.sh
+ExecStart=/bin/bash /etc/vxlb/layer-up-{sit_iface}.sh
+ExecStop=/bin/bash /etc/vxlb/layer-down-{sit_iface}.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -303,7 +303,7 @@ WantedBy=multi-user.target
     )
 
     # Layer 1: GRE6 over SIT IPv6
-    gre6_svc = f"ldbp-layer-gre6-{gre6_iface}.service"
+    gre6_svc = f"vxlb-layer-gre6-{gre6_iface}.service"
     gre6_up = f"""#!/bin/bash
 set -euo pipefail
 modprobe ip6_gre 2>/dev/null || true
@@ -317,15 +317,15 @@ ip link set {shlex.quote(gre6_iface)} down 2>/dev/null || true
 ip link del {shlex.quote(gre6_iface)} 2>/dev/null || true
 """
     gre6_unit = f"""[Unit]
-Description=LD-BP Layer 1 GRE6 over SIT ({gre6_iface})
+Description=VX-LB Layer 1 GRE6 over SIT ({gre6_iface})
 After=network.target {sit_svc}
 Requires={sit_svc}
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash /etc/ldbp/layer-up-{gre6_iface}.sh
-ExecStop=/bin/bash /etc/ldbp/layer-down-{gre6_iface}.sh
+ExecStart=/bin/bash /etc/vxlb/layer-up-{gre6_iface}.sh
+ExecStop=/bin/bash /etc/vxlb/layer-down-{gre6_iface}.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -343,7 +343,7 @@ WantedBy=multi-user.target
     )
 
     # Layer 2: Geneve L2 over GRE6
-    geneve_svc = f"ldbp-layer-geneve-{geneve_iface}.service"
+    geneve_svc = f"vxlb-layer-geneve-{geneve_iface}.service"
     geneve_up = f"""#!/bin/bash
 set -euo pipefail
 modprobe geneve 2>/dev/null || true
@@ -357,15 +357,15 @@ ip link set {shlex.quote(geneve_iface)} down 2>/dev/null || true
 ip link del {shlex.quote(geneve_iface)} 2>/dev/null || true
 """
     geneve_unit = f"""[Unit]
-Description=LD-BP Layer 2 Geneve over GRE6 ({geneve_iface})
+Description=VX-LB Layer 2 Geneve over GRE6 ({geneve_iface})
 After=network.target {gre6_svc}
 Requires={gre6_svc}
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash /etc/ldbp/layer-up-{geneve_iface}.sh
-ExecStop=/bin/bash /etc/ldbp/layer-down-{geneve_iface}.sh
+ExecStart=/bin/bash /etc/vxlb/layer-up-{geneve_iface}.sh
+ExecStop=/bin/bash /etc/vxlb/layer-down-{geneve_iface}.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -439,7 +439,7 @@ def build_wireguard_amnezia_plan(
     overhead = WIREGUARD_BASE_OVERHEAD + 20  # Additional padding overhead
     wg_mtu = max(1280, base_mtu - overhead)
     iface = sanitize_layer_iface("awg", identifier)
-    svc = f"ldbp-awg-{iface}.service"
+    svc = f"vxlb-awg-{iface}.service"
 
     conf_content = f"""[Interface]
 PrivateKey = {private_key}
@@ -478,14 +478,14 @@ awg-quick down {iface} 2>/dev/null || wg-quick down {iface} 2>/dev/null || true
 rm -f {conf_path}
 """
     unit_content = f"""[Unit]
-Description=LD-BP AmneziaWG Obfuscated Tunnel ({iface})
+Description=VX-LB AmneziaWG Obfuscated Tunnel ({iface})
 After=network.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash /etc/ldbp/layer-up-{iface}.sh
-ExecStop=/bin/bash /etc/ldbp/layer-down-{iface}.sh
+ExecStart=/bin/bash /etc/vxlb/layer-up-{iface}.sh
+ExecStop=/bin/bash /etc/vxlb/layer-down-{iface}.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -525,7 +525,7 @@ def build_wireguard_udp2raw_plan(
     private_ip: str,
     peer_private_ip: str,
     role: str = "iran",
-    password: str = "ldbp-udp2raw-secret",
+    password: str = "vxlb-udp2raw-secret",
     base_mtu: int = STANDARD_ETHERNET_MTU,
 ) -> LayeredTunnelPlan:
     """Builds 2-tier plan: WireGuard wrapped inside udp2raw (fake TCP).
@@ -536,8 +536,8 @@ def build_wireguard_udp2raw_plan(
     overhead = WIREGUARD_BASE_OVERHEAD + UDP2RAW_OVERHEAD_BYTES  # 60 + 40 = 100
     wg_mtu = max(1280, base_mtu - overhead)
     iface = sanitize_layer_iface("wgr", identifier)
-    u2r_svc = f"ldbp-udp2raw-{iface}.service"
-    wg_svc = f"ldbp-wg-{iface}.service"
+    u2r_svc = f"vxlb-udp2raw-{iface}.service"
+    wg_svc = f"vxlb-wg-{iface}.service"
 
     # Layer 0: udp2raw fake TCP carrier
     # Client (Iran) listens on 127.0.0.1:local_bind_port and sends fake TCP to remote_ip:carrier_port
@@ -572,14 +572,14 @@ fi
 killall udp2raw 2>/dev/null || true
 """
     u2r_unit = f"""[Unit]
-Description=LD-BP udp2raw Carrier ({iface})
+Description=VX-LB udp2raw Carrier ({iface})
 After=network.target
 
 [Service]
 Type=forking
 PIDFile=/var/run/udp2raw-{iface}.pid
-ExecStart=/bin/bash /etc/ldbp/layer-up-u2r-{iface}.sh
-ExecStop=/bin/bash /etc/ldbp/layer-down-u2r-{iface}.sh
+ExecStart=/bin/bash /etc/vxlb/layer-up-u2r-{iface}.sh
+ExecStop=/bin/bash /etc/vxlb/layer-down-u2r-{iface}.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -624,15 +624,15 @@ wg-quick down {iface} 2>/dev/null || true
 rm -f {wg_conf_path}
 """
     wg_unit = f"""[Unit]
-Description=LD-BP WireGuard over udp2raw ({iface})
+Description=VX-LB WireGuard over udp2raw ({iface})
 After=network.target {u2r_svc}
 Requires={u2r_svc}
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash /etc/ldbp/layer-up-wg-{iface}.sh
-ExecStop=/bin/bash /etc/ldbp/layer-down-wg-{iface}.sh
+ExecStart=/bin/bash /etc/vxlb/layer-up-wg-{iface}.sh
+ExecStop=/bin/bash /etc/vxlb/layer-down-wg-{iface}.sh
 
 [Install]
 WantedBy=multi-user.target
@@ -710,11 +710,11 @@ class BaseLayeredAdapter(BaseTunnelAdapter):
             layer = next(l for l in plan.layers if l.layer_id == layer_id)
 
             # Write scripts and units
-            up_path = f"/etc/ldbp/layer-up-{layer.interface}.sh"
-            down_path = f"/etc/ldbp/layer-down-{layer.interface}.sh"
+            up_path = f"/etc/vxlb/layer-up-{layer.interface}.sh"
+            down_path = f"/etc/vxlb/layer-down-{layer.interface}.sh"
             unit_path = f"/etc/systemd/system/{layer.service_name}"
 
-            ssh.execute(f"mkdir -p /etc/ldbp /etc/systemd/system")
+            ssh.execute(f"mkdir -p /etc/vxlb /etc/systemd/system")
             ok_up, _, err_up = ssh.execute(f"cat > {up_path} <<'EOF'\n{layer.up_script}\nEOF\nchmod 755 {up_path}")
             if ok_up != 0:
                 self._execute_plan_teardown(ssh, plan, stop_before=layer_id)
@@ -758,10 +758,10 @@ class BaseLayeredAdapter(BaseTunnelAdapter):
             stop_cmd = (
                 f"systemctl stop {shlex.quote(layer.service_name)} 2>/dev/null || true; "
                 f"systemctl disable {shlex.quote(layer.service_name)} 2>/dev/null || true; "
-                f"/bin/bash /etc/ldbp/layer-down-{shlex.quote(layer.interface)}.sh 2>/dev/null || true; "
+                f"/bin/bash /etc/vxlb/layer-down-{shlex.quote(layer.interface)}.sh 2>/dev/null || true; "
                 f"rm -f /etc/systemd/system/{shlex.quote(layer.service_name)} "
-                f"/etc/ldbp/layer-up-{shlex.quote(layer.interface)}.sh "
-                f"/etc/ldbp/layer-down-{shlex.quote(layer.interface)}.sh; "
+                f"/etc/vxlb/layer-up-{shlex.quote(layer.interface)}.sh "
+                f"/etc/vxlb/layer-down-{shlex.quote(layer.interface)}.sh; "
                 f"systemctl daemon-reload"
             )
             ok, out, err = ssh.execute(stop_cmd)
@@ -814,7 +814,7 @@ class GeneveGre6NativeAdapter(BaseLayeredAdapter):
         # Starts both units
         gre6_iface = sanitize_layer_iface("g6u", identifier)
         gnv_iface = sanitize_layer_iface("gnv", identifier)
-        cmd = f"systemctl start ldbp-layer-gre6-{gre6_iface}.service ldbp-layer-geneve-{gnv_iface}.service"
+        cmd = f"systemctl start vxlb-layer-gre6-{gre6_iface}.service vxlb-layer-geneve-{gnv_iface}.service"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
@@ -822,7 +822,7 @@ class GeneveGre6NativeAdapter(BaseLayeredAdapter):
         gre6_iface = sanitize_layer_iface("g6u", identifier)
         gnv_iface = sanitize_layer_iface("gnv", identifier)
         # Teardown in strict reverse order: Geneve first, then GRE6
-        cmd = f"systemctl stop ldbp-layer-geneve-{gnv_iface}.service ldbp-layer-gre6-{gre6_iface}.service"
+        cmd = f"systemctl stop vxlb-layer-geneve-{gnv_iface}.service vxlb-layer-gre6-{gre6_iface}.service"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
@@ -844,15 +844,15 @@ class GeneveGre6NativeAdapter(BaseLayeredAdapter):
         gnv_iface = sanitize_layer_iface("gnv", identifier)
         # Teardown in strict reverse order
         cmd = (
-            f"systemctl stop ldbp-layer-geneve-{gnv_iface}.service 2>/dev/null || true; "
-            f"systemctl disable ldbp-layer-geneve-{gnv_iface}.service 2>/dev/null || true; "
+            f"systemctl stop vxlb-layer-geneve-{gnv_iface}.service 2>/dev/null || true; "
+            f"systemctl disable vxlb-layer-geneve-{gnv_iface}.service 2>/dev/null || true; "
             f"ip link del {gnv_iface} 2>/dev/null || true; "
-            f"systemctl stop ldbp-layer-gre6-{gre6_iface}.service 2>/dev/null || true; "
-            f"systemctl disable ldbp-layer-gre6-{gre6_iface}.service 2>/dev/null || true; "
+            f"systemctl stop vxlb-layer-gre6-{gre6_iface}.service 2>/dev/null || true; "
+            f"systemctl disable vxlb-layer-gre6-{gre6_iface}.service 2>/dev/null || true; "
             f"ip link del {gre6_iface} 2>/dev/null || true; "
-            f"rm -f /etc/systemd/system/ldbp-layer-*-{gnv_iface}.service "
-            f"/etc/systemd/system/ldbp-layer-*-{gre6_iface}.service "
-            f"/etc/ldbp/layer-*-{gnv_iface}.sh /etc/ldbp/layer-*-{gre6_iface}.sh; "
+            f"rm -f /etc/systemd/system/vxlb-layer-*-{gnv_iface}.service "
+            f"/etc/systemd/system/vxlb-layer-*-{gre6_iface}.service "
+            f"/etc/vxlb/layer-*-{gnv_iface}.sh /etc/vxlb/layer-*-{gre6_iface}.sh; "
             f"systemctl daemon-reload"
         )
         ok, out, err = ssh.execute(cmd)
@@ -900,7 +900,7 @@ class GeneveGre6Ipv4Adapter(BaseLayeredAdapter):
         sit_iface = sanitize_layer_iface("sit", identifier)
         gre6_iface = sanitize_layer_iface("g6t", identifier)
         gnv_iface = sanitize_layer_iface("gnv", identifier)
-        cmd = f"systemctl start ldbp-layer-sit-{sit_iface}.service ldbp-layer-gre6-{gre6_iface}.service ldbp-layer-geneve-{gnv_iface}.service"
+        cmd = f"systemctl start vxlb-layer-sit-{sit_iface}.service vxlb-layer-gre6-{gre6_iface}.service vxlb-layer-geneve-{gnv_iface}.service"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
@@ -909,7 +909,7 @@ class GeneveGre6Ipv4Adapter(BaseLayeredAdapter):
         gre6_iface = sanitize_layer_iface("g6t", identifier)
         gnv_iface = sanitize_layer_iface("gnv", identifier)
         # Reverse order: Geneve -> GRE6 -> SIT
-        cmd = f"systemctl stop ldbp-layer-geneve-{gnv_iface}.service ldbp-layer-gre6-{gre6_iface}.service ldbp-layer-sit-{sit_iface}.service"
+        cmd = f"systemctl stop vxlb-layer-geneve-{gnv_iface}.service vxlb-layer-gre6-{gre6_iface}.service vxlb-layer-sit-{sit_iface}.service"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
@@ -935,16 +935,16 @@ class GeneveGre6Ipv4Adapter(BaseLayeredAdapter):
         gnv_iface = sanitize_layer_iface("gnv", identifier)
         # Reverse order teardown: Geneve -> GRE6 -> SIT
         cmd = (
-            f"systemctl stop ldbp-layer-geneve-{gnv_iface}.service 2>/dev/null || true; "
+            f"systemctl stop vxlb-layer-geneve-{gnv_iface}.service 2>/dev/null || true; "
             f"ip link del {gnv_iface} 2>/dev/null || true; "
-            f"systemctl stop ldbp-layer-gre6-{gre6_iface}.service 2>/dev/null || true; "
+            f"systemctl stop vxlb-layer-gre6-{gre6_iface}.service 2>/dev/null || true; "
             f"ip link del {gre6_iface} 2>/dev/null || true; "
-            f"systemctl stop ldbp-layer-sit-{sit_iface}.service 2>/dev/null || true; "
+            f"systemctl stop vxlb-layer-sit-{sit_iface}.service 2>/dev/null || true; "
             f"ip link del {sit_iface} 2>/dev/null || true; "
-            f"rm -f /etc/systemd/system/ldbp-layer-*-{gnv_iface}.service "
-            f"/etc/systemd/system/ldbp-layer-*-{gre6_iface}.service "
-            f"/etc/systemd/system/ldbp-layer-*-{sit_iface}.service "
-            f"/etc/ldbp/layer-*-{gnv_iface}.sh /etc/ldbp/layer-*-{gre6_iface}.sh /etc/ldbp/layer-*-{sit_iface}.sh; "
+            f"rm -f /etc/systemd/system/vxlb-layer-*-{gnv_iface}.service "
+            f"/etc/systemd/system/vxlb-layer-*-{gre6_iface}.service "
+            f"/etc/systemd/system/vxlb-layer-*-{sit_iface}.service "
+            f"/etc/vxlb/layer-*-{gnv_iface}.sh /etc/vxlb/layer-*-{gre6_iface}.sh /etc/vxlb/layer-*-{sit_iface}.sh; "
             f"systemctl daemon-reload"
         )
         ok, out, err = ssh.execute(cmd)
@@ -1007,21 +1007,21 @@ class WireGuardAmneziaAdapter(BaseLayeredAdapter):
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
         iface = sanitize_layer_iface("awg", identifier)
-        svc = f"ldbp-awg-{iface}.service"
+        svc = f"vxlb-awg-{iface}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {shlex.quote(svc)} && systemctl restart {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
         iface = sanitize_layer_iface("awg", identifier)
-        svc = f"ldbp-awg-{iface}.service"
+        svc = f"vxlb-awg-{iface}.service"
         cmd = f"systemctl stop {shlex.quote(svc)} && systemctl disable {shlex.quote(svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
         iface = sanitize_layer_iface("awg", identifier)
-        svc = f"ldbp-awg-{iface}.service"
+        svc = f"vxlb-awg-{iface}.service"
         ok_svc, out_svc, _ = ssh.execute(f"systemctl is-active {shlex.quote(svc)}")
         ok_iface, _, _ = ssh.execute(f"ip link show {shlex.quote(iface)}")
         active = (ok_svc == 0 and out_svc.strip() == "active" and ok_iface == 0)
@@ -1033,13 +1033,13 @@ class WireGuardAmneziaAdapter(BaseLayeredAdapter):
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
         iface = sanitize_layer_iface("awg", identifier)
-        svc = f"ldbp-awg-{iface}.service"
+        svc = f"vxlb-awg-{iface}.service"
         cmd = (
             f"systemctl stop {shlex.quote(svc)} 2>/dev/null || true; "
             f"systemctl disable {shlex.quote(svc)} 2>/dev/null || true; "
             f"awg-quick down {shlex.quote(iface)} 2>/dev/null || wg-quick down {shlex.quote(iface)} 2>/dev/null || true; "
             f"ip link del {shlex.quote(iface)} 2>/dev/null || true; "
-            f"rm -f /etc/systemd/system/{shlex.quote(svc)} /etc/ldbp/layer-*-{shlex.quote(iface)}.sh /etc/amnezia/amneziawg/{shlex.quote(iface)}.conf; "
+            f"rm -f /etc/systemd/system/{shlex.quote(svc)} /etc/vxlb/layer-*-{shlex.quote(iface)}.sh /etc/amnezia/amneziawg/{shlex.quote(iface)}.conf; "
             f"systemctl daemon-reload"
         )
         ok, out, err = ssh.execute(cmd)
@@ -1063,7 +1063,7 @@ class WireGuardUdp2rawAdapter(BaseLayeredAdapter):
 
         carrier_port = int(pool_config.get("carrier_port", 40001))
         local_bind = int(pool_config.get("local_bind_port", 33333))
-        password = pool_config.get("password", "ldbp-udp2raw-secret")
+        password = pool_config.get("password", "vxlb-udp2raw-secret")
 
         plan_ir = build_wireguard_udp2raw_plan(
             identifier=pool_config.get("pool_name", "wgu2r"),
@@ -1101,16 +1101,16 @@ class WireGuardUdp2rawAdapter(BaseLayeredAdapter):
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
         iface = sanitize_layer_iface("wgr", identifier)
-        u2r_svc = f"ldbp-udp2raw-{iface}.service"
-        wg_svc = f"ldbp-wg-{iface}.service"
+        u2r_svc = f"vxlb-udp2raw-{iface}.service"
+        wg_svc = f"vxlb-wg-{iface}.service"
         cmd = f"systemctl start {shlex.quote(u2r_svc)} && sleep 1 && systemctl start {shlex.quote(wg_svc)}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
         iface = sanitize_layer_iface("wgr", identifier)
-        u2r_svc = f"ldbp-udp2raw-{iface}.service"
-        wg_svc = f"ldbp-wg-{iface}.service"
+        u2r_svc = f"vxlb-udp2raw-{iface}.service"
+        wg_svc = f"vxlb-wg-{iface}.service"
         # Strict reverse order: WireGuard first, then udp2raw
         cmd = f"systemctl stop {shlex.quote(wg_svc)} {shlex.quote(u2r_svc)}"
         ok, out, err = ssh.execute(cmd)
@@ -1118,8 +1118,8 @@ class WireGuardUdp2rawAdapter(BaseLayeredAdapter):
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
         iface = sanitize_layer_iface("wgr", identifier)
-        u2r_svc = f"ldbp-udp2raw-{iface}.service"
-        wg_svc = f"ldbp-wg-{iface}.service"
+        u2r_svc = f"vxlb-udp2raw-{iface}.service"
+        wg_svc = f"vxlb-wg-{iface}.service"
         ok_u2r, out_u2r, _ = ssh.execute(f"systemctl is-active {shlex.quote(u2r_svc)}")
         ok_wg, out_wg, _ = ssh.execute(f"systemctl is-active {shlex.quote(wg_svc)}")
         ok_iface, _, _ = ssh.execute(f"ip link show {shlex.quote(iface)}")
@@ -1132,8 +1132,8 @@ class WireGuardUdp2rawAdapter(BaseLayeredAdapter):
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
         iface = sanitize_layer_iface("wgr", identifier)
-        u2r_svc = f"ldbp-udp2raw-{iface}.service"
-        wg_svc = f"ldbp-wg-{iface}.service"
+        u2r_svc = f"vxlb-udp2raw-{iface}.service"
+        wg_svc = f"vxlb-wg-{iface}.service"
         # Strict reverse order teardown: WireGuard -> udp2raw
         cmd = (
             f"systemctl stop {shlex.quote(wg_svc)} 2>/dev/null || true; "
@@ -1144,7 +1144,7 @@ class WireGuardUdp2rawAdapter(BaseLayeredAdapter):
             f"systemctl disable {shlex.quote(u2r_svc)} 2>/dev/null || true; "
             f"killall udp2raw 2>/dev/null || true; "
             f"rm -f /etc/systemd/system/{shlex.quote(wg_svc)} /etc/systemd/system/{shlex.quote(u2r_svc)} "
-            f"/etc/wireguard/{shlex.quote(iface)}.conf /etc/ldbp/layer-*-{shlex.quote(iface)}.sh; "
+            f"/etc/wireguard/{shlex.quote(iface)}.conf /etc/vxlb/layer-*-{shlex.quote(iface)}.sh; "
             f"systemctl daemon-reload"
         )
         ok, out, err = ssh.execute(cmd)

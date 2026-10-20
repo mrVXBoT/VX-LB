@@ -94,7 +94,7 @@ class Observer:
         domain=config.get('fake_sni','www.shaparak.ir')
         if not isinstance(domain,str) or not re.fullmatch(r'[A-Za-z0-9.-]{1,253}',domain):raise ValueError('Invalid fake SNI')
         self.domain=domain.lower().encode()
-        if self.mode=='hop-ttl-injection' and self.domain==b'ldbp-http':raise ValueError('Fake SNI must differ from the authenticated carrier identity')
+        if self.mode=='hop-ttl-injection' and self.domain==b'vxlb-http':raise ValueError('Fake SNI must differ from the authenticated carrier identity')
         self.authority=('CONNECT link-'+identity+':443 HTTP/1.1\r\n').encode()
         self.flows={};self.packets=0;self.limited=False
         self.fake_md5=False;self.fake_ttl=set();self.urg=False;self.fake_rst=False;self.hostcase=False

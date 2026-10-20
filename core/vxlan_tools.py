@@ -1,4 +1,4 @@
-"""Dedicated VXLAN (Virtual Extensible LAN) management tools for LD-BP.
+"""Dedicated VXLAN (Virtual Extensible LAN) management tools for VX-LB.
 
 Coverage:
 - VXLAN Single-Server: Three Reference Methods (P2P, Bridge + IP Pointing, FDB + Bridge)
@@ -17,7 +17,7 @@ import re
 import shlex
 from typing import Dict, List, Optional, Tuple, Any
 
-logger = logging.getLogger("ldbp.vxlan")
+logger = logging.getLogger("vxlb.vxlan")
 
 # Standard constants
 DEFAULT_VXLAN_PORT = 4789

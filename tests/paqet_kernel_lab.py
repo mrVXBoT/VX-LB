@@ -23,13 +23,13 @@ from wireguard_kernel_lab import NamespaceSSH,run
 
 def main():
     if os.geteuid()!=0:raise RuntimeError('Run as root only inside a disposable VM')
-    if not os.environ.get('LD_BP_PAQET_LAB_INSIDE'):
-        return subprocess.call(['unshare','-n',sys.executable,__file__],env=dict(os.environ,LD_BP_PAQET_LAB_INSIDE='1'))
-    binary=os.environ.get('LD_BP_PAQET_BINARY','/opt/ldbp-lab/bin/paqet')
+    if not os.environ.get('VX_LB_PAQET_LAB_INSIDE'):
+        return subprocess.call(['unshare','-n',sys.executable,__file__],env=dict(os.environ,VX_LB_PAQET_LAB_INSIDE='1'))
+    binary=os.environ.get('VX_LB_PAQET_BINARY','/opt/vxlb-lab/bin/paqet')
     print('Official Paqet binary:',run(binary,'version'))
     names=['pqir-'+secrets.token_hex(3),'pqkh-'+secrets.token_hex(3)];created=[];processes=[];logs=[];echo_channel=None
     adapter=PaqetAdapter();node={'node_name':'lab','paqet':{'probe_port':43000,'probe_backend_port':44000}}
-    with tempfile.TemporaryDirectory(prefix='ldbp-paqet-kernel-') as folder:
+    with tempfile.TemporaryDirectory(prefix='vxlb-paqet-kernel-') as folder:
         folder=Path(folder)
         try:
             for name in names:run('ip','netns','add',name);created.append(name)

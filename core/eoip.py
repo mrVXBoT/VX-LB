@@ -1,4 +1,4 @@
-"""EOIP (Ethernet over IP) Tunnel Engine for LD-BP.
+"""EOIP (Ethernet over IP) Tunnel Engine for VX-LB.
 
 Coverage:
 - MikroTik compatible Ethernet over IP L2 tunnel protocol.
@@ -26,7 +26,7 @@ from core.ipv6_tunnel_tools import (
     validate_mtu,
 )
 
-logger = logging.getLogger("ldbp.eoip")
+logger = logging.getLogger("vxlb.eoip")
 
 ENGINE_ID = "eoip"
 DEFAULT_MTU = 1420
@@ -83,7 +83,7 @@ def configure_eoip_link(
         pool_config.get("ipv4_subnet") or "10.100.88.0/30",
     )
 
-    service_name = f"ldbp-eoip-{iface}.service"
+    service_name = f"vxlb-eoip-{iface}.service"
 
     ir_create_cmd = f"ip link add {iface} type gretap local {iran_ip} remote {kharej_ip} key {tunnel_id}"
     kh_create_cmd = f"ip link add {iface} type gretap local {kharej_ip} remote {iran_ip} key {tunnel_id}"
@@ -114,7 +114,7 @@ def configure_eoip_link(
     target_ipv4 = addressing["kharej_ipv4"].split("/")[0]
 
     relay_script, relay_unit = render_relay_service(
-        service_name=f"ldbp-eoip-{iface}-relay.service",
+        service_name=f"vxlb-eoip-{iface}-relay.service",
         interface=iface,
         peer_ip=target_ipv4,
         ports=[int(p) for p in client_ports],

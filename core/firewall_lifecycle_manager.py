@@ -38,7 +38,7 @@ class ScopedFirewallManager:
     def generate_iptables_rules(tag: str, peer_ip: str, private_subnet: str, allowed_ports: List[int]) -> List[str]:
         """Generates precisely scoped iptables rules with custom comments."""
         rules = []
-        comment = f"ldbp-{tag}"
+        comment = f"vxlb-{tag}"
         # Allow tunnel traffic from specific peer IP
         for p in allowed_ports:
             rules.append(f"iptables -A INPUT -p tcp -s {peer_ip} --dport {p} -m comment --comment '{comment}' -j ACCEPT")
@@ -55,7 +55,7 @@ class ScopedFirewallManager:
 
         Never disables UFW. Adds tagged allow rules for peer IP and private subnet.
         """
-        comment = f"ldbp-{tag}"
+        comment = f"vxlb-{tag}"
         rules = []
         for p in allowed_ports:
             rules.append(f"ufw allow from {shlex.quote(peer_ip)} to any port {int(p)} proto tcp comment {shlex.quote(comment)}")
@@ -66,7 +66,7 @@ class ScopedFirewallManager:
     @staticmethod
     def generate_cleanup_script(tag: str) -> str:
         """Generates teardown commands that remove ONLY rules matching the tag comment."""
-        comment = f"ldbp-{tag}"
+        comment = f"vxlb-{tag}"
         script = f"""
 # Clean scoped iptables rules matching comment {comment}
 for table in filter nat; do
@@ -87,19 +87,19 @@ fi
 
         Returns (unit_name, unit_content).
         """
-        service_name = f"ldbp-fw-{tag}.service"
-        script_path = f"/etc/ldbp/fw-{tag}.sh"
+        service_name = f"vxlb-fw-{tag}.service"
+        script_path = f"/etc/vxlb/fw-{tag}.sh"
 
         script_content = "#!/bin/bash\nset -e\n" + "\n".join(rules) + "\n"
         unit_content = f"""[Unit]
-Description=LD-BP Scoped Firewall Rules ({tag})
+Description=VX-LB Scoped Firewall Rules ({tag})
 After=network.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/bin/bash {script_path}
-ExecStop=/bin/bash -c "for table in filter nat; do iptables-save -t $table | grep -v 'ldbp-{tag}' | iptables-restore -T $table 2>/dev/null || true; done"
+ExecStop=/bin/bash -c "for table in filter nat; do iptables-save -t $table | grep -v 'vxlb-{tag}' | iptables-restore -T $table 2>/dev/null || true; done"
 
 [Install]
 WantedBy=multi-user.target

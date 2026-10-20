@@ -166,7 +166,7 @@ def framed_tcp(plain, secure):
 def connect_carrier(config):
     raw = socket.create_connection((config.get('carrier_host', '127.0.0.1'), int(config['carrier_port'])), timeout=10)
     try:
-        wrapped = TLSStream(context(config).wrap_socket(raw, server_hostname=config.get('server_name', 'ldbp-slipstream')))
+        wrapped = TLSStream(context(config).wrap_socket(raw, server_hostname=config.get('server_name', 'vxlb-slipstream')))
         wrapped.settimeout(60)
         return wrapped
     except BaseException:

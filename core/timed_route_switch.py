@@ -14,12 +14,12 @@ import shlex
 import time
 from typing import Dict, List, Optional, Tuple, Any
 
-logger = logging.getLogger("ldbp.timed_route_switch")
+logger = logging.getLogger("vxlb.timed_route_switch")
 
-SNAPSHOT_FILE = "/etc/ldbp/route-watchdog-snapshot.json"
-CONFIRM_FILE = "/etc/ldbp/route-watchdog.confirm"
-WATCHDOG_SCRIPT = "/usr/local/bin/ldbp-route-watchdog.py"
-WATCHDOG_SERVICE = "ldbp-route-watchdog.service"
+SNAPSHOT_FILE = "/etc/vxlb/route-watchdog-snapshot.json"
+CONFIRM_FILE = "/etc/vxlb/route-watchdog.confirm"
+WATCHDOG_SCRIPT = "/usr/local/bin/vxlb-route-watchdog.py"
+WATCHDOG_SERVICE = "vxlb-route-watchdog.service"
 WATCHDOG_UNIT_PATH = f"/etc/systemd/system/{WATCHDOG_SERVICE}"
 
 
@@ -73,11 +73,11 @@ def get_current_default_route_snapshot(ssh: Any) -> dict:
 
 def render_watchdog_program() -> str:
     return '''#!/usr/bin/env python3
-"""LD-BP standalone route switch watchdog."""
+"""VX-LB standalone route switch watchdog."""
 import json, os, subprocess, sys, time
 
-SNAPSHOT_FILE = "/etc/ldbp/route-watchdog-snapshot.json"
-CONFIRM_FILE = "/etc/ldbp/route-watchdog.confirm"
+SNAPSHOT_FILE = "/etc/vxlb/route-watchdog-snapshot.json"
+CONFIRM_FILE = "/etc/vxlb/route-watchdog.confirm"
 
 def restore():
     if not os.path.isfile(SNAPSHOT_FILE):
@@ -131,7 +131,7 @@ if __name__ == "__main__":
 def render_watchdog_unit(gateway_ip: str, timeout_seconds: int, dev: Optional[str] = None) -> str:
     dev_arg = f" {shlex.quote(dev)}" if dev else ""
     return f"""[Unit]
-Description=LD-BP Timed Default Route Watchdog Rollback
+Description=VX-LB Timed Default Route Watchdog Rollback
 After=network.target
 
 [Service]
@@ -155,7 +155,7 @@ def execute_timed_route_switch(
     snapshot = get_current_default_route_snapshot(ssh)
 
     # Prepare directories and files
-    ssh.execute("mkdir -p /etc/ldbp")
+    ssh.execute("mkdir -p /etc/vxlb")
     ssh.write_file(SNAPSHOT_FILE, json.dumps(snapshot, indent=2))
     ssh.execute(f"rm -f {CONFIRM_FILE}")
 

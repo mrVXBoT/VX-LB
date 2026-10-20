@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Standalone headless runner for LD-BP Telemetry Watchdog & DNS Failover Daemon.
+Standalone headless runner for VX-LB Telemetry Watchdog & DNS Failover Daemon.
 Supports foreground execution (systemd), background daemonizing with PID tracking,
 and single-cycle test execution.
 """
@@ -24,7 +24,7 @@ def log(msg: str):
 
 def run_loop(interval: int = 30):
     watchdog = TelemetryWatchdog(check_interval=interval)
-    log(f"Starting LD-BP Watchdog in foreground (interval: {interval}s)...")
+    log(f"Starting VX-LB Watchdog in foreground (interval: {interval}s)...")
 
     # Save PID
     with open(PID_FILE, "w") as f:
@@ -132,7 +132,7 @@ def run_once():
     print(json.dumps(rep, indent=2, ensure_ascii=False))
 
 def main():
-    parser = argparse.ArgumentParser(description="LD-BP Watchdog Daemon Manager")
+    parser = argparse.ArgumentParser(description="VX-LB Watchdog Daemon Manager")
     parser.add_argument("--foreground", action="store_true", help="Run daemon in foreground (for systemd)")
     parser.add_argument("--start", action="store_true", help="Start daemon in background")
     parser.add_argument("--stop", action="store_true", help="Stop running background daemon")

@@ -167,7 +167,7 @@ class UserspaceUdpCryptoMockEndpoint:
 
 def run_crypto_mock_lab() -> bool:
     print("=" * 70)
-    print("  LD-BP Userspace UDP Crypto Mock Lab (Simulation - Not Real WireGuard)")
+    print("  VX-LB Userspace UDP Crypto Mock Lab (Simulation - Not Real WireGuard)")
     print("=" * 70)
 
     # 1. Generate Curve25519 keypairs for mock exchange
@@ -220,11 +220,11 @@ def run_crypto_mock_lab() -> bool:
 
     def kharej_private_ip_stack(packet: bytes):
         """Simulates Kharej host receiving private IP packet through mock socket."""
-        if packet.startswith(b"LD-BP-WG:"):
+        if packet.startswith(b"VX-LB-WG:"):
             nonce = packet[9:]
             responder_received.append(nonce)
             # Reply back over the mock UDP socket to Iran
-            reply = b"LD-BP-WG-OK:" + nonce
+            reply = b"VX-LB-WG-OK:" + nonce
             kharej_endpoint.send_encapsulated(reply)
 
     kharej_endpoint.packet_handler = kharej_private_ip_stack
@@ -234,7 +234,7 @@ def run_crypto_mock_lab() -> bool:
 
     def iran_private_ip_stack(packet: bytes):
         """Simulates Iran host receiving reply through mock socket."""
-        if packet.startswith(b"LD-BP-WG-OK:"):
+        if packet.startswith(b"VX-LB-WG-OK:"):
             iran_probe_responses.append(packet)
 
     iran_endpoint.packet_handler = iran_private_ip_stack
@@ -247,7 +247,7 @@ def run_crypto_mock_lab() -> bool:
     try:
         # 6. Active Probe Phase: Send Nonce across mock UDP sockets
         nonce = secrets.token_hex(16).encode("ascii")
-        probe_packet = b"LD-BP-WG:" + nonce
+        probe_packet = b"VX-LB-WG:" + nonce
 
         print(f"\n[+] Executing Nonce probe across mock UDP sockets...")
         print(f"    Sending Nonce: {nonce.decode('ascii')}")
@@ -266,7 +266,7 @@ def run_crypto_mock_lab() -> bool:
             print("[-] FAIL: No response received through mock socket")
             return False
 
-        expected = b"LD-BP-WG-OK:" + nonce
+        expected = b"VX-LB-WG-OK:" + nonce
         if iran_probe_responses[0] != expected:
             print(f"[-] FAIL: Corrupted response: {iran_probe_responses[0]}")
             return False
@@ -287,7 +287,7 @@ def run_crypto_mock_lab() -> bool:
 
         # Send second probe challenge
         nonce2 = secrets.token_hex(16).encode("ascii")
-        probe_packet2 = b"LD-BP-WG:" + nonce2
+        probe_packet2 = b"VX-LB-WG:" + nonce2
 
         print(f"    Sending Nonce 2 while mock socket is closed: {nonce2.decode('ascii')}")
         failed_as_expected = False

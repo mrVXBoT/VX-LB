@@ -1,4 +1,4 @@
-"""Engine capabilities registry for LD-BP multi-tunnel platform.
+"""Engine capabilities registry for VX-LB multi-tunnel platform.
 
 Machine-readable registry defining protocols, address
 families, directionality, topology, encryption, kernel requirements, MTU bounds,

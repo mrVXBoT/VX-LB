@@ -20,7 +20,7 @@ from core.paqet_probe import reserve_probe_port
 from core.private_link_health import ECHO, PROBE
 from core.slipstream_deploy import identity_material
 
-DIRECTORY = '/etc/ldbp/http'
+DIRECTORY = '/etc/vxlb/http'
 MODES = {'http', 'https'}
 
 
@@ -34,7 +34,7 @@ def execute(ssh, command, timeout=30):
 def unit(name, script, config, parent=None):
     dependency = f'After={parent}\nRequires={parent}\nPartOf={parent}\n' if parent else ''
     return f'''[Unit]
-Description=LD-BP HTTP CONNECT {name}
+Description=VX-LB HTTP CONNECT {name}
 After=network-online.target
 Wants=network-online.target
 {dependency}[Service]
@@ -63,7 +63,7 @@ def plan(node, pool):
     if reserved.intersection(ports):
         raise ValueError('Client port overlaps a reserved HTTP carrier/probe port')
     allowed = ports + [probe_port]
-    carrier = dict(id=identity, token=meta['token'], tls=node['transport']=='https', server_name='ldbp-http')
+    carrier = dict(id=identity, token=meta['token'], tls=node['transport']=='https', server_name='vxlb-http')
     server_carrier = dict(carrier, role='server', listen_host=str(ipaddress.IPv4Address(pool['kharej_server']['ip'])),
                           listen_port=meta['public_port'], backend_port=meta['relay_backend_port'],
                           cert=base+'/server.crt', key=base+'/server.key', peer_cert=base+'/client.crt')
@@ -73,7 +73,7 @@ def plan(node, pool):
     server_relay = dict(role='server', listen_port=meta['relay_backend_port'], ports=allowed, target_host='127.0.0.1',
                         cert=base+'/server.crt', key=base+'/server.key', peer_cert=base+'/client.crt')
     client_relay = dict(role='client', carrier_port=meta['carrier_local_port'], ports=allowed, loopback_ports=[probe_port],
-                        server_name='ldbp-http', cert=base+'/client.crt', key=base+'/client.key', peer_cert=base+'/server.crt')
+                        server_name='vxlb-http', cert=base+'/client.crt', key=base+'/client.key', peer_cert=base+'/server.crt')
     common = {base+'/relay.py': Path(__file__).with_name('slipstream_secure_relay.py').read_text(),
               base+'/carrier.py': Path(__file__).with_name('http_connect_agent.py').read_text(),
               base+'/firewall.py': Path(__file__).with_name('http_firewall_agent.py').read_text()}
@@ -85,18 +85,18 @@ def plan(node, pool):
     client_files.update({base+'/client.crt':security['client_cert'], base+'/client.key':security['client_key'],
                          base+'/server.crt':security['server_cert'], base+'/client.json':json.dumps(client_relay),
                          base+'/client-carrier.json':json.dumps(client_carrier)})
-    server_firewall = f'ldbp-http-{identity}-server-firewall.service'
-    client_firewall = f'ldbp-http-{identity}-client-firewall.service'
+    server_firewall = f'vxlb-http-{identity}-server-firewall.service'
+    client_firewall = f'vxlb-http-{identity}-client-firewall.service'
     common_firewall=dict(id=identity,ports=ports,public_port=meta['public_port'],relay_backend_port=meta['relay_backend_port'],
                          carrier_local_port=meta['carrier_local_port'],probe_port=probe_port)
     server_files[base+'/server-firewall.json']=json.dumps(dict(common_firewall,role='server',peer=node['ip']))
     client_files[base+'/client-firewall.json']=json.dumps(dict(common_firewall,role='client'))
     for files,name,role in [(server_files,server_firewall,'server'),(client_files,client_firewall,'client')]:
-        files['/etc/systemd/system/'+name]=f'[Unit]\nDescription=LD-BP HTTP owned firewall\nAfter=network-online.target\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/bin/python3 {base}/firewall.py apply {base}/{role}-firewall.json\nExecStopPost=/usr/bin/python3 {base}/firewall.py remove {base}/{role}-firewall.json\n[Install]\nWantedBy=multi-user.target\n'
-    server_secure = f'ldbp-http-{identity}-server.service'
-    server_proxy = f'ldbp-http-{identity}-server-carrier.service'
-    client_proxy = f'ldbp-http-{identity}-client-carrier.service'
-    client_secure = f'ldbp-http-{identity}-client.service'
+        files['/etc/systemd/system/'+name]=f'[Unit]\nDescription=VX-LB HTTP owned firewall\nAfter=network-online.target\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/usr/bin/python3 {base}/firewall.py apply {base}/{role}-firewall.json\nExecStopPost=/usr/bin/python3 {base}/firewall.py remove {base}/{role}-firewall.json\n[Install]\nWantedBy=multi-user.target\n'
+    server_secure = f'vxlb-http-{identity}-server.service'
+    server_proxy = f'vxlb-http-{identity}-server-carrier.service'
+    client_proxy = f'vxlb-http-{identity}-client-carrier.service'
+    client_secure = f'vxlb-http-{identity}-client.service'
     for files, name, script, config, parent in [
         (server_files,server_secure,'relay.py','server.json',server_firewall),
         (server_files,server_proxy,'carrier.py','server-carrier.json',server_secure),
@@ -206,7 +206,7 @@ def allocate(iran, kharej, server, pool):
     return dict(ip=server['ip'],name=server.get('name',server['ip']),node_name='http-'+identity,
                 engine=pool['transport'],transport=pool['transport'],provisioning=True,status='PROVISIONING',
                 http_connect=dict(id=identity,token=secrets.token_hex(32),public_port=public,relay_backend_port=backend,
-                                  carrier_local_port=local,probe_port=candidate,security=identity_material('ldbp-http')))
+                                  carrier_local_port=local,probe_port=candidate,security=identity_material('vxlb-http')))
 
 
 def create(name, kharej, servers, ports, transport='http', callback=None):

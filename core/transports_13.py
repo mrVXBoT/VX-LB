@@ -1,4 +1,4 @@
-"""13 Advanced Transports Engine (LD-BP Suite).
+"""13 Advanced Transports Engine (VX-LB Suite).
 
 Transport profiles:
 1. tcp: Raw TCP / Noise-Framed TCP (Low overhead, Nodelay, BBR)
@@ -29,7 +29,7 @@ import struct
 import time
 from typing import Dict, List, Optional, Tuple, Any
 
-logger = logging.getLogger("ldbp.transports_13")
+logger = logging.getLogger("vxlb.transports_13")
 
 # Category Identifiers
 CAT_WEB_STREAM = "web_stream"
@@ -159,7 +159,7 @@ TRANSPORTS_13_CATALOG: Dict[str, TransportSpecification] = {
     "http": TransportSpecification(
         id="http", display_name="HTTP/1.1 CONNECT + mTLS", display_name_fa="اچ‌تی‌تی‌پی CONNECT با احراز هویت دوطرفه",
         category=CAT_WEB_STREAM, category_title_fa=CATEGORY_TITLES[CAT_WEB_STREAM], layer="L7",
-        underlying_protocol="HTTP/1.1 CONNECT / inner TLS1.3 TCP/UDP framing", reference_core="LD-BP stdlib HTTP CONNECT / OpenSSL",
+        underlying_protocol="HTTP/1.1 CONNECT / inner TLS1.3 TCP/UDP framing", reference_core="VX-LB stdlib HTTP CONNECT / OpenSSL",
         header_overhead_bytes=80, dpi_resistance="آزمایشی؛ بدون تقلید اثر انگشت مرورگر",
         recommended_use="حامل CONNECT با هویت اختصاصی mTLS؛ آزمون TCP/UDP پیش از فعال‌شدن؛ بدون ادعای HTTP/2 یا استتار مرورگر",
         min_mtu=1200, max_mtu=1500, default_mtu=1400, kernel_modules=[],
@@ -170,7 +170,7 @@ TRANSPORTS_13_CATALOG: Dict[str, TransportSpecification] = {
     "https": TransportSpecification(
         id="https", display_name="HTTPS CONNECT + mTLS", display_name_fa="اچ‌تی‌تی‌پی‌اس CONNECT با گواهی اختصاصی",
         category=CAT_WEB_STREAM, category_title_fa=CATEGORY_TITLES[CAT_WEB_STREAM], layer="L7",
-        underlying_protocol="TLS1.3 / HTTP/1.1 CONNECT / inner mTLS TCP/UDP framing", reference_core="LD-BP stdlib HTTP CONNECT / OpenSSL",
+        underlying_protocol="TLS1.3 / HTTP/1.1 CONNECT / inner mTLS TCP/UDP framing", reference_core="VX-LB stdlib HTTP CONNECT / OpenSSL",
         header_overhead_bytes=80, dpi_resistance="آزمایشی؛ بدون تقلید اثر انگشت مرورگر",
         recommended_use="حامل CONNECT با هویت اختصاصی mTLS؛ آزمون TCP/UDP پیش از فعال‌شدن؛ بدون ادعای HTTP/2 یا استتار مرورگر",
         min_mtu=1200, max_mtu=1500, default_mtu=1400, kernel_modules=[],
@@ -255,7 +255,7 @@ TRANSPORTS_13_CATALOG: Dict[str, TransportSpecification] = {
         requires_encryption=True,
         encryption_type="noise",
         default_parameters={
-            "interface_name": "tun_ldbp",
+            "interface_name": "tun_vxlb",
             "clamp_mss": True,
             "txqueuelen": 4096,
             "carrier": "udp",

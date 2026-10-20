@@ -161,18 +161,18 @@ class SlipstreamResourceHelpers(unittest.TestCase):
         ssh = MagicMock()
         ssh.execute.side_effect = [(0, 'loaded', ''), (1, '', 'failed')]
         with self.assertRaisesRegex(RuntimeError, 'stop'):
-            deploy.cleanup(ssh, ['/etc/ldbp/slipstream/owned/client.json'], ['ldbp-slipstream-owned.service'])
+            deploy.cleanup(ssh, ['/etc/vxlb/slipstream/owned/client.json'], ['vxlb-slipstream-owned.service'])
         self.assertFalse(any('rm -f' in call.args[0] for call in ssh.execute.call_args_list))
 
     def test_partial_deployment_missing_units_can_be_cleaned(self):
         ssh = MagicMock()
         ssh.execute.side_effect = [(0, 'not-found', ''), (0, '', '')]
-        deploy.cleanup(ssh, ['/etc/ldbp/slipstream/owned/client.json'], ['ldbp-slipstream-owned.service'])
+        deploy.cleanup(ssh, ['/etc/vxlb/slipstream/owned/client.json'], ['vxlb-slipstream-owned.service'])
         self.assertIn('rm -f', ssh.execute.call_args.args[0])
 
     def test_probe_failure_is_not_a_positive_latency(self):
         ssh = MagicMock()
         ssh.execute.return_value = (1, '', 'TLS failed')
-        result = deploy.probe(ssh, '/etc/ldbp/slipstream/test/client.json')
+        result = deploy.probe(ssh, '/etc/vxlb/slipstream/test/client.json')
         self.assertFalse(result['passed'])
         self.assertIsNone(result['latency_ms'])

@@ -1,4 +1,4 @@
-"""Unified durable job lifecycle manager for all LD-BP operations.
+"""Unified durable job lifecycle manager for all VX-LB operations.
 
 Durable asynchronous jobs for pool creation, pool deletion,
 node operations, link modifications, and migrations with crash recovery.

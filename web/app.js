@@ -3,9 +3,9 @@
    Full-Feature Parity with Core Script
    ========================================================================== */
 
-let authToken = localStorage.getItem("ld_bp_token") || "";
+let authToken = localStorage.getItem("vx_lb_token") || "";
 let pollTimer = null;
-let currentTab = localStorage.getItem("ld_bp_tab") || "pools";
+let currentTab = localStorage.getItem("vx_lb_tab") || "pools";
 let nodeFilter = "ALL";
 let serverFilter = "ALL";
 let poolSearch = "";
@@ -24,7 +24,7 @@ const tabScroll = {};
 const faNumber = { format: n => (n === null || n === undefined ? '' : String(n)) };
 const copy = window.panelCopy;
 
-const storedTheme = localStorage.getItem('ld_bp_theme');
+const storedTheme = localStorage.getItem('vx_lb_theme');
 if (storedTheme === 'light' || storedTheme === 'dark') {
   document.documentElement.dataset.theme = storedTheme;
 } else {
@@ -132,7 +132,7 @@ function updateThemeLogos(theme) {
 function toggleTheme() {
   const theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
   document.documentElement.dataset.theme = theme;
-  localStorage.setItem('ld_bp_theme', theme);
+  localStorage.setItem('vx_lb_theme', theme);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = theme === 'light' ? '#f1f4f0' : '#101819';
   updateThemeLogos(theme);
@@ -259,7 +259,7 @@ async function requestJson(endpoint, options = {}) {
 
   const res = await fetch(endpoint, options);
   if (res.status === 401) {
-    localStorage.removeItem("ld_bp_token");
+    localStorage.removeItem("vx_lb_token");
     authToken = "";
     showLoginView();
     throw new Error("Unauthorized");
@@ -294,7 +294,7 @@ async function handleLogin(e) {
     const data = await res.json();
     if (res.ok && data.success) {
       authToken = data.token;
-      localStorage.setItem("ld_bp_token", authToken);
+      localStorage.setItem("vx_lb_token", authToken);
       showAppView();
       startPolling();
       showToast("ورود با موفقیت انجام شد");
@@ -317,7 +317,7 @@ function handleLogout() {
       headers: { "Authorization": "Bearer " + authToken }
     }).catch(() => {});
   } catch (e) {}
-  localStorage.removeItem("ld_bp_token");
+  localStorage.removeItem("vx_lb_token");
   authToken = "";
   showLoginView();
   showToast("از حساب خارج شدید");
@@ -346,7 +346,7 @@ function switchTab(tab) {
   if (!copy.pages[tab]) return;
   tabScroll[currentTab] = window.scrollY;
   currentTab = tab;
-  try { localStorage.setItem("ld_bp_tab", tab); } catch (e) {}
+  try { localStorage.setItem("vx_lb_tab", tab); } catch (e) {}
   document.getElementById("network-summary").classList.toggle("hidden", tab !== "pools");
   document.getElementById('page-kicker').textContent = copy.kickers[tab];
   document.getElementById('page-heading').textContent = copy.pages[tab][0];

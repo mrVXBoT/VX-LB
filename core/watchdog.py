@@ -73,7 +73,7 @@ class TelemetryWatchdog:
 
     def analyze_node_health(self, pool_name: str, node: dict, client_ports: Optional[List[str]] = None) -> Tuple[str, str, List[str], Dict[str, dict]]:
         """
-        Inspects user connection telemetry (/var/log/bp-user-connections.log)
+        Inspects user connection telemetry (/var/log/vxlb-user-connections.log)
         and live sockets strictly across client ports belonging to this specific pool.
         Requires multi-client consensus for filtering, avoids marking idle nodes as filtered,
         and provides canary recovery after cooldown.
@@ -187,7 +187,7 @@ class TelemetryWatchdog:
         # push successful sessions out of an arbitrary tail-of-lines sample.
         reader = """import time, os
 now=time.time()
-for path in ['/var/log/bp-user-connections.log.1','/var/log/bp-user-connections.log']:
+for path in ['/var/log/vxlb-user-connections.log.1','/var/log/vxlb-user-connections.log']:
     if not os.path.exists(path): continue
     with open(path, errors='replace') as source:
         for line in source:

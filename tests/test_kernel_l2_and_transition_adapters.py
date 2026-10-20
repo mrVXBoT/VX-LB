@@ -50,9 +50,9 @@ class KernelL2AndTransitionAdaptersTests(unittest.TestCase):
         self.assertIn("strictly forbidden", str(ctx.exception).lower())
 
         # Isolated custom bridge
-        cfg_br = adapter.configure(self.iran_v4, self.kharej_v4, {"bridge_name": "ldbp-br-test"})
+        cfg_br = adapter.configure(self.iran_v4, self.kharej_v4, {"bridge_name": "vxlb-br-test"})
         self.assertIn("stp_state 1", cfg_br["unit_script"])
-        self.assertIn("master ldbp-br-test", cfg_br["unit_script"])
+        self.assertIn("master vxlb-br-test", cfg_br["unit_script"])
 
         # Status
         st = adapter.status(self.mock_ssh, "gtap-ir_node")

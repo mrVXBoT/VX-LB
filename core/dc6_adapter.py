@@ -15,7 +15,7 @@ DEFAULT_CARRIER = 'ip6gre'
 SUPPORTED_CARRIERS = {'ip6gre', 'ip6ip6', 'sit'}
 DEFAULT_MTU, MIN_MTU, MAX_MTU = 1280, 1280, 1440
 DEFAULT_MSS = 1220
-FIREWALL = '/usr/local/libexec/ldbp-dc6-firewall.py'
+FIREWALL = '/usr/local/libexec/vxlb-dc6-firewall.py'
 
 
 def validate_dc6_mtu(value):
@@ -30,7 +30,7 @@ def validate_carrier_type(value):
 
 
 def interface(value):
-    value = str(value).removeprefix('ldbp-dc6-').removesuffix('.service')
+    value = str(value).removeprefix('vxlb-dc6-').removesuffix('.service')
     if not re.fullmatch(r'dc6-[0-9a-f]{10}', value):
         raise ValueError('Invalid owned DC6 interface')
     return value
@@ -79,8 +79,8 @@ class DC6Adapter(BaseTunnelAdapter):
             if carrier == 'ip6ip6':
                 return f'ip -6 tunnel add {iface} mode ip6ip6 local {source} remote {destination} encaplimit none hoplimit 64'
             return f'ip tunnel add {iface} mode sit local {source} remote {destination} ttl 64'
-        service = f'ldbp-dc6-{iface}.service'
-        firewall_path = f'/etc/ldbp/dc6/{iface}-fw.json'
+        service = f'vxlb-dc6-{iface}.service'
+        firewall_path = f'/etc/vxlb/dc6/{iface}-fw.json'
         def unit(source, destination, role):
             other = 'kharej' if role == 'iran' else 'iran'
             text = render_scoped_service(service, iface, command(source, destination), mtu,
@@ -92,7 +92,7 @@ class DC6Adapter(BaseTunnelAdapter):
                         peer_v4=ips[other+'_ipv4'], peer_v6=ips[other+'_ipv6'])
         return dict(engine=ENGINE_ID, mode=carrier, carrier_type=carrier, interface=iface, mtu=mtu,
                     mss_clamp=mss, mss_rule=f'TCPMSS --set-mss {mss}', local_ip=local, remote_ip=remote,
-                    service_name=service, config_path=f'/etc/ldbp/dc6/{iface}.json', firewall_path=firewall_path,
+                    service_name=service, config_path=f'/etc/vxlb/dc6/{iface}.json', firewall_path=firewall_path,
                     iran_firewall=firewall_config(remote, 'iran'), kharej_firewall=firewall_config(local, 'kharej'),
                     iran_service_unit=unit(local, remote, 'iran'), kharej_service_unit=unit(remote, local, 'kharej'),
                     private_addressing=ips,
@@ -102,14 +102,14 @@ class DC6Adapter(BaseTunnelAdapter):
     def start(self, ssh, name):
         try:
             iface = interface(name)
-            code, out, error = ssh.execute(f'systemctl daemon-reload && systemctl enable ldbp-dc6-{iface}.service && systemctl restart ldbp-dc6-{iface}.service')
+            code, out, error = ssh.execute(f'systemctl daemon-reload && systemctl enable vxlb-dc6-{iface}.service && systemctl restart vxlb-dc6-{iface}.service')
             return code == 0, error or out
         except Exception as error:
             return False, str(error)
 
     def stop(self, ssh, name):
         try:
-            code, out, error = ssh.execute(f'systemctl stop ldbp-dc6-{interface(name)}.service')
+            code, out, error = ssh.execute(f'systemctl stop vxlb-dc6-{interface(name)}.service')
             return code == 0, error or out
         except Exception as error:
             return False, str(error)
@@ -117,7 +117,7 @@ class DC6Adapter(BaseTunnelAdapter):
     def status(self, ssh, name):
         try:
             iface = interface(name)
-            code, out, error = ssh.execute(f'systemctl is-active ldbp-dc6-{iface}.service && ip -j -s link show dev {iface}')
+            code, out, error = ssh.execute(f'systemctl is-active vxlb-dc6-{iface}.service && ip -j -s link show dev {iface}')
             return dict(status='UP' if code==0 else 'DOWN', details=dict(raw=out, error=error, path_verified=False))
         except Exception as error:
             return dict(status='DOWN', details=dict(error=str(error), path_verified=False))
@@ -138,9 +138,9 @@ class DC6Adapter(BaseTunnelAdapter):
     def clean(self, ssh, name):
         try:
             iface = interface(name)
-            service = f'ldbp-dc6-{iface}.service'
-            path = f'/etc/ldbp/dc6/{iface}-fw.json'
-            code, _, error = ssh.execute(f'if test -f /etc/systemd/system/{service}; then systemctl stop {service} && systemctl disable {service} || exit $?; fi; if systemctl is-active --quiet {service}; then exit 1; fi; if test -f {path}; then python3 {FIREWALL} remove {path} || exit $?; fi; if ip link show dev {iface} >/dev/null 2>&1; then ip link del dev {iface} || exit $?; fi; rm -f /etc/systemd/system/{service} /etc/ldbp/dc6/{iface}.json {path} || exit $?; systemctl daemon-reload')
+            service = f'vxlb-dc6-{iface}.service'
+            path = f'/etc/vxlb/dc6/{iface}-fw.json'
+            code, _, error = ssh.execute(f'if test -f /etc/systemd/system/{service}; then systemctl stop {service} && systemctl disable {service} || exit $?; fi; if systemctl is-active --quiet {service}; then exit 1; fi; if test -f {path}; then python3 {FIREWALL} remove {path} || exit $?; fi; if ip link show dev {iface} >/dev/null 2>&1; then ip link del dev {iface} || exit $?; fi; rm -f /etc/systemd/system/{service} /etc/vxlb/dc6/{iface}.json {path} || exit $?; systemctl daemon-reload')
             if code:
                 raise RuntimeError(error or 'DC6 cleanup failed')
             code, _, _ = ssh.execute(f'ip link show dev {iface} >/dev/null 2>&1')

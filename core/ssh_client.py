@@ -8,14 +8,14 @@ from typing import Tuple, Optional
 from core.validation import shquote
 
 # Security: the BackPack installer is fetched from a third-party repo at a
-# mutable branch. Override with LD_BP_BACKPACK_INSTALL_URL after auditing the
+# mutable branch. Override with VX_LB_BACKPACK_INSTALL_URL after auditing the
 # script, or vendor a pinned release tarball with a SHA256 check.
 BACKPACK_INSTALL_URL = os.environ.get(
-    "LD_BP_BACKPACK_INSTALL_URL",
+    "VX_LB_BACKPACK_INSTALL_URL",
     "https://raw.githubusercontent.com/AminMGMT/BackPack/main/install.sh",
 )
 
-# LD-BP's own known_hosts file for Trust-On-First-Use (TOFU) host key pinning.
+# VX-LB's own known_hosts file for Trust-On-First-Use (TOFU) host key pinning.
 _KNOWN_HOSTS_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "ssh_known_hosts"
 )
@@ -31,7 +31,7 @@ class _TOFUHostKeyPolicy(paramiko.MissingHostKeyPolicy):
 
     def missing_host_key(self, client, hostname, key):
         warnings.warn(
-            f"LD-BP: trusting new SSH host key {key.get_name()} for {hostname} "
+            f"VX-LB: trusting new SSH host key {key.get_name()} for {hostname} "
             f"(first encounter, TOFU). Fingerprint: {':'.join('%02x' % b for b in key.get_fingerprint())}"
         )
         client.get_host_keys().add(hostname, key.get_name(), key)
@@ -88,7 +88,7 @@ class SSHManager:
         connection = None
         try:
             client = paramiko.SSHClient()
-            # Load system keys + LD-BP's TOFU store; unknown hosts are pinned
+            # Load system keys + VX-LB's TOFU store; unknown hosts are pinned
             # on first use, changed keys are rejected (MITM protection).
             try:
                 client.load_system_host_keys()
@@ -344,12 +344,12 @@ for p in ports:
 
     def ensure_conn_monitor_installed(self) -> Tuple[bool, str]:
         """
-        Ensures /usr/local/bin/bp-conn-monitor.py and its systemd service
+        Ensures /usr/local/bin/vxlb-conn-monitor.py and its systemd service
         are deployed, enabled, and running on the remote node.
         """
         import os
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        script_path = os.path.join(base_dir, "scripts", "bp-conn-monitor.py")
+        script_path = os.path.join(base_dir, "scripts", "vxlb-conn-monitor.py")
 
         if not os.path.exists(script_path):
             return False, f"Local script not found at {script_path}"
@@ -358,11 +358,11 @@ for p in ports:
             script_content = f.read()
 
         # 1. Upload script
-        ok = self.write_file("/usr/local/bin/bp-conn-monitor.py", script_content)
+        ok = self.write_file("/usr/local/bin/vxlb-conn-monitor.py", script_content)
         if not ok:
-            return False, "Failed to upload bp-conn-monitor.py"
+            return False, "Failed to upload vxlb-conn-monitor.py"
 
-        self.execute("chmod +x /usr/local/bin/bp-conn-monitor.py")
+        self.execute("chmod +x /usr/local/bin/vxlb-conn-monitor.py")
 
         # 2. Deploy systemd unit
         service_content = """[Unit]
@@ -371,23 +371,23 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /usr/local/bin/bp-conn-monitor.py
+ExecStart=/usr/bin/python3 /usr/local/bin/vxlb-conn-monitor.py
 Restart=always
 RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
 """
-        ok_srv = self.write_file("/etc/systemd/system/bp-conn-monitor.service", service_content)
+        ok_srv = self.write_file("/etc/systemd/system/vxlb-conn-monitor.service", service_content)
         if not ok_srv:
-            return False, "Failed to write bp-conn-monitor.service"
+            return False, "Failed to write vxlb-conn-monitor.service"
 
         # 3. Reload and restart service
-        self.execute("systemctl daemon-reload && systemctl enable bp-conn-monitor.service && systemctl restart bp-conn-monitor.service")
+        self.execute("systemctl daemon-reload && systemctl enable vxlb-conn-monitor.service && systemctl restart vxlb-conn-monitor.service")
 
         # 4. Verify status
         time.sleep(1)
-        c, out, _ = self.execute("systemctl is-active bp-conn-monitor.service")
+        c, out, _ = self.execute("systemctl is-active vxlb-conn-monitor.service")
         if out.strip() == "active":
-            return True, "bp-conn-monitor installed and running"
-        return False, f"bp-conn-monitor service status: {out.strip()}"
+            return True, "vxlb-conn-monitor installed and running"
+        return False, f"vxlb-conn-monitor service status: {out.strip()}"

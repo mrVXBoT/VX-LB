@@ -1,4 +1,4 @@
-"""User-space Tunnel Software Engine Adapters for LD-BP.
+"""User-space Tunnel Software Engine Adapters for VX-LB.
 
 Coverage:
 - TrustTunnel
@@ -27,7 +27,7 @@ from core.dependency_manifest import get_dependency_manifest
 from core.ssh_client import SSHManager
 from core.validation import validate_port, validate_tunnel_name
 
-logger = logging.getLogger("ldbp.software_engines")
+logger = logging.getLogger("vxlb.software_engines")
 
 
 def _build_daemon_systemd_unit(
@@ -43,7 +43,7 @@ def _build_daemon_systemd_unit(
 Description={description}
 After=network-online.target
 Wants=network-online.target
-PartOf=ldbp-tunnels.target
+PartOf=vxlb-tunnels.target
 
 [Service]
 Type=simple
@@ -96,19 +96,19 @@ class SoftwareEngineBaseAdapter(BaseTunnelAdapter):
         return False, f"Binary '{self.binary_name}' not found on host or local bin/ depot."
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-{self.engine_id}-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-{self.engine_id}-{identifier}.service"
         cmd = f"systemctl daemon-reload && systemctl enable {svc} && systemctl restart {svc}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def stop(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-{self.engine_id}-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-{self.engine_id}-{identifier}.service"
         cmd = f"systemctl stop {svc} && systemctl disable {svc}"
         ok, out, err = ssh.execute(cmd)
         return (ok == 0), (out if ok == 0 else err)
 
     def status(self, ssh: SSHManager, identifier: str) -> dict:
-        svc = identifier if identifier.endswith(".service") else f"ldbp-{self.engine_id}-{identifier}.service"
+        svc = identifier if identifier.endswith(".service") else f"vxlb-{self.engine_id}-{identifier}.service"
         ok, out, _ = ssh.execute(f"systemctl is-active {svc}")
         is_active = (ok == 0 and out.strip() == "active")
         return {
@@ -131,8 +131,8 @@ class SoftwareEngineBaseAdapter(BaseTunnelAdapter):
         return False, f"Rollback is unsupported for engine '{self.engine_id}'"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
-        clean_id = identifier.replace(f"ldbp-{self.engine_id}-", "").replace(".service", "")
-        svc = f"ldbp-{self.engine_id}-{clean_id}.service"
+        clean_id = identifier.replace(f"vxlb-{self.engine_id}-", "").replace(".service", "")
+        svc = f"vxlb-{self.engine_id}-{clean_id}.service"
         cfg = f"/etc/{self.engine_id}/{clean_id}.{self.config_ext}"
         cmd = f"systemctl stop {svc} 2>/dev/null || true; systemctl disable {svc} 2>/dev/null || true; rm -f /etc/systemd/system/{svc} {cfg}; systemctl daemon-reload"
         ok, out, err = ssh.execute(cmd)
@@ -173,7 +173,7 @@ class TrustTunnelAdapter(SoftwareEngineBaseAdapter):
             "forwards": [{"listen": f"0.0.0.0:{p}", "target": f"127.0.0.1:{p}"} for p in client_ports],
         }
 
-        svc = f"ldbp-trusttunnel-{clean_name}.service"
+        svc = f"vxlb-trusttunnel-{clean_name}.service"
         cfg_path = f"/etc/trusttunnel/{clean_name}.json"
 
         return {
@@ -231,7 +231,7 @@ ports = [
 {port_lines}
 ]
 """
-        svc = f"ldbp-backhaul-{clean_name}.service"
+        svc = f"vxlb-backhaul-{clean_name}.service"
         cfg_path = f"/etc/backhaul/{clean_name}.toml"
 
         return {
@@ -291,8 +291,8 @@ auth.token = "{token}"
 
 {"".join(proxy_blocks)}"""
 
-        ir_svc = f"ldbp-frpc-{clean_name}.service"
-        kh_svc = f"ldbp-frps-{clean_name}.service"
+        ir_svc = f"vxlb-frpc-{clean_name}.service"
+        kh_svc = f"vxlb-frps-{clean_name}.service"
         ir_cfg = f"/etc/frp/frpc-{clean_name}.toml"
         kh_cfg = f"/etc/frp/frps-{clean_name}.toml"
 
@@ -355,7 +355,7 @@ default_token = "{token}"
 
 {"".join(client_srv_blocks)}"""
 
-        svc = f"ldbp-rathole-{clean_name}.service"
+        svc = f"vxlb-rathole-{clean_name}.service"
         cfg_path = f"/etc/rathole/{clean_name}.toml"
 
         return {
@@ -398,7 +398,7 @@ class GostAdapter(SoftwareEngineBaseAdapter):
     handler:
       type: auto
       auth:
-        username: ldbp
+        username: vxlb
         password: "{token}"
     listener:
       type: tcp
@@ -428,12 +428,12 @@ chains:
             connector:
               type: auto
               auth:
-                username: ldbp
+                username: vxlb
                 password: "{token}"
             dialer:
               type: tcp
 """
-        svc = f"ldbp-gost-{clean_name}.service"
+        svc = f"vxlb-gost-{clean_name}.service"
         cfg_path = f"/etc/gost/{clean_name}.yaml"
 
         return {
@@ -496,7 +496,7 @@ tls:
 tcpTunnels:
 {"".join(tcp_tunnels)}
 """
-        svc = f"ldbp-hysteria2-{clean_name}.service"
+        svc = f"vxlb-hysteria2-{clean_name}.service"
         cfg_path = f"/etc/hysteria/{clean_name}.yaml"
 
         return {

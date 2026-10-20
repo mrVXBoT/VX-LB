@@ -25,7 +25,7 @@ def test_profiles_have_real_queue_gate_and_preserve_peer_key_ownership(mode):
     base=plan['base'];client=json.loads(plan['client_files'][base+'/client-carrier.json'])
     server=json.loads(plan['server_files'][base+'/server-carrier.json'])
     assert client['tls'] is (mode!='l7-header-mutation') and server['tls']==client['tls']
-    unit=plan['client_files']['/etc/systemd/system/ldbp-http-'+('a'*32)+'-client-carrier.service']
+    unit=plan['client_files']['/etc/systemd/system/vxlb-http-'+('a'*32)+'-client-carrier.service']
     assert plan['queue_rules_service'] in unit
     rules=plan['client_files']['/etc/systemd/system/'+plan['queue_rules_service']]
     assert 'ExecStopPost=' in rules and ' remove ' in rules
@@ -43,8 +43,8 @@ def test_tls_record_helper_is_loopback_only_required_and_firewall_scoped():
     fw=json.loads(plan['client_files'][base+'/client-firewall.json'])
     rules=[r for r in firewall.rules(fw) if '51004' in r]
     assert len(rules)==1 and '-i' in rules[0] and 'lo' in rules[0] and '127.0.0.1' in rules[0]
-    unit=plan['client_files']['/etc/systemd/system/ldbp-http-'+('a'*32)+'-client-carrier.service']
-    assert 'ldbp-spoof-'+('a'*32)+'-records.service' in unit
+    unit=plan['client_files']['/etc/systemd/system/vxlb-http-'+('a'*32)+'-client-carrier.service']
+    assert 'vxlb-spoof-'+('a'*32)+'-records.service' in unit
 
 
 @pytest.mark.parametrize('port',[443,51001,51002,51003,8080])

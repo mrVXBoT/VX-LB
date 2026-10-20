@@ -10,7 +10,7 @@ import shlex
 from pathlib import Path
 from core.storage import get_pools
 
-AGENT = '/usr/local/libexec/ldbp-gre-https.py'
+AGENT = '/usr/local/libexec/vxlb-gre-https.py'
 
 
 def config_path(node):
@@ -60,7 +60,7 @@ def provision(sessions, node, ports):
     for ssh, c in zip(sessions, node['gre_https']):
         h.execute(ssh, 'command -v ip && command -v ping && modprobe ip_gre && modprobe fou')
         h.write(ssh, AGENT, Path(__file__).with_name('gre_https_agent.py').read_text())
-        h.write(ssh, '/usr/local/libexec/ldbp-gre-v1.py', Path(__file__).with_name('gre_agent.py').read_text())
+        h.write(ssh, '/usr/local/libexec/vxlb-gre-v1.py', Path(__file__).with_name('gre_agent.py').read_text())
         h.execute(ssh, 'test ! -e '+config_path(node)+' && test ! -e /etc/systemd/system/'+units(node)[0])
         c = dict(c, ports=ports)
         h.write(ssh, config_path(node), json.dumps(c))
@@ -68,7 +68,7 @@ def provision(sessions, node, ports):
             resource = units(node)[int(relay)]
             parent = units(node)[0] if relay else h.unit(node)
             service = f'''[Unit]
-Description=LD-BP GRE inside authenticated HTTPS {'port relay' if relay else 'link'}
+Description=VX-LB GRE inside authenticated HTTPS {'port relay' if relay else 'link'}
 After=network-online.target {parent}
 Requires={parent}
 PartOf={parent}

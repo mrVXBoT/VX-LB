@@ -197,16 +197,16 @@ class Ip6Ip6AdapterTests(unittest.TestCase):
         cmd_start = mock_ssh.execute.call_args[0][0]
         self.assertIn("systemctl enable", cmd_start)
         self.assertIn("systemctl restart", cmd_start)
-        self.assertIn("ldbp-ip6ip6-lip6-irnode1.service", cmd_start)
+        self.assertIn("vxlb-ip6ip6-lip6-irnode1.service", cmd_start)
 
         mock_ssh.reset_mock()
         mock_ssh.execute.return_value = (0, "", "")
-        ok_stop, _ = self.adapter.stop(mock_ssh, "ldbp-ip6ip6-lip6-irnode1.service")
+        ok_stop, _ = self.adapter.stop(mock_ssh, "vxlb-ip6ip6-lip6-irnode1.service")
         self.assertTrue(ok_stop)
         cmd_stop = mock_ssh.execute.call_args[0][0]
         self.assertIn("systemctl stop", cmd_stop)
         self.assertIn("systemctl disable", cmd_stop)
-        self.assertIn("ldbp-ip6ip6-lip6-irnode1.service", cmd_stop)
+        self.assertIn("vxlb-ip6ip6-lip6-irnode1.service", cmd_stop)
 
     def test_status_query_and_telemetry_synthesis(self):
         """Verify status reports active service and interface telemetry."""
@@ -366,7 +366,7 @@ class Ip6Ip6AdapterTests(unittest.TestCase):
 
         ok_mod, msg_mod = self.adapter.modify("pool_test", {
             "ssh": mock_ssh,
-            "interface": "ldbp-ip6ip6-lip6-test.service",
+            "interface": "vxlb-ip6ip6-lip6-test.service",
             "mtu": 1380,
         })
         self.assertTrue(ok_mod)
@@ -374,7 +374,7 @@ class Ip6Ip6AdapterTests(unittest.TestCase):
 
         ok_rb, msg_rb = self.adapter.rollback("pool_test", {
             "ssh": mock_ssh,
-            "interface": "ldbp-ip6ip6-lip6-test.service",
+            "interface": "vxlb-ip6ip6-lip6-test.service",
             "mtu": 1420,
         })
         self.assertTrue(ok_rb)

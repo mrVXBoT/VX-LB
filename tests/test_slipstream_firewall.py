@@ -17,7 +17,7 @@ def test_rule_only_drops_excess_dns_packets_and_never_accepts_or_flushes():
 
 
 def test_cleanup_finds_owned_old_rule_after_rate_and_port_were_changed():
-    existing = '-A INPUT -p udp --dport 53 -m comment --comment ldbp-slipstream:'+'a'*16+' -j DROP\n'
+    existing = '-A INPUT -p udp --dport 53 -m comment --comment vxlb-slipstream:'+'a'*16+' -j DROP\n'
     unrelated = '-A INPUT -p udp --dport 53 -m comment --comment other-service -j DROP\n'
     with patch.object(firewall, 'command', side_effect=[existing+unrelated, '']) as command:
         firewall.remove(CONFIG)

@@ -44,7 +44,7 @@ def test_bad_or_truncated_header_fails_before_body_forwarding(data):
 
 
 def test_real_mtls_peer_receives_two_hello_records_and_exact_64kib(tmp_path):
-    material=identity_material('ldbp-split')
+    material=identity_material('vxlb-split')
     paths={}
     for name,value in material.items():
         path=tmp_path/name;path.write_text(value);path.chmod(0o600);paths[name]=str(path)
@@ -86,7 +86,7 @@ def test_real_mtls_peer_receives_two_hello_records_and_exact_64kib(tmp_path):
         context.minimum_version=ssl.TLSVersion.TLSv1_3
         context.load_cert_chain(paths['client_cert'],paths['client_key'])
         with socket.create_connection(('127.0.0.1',port),timeout=5) as raw:
-            with context.wrap_socket(raw,server_hostname='ldbp-split') as secured:
+            with context.wrap_socket(raw,server_hostname='vxlb-split') as secured:
                 data=bytes(range(256))*256;secured.sendall(data);received=b''
                 while len(received)<len(data):
                     chunk=secured.recv(65536)

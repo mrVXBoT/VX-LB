@@ -37,7 +37,7 @@ class SlipstreamAdapterTests(unittest.TestCase):
             result = subprocess.run(command, capture_output=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(destination.read_bytes(), b"old binary")
-            self.assertEqual(list(root.glob(".ldbp-slipstream-*")), [])
+            self.assertEqual(list(root.glob(".vxlb-slipstream-*")), [])
             command[-2] = hashlib.sha256(source.read_bytes()).hexdigest()
             result = subprocess.run(command, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)

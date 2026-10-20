@@ -74,7 +74,7 @@ def echo():
 
 
 def certificates(tmp_path):
-    material=identity_material('ldbp-http')
+    material=identity_material('vxlb-http')
     result={}
     for name,text in material.items():
         path=tmp_path/name;path.write_text(text);result[name]=str(path)
@@ -86,7 +86,7 @@ def test_real_64kib_bytes_cross_carrier_and_tls_is_verified(tmp_path,echo,tls):
     public,local=free_port(),free_port()
     material=certificates(tmp_path)
     server=settings(listen_port=public,backend_port=echo,tls=tls,cert=material['server_cert'],key=material['server_key'],peer_cert=material['client_cert'])
-    client=settings('client',listen_port=local,remote_port=public,tls=tls,server_name='ldbp-http',cert=material['client_cert'],key=material['client_key'],peer_cert=material['server_cert'])
+    client=settings('client',listen_port=local,remote_port=public,tls=tls,server_name='vxlb-http',cert=material['client_cert'],key=material['client_key'],peer_cert=material['server_cert'])
     with process(tmp_path,'server',server),process(tmp_path,'client',client):
         payload=bytes(range(256))*256
         with socket.create_connection(('127.0.0.1',local),timeout=5) as connection:
@@ -118,11 +118,11 @@ def test_https_never_falls_back_when_peer_identity_is_wrong(tmp_path,echo,failur
     public,local=free_port(),free_port()
     material=certificates(tmp_path)
     server=settings(listen_port=public,backend_port=echo,tls=True,cert=material['server_cert'],key=material['server_key'],peer_cert=material['client_cert'])
-    client=settings('client',listen_port=local,remote_port=public,tls=True,server_name='ldbp-http',cert=material['client_cert'],key=material['client_key'],peer_cert=material['server_cert'])
+    client=settings('client',listen_port=local,remote_port=public,tls=True,server_name='vxlb-http',cert=material['client_cert'],key=material['client_key'],peer_cert=material['server_cert'])
     if failure=='hostname':
         client['server_name']='untrusted-name'
     else:
-        wrong=tmp_path/'other-server.pem';wrong.write_text(identity_material('ldbp-http')['server_cert']);client['peer_cert']=str(wrong)
+        wrong=tmp_path/'other-server.pem';wrong.write_text(identity_material('vxlb-http')['server_cert']);client['peer_cert']=str(wrong)
     with process(tmp_path,'server',server),process(tmp_path,'client',client):
         with socket.create_connection(('127.0.0.1',local),timeout=5) as connection:
             connection.sendall(b'must-not-cross')
@@ -148,7 +148,7 @@ def test_half_close_preserves_delayed_backend_response(tmp_path,tls):
     thread=threading.Thread(target=backend.serve_forever,daemon=True);thread.start()
     public,local=free_port(),free_port();material=certificates(tmp_path)
     server=settings(listen_port=public,backend_port=backend.server_address[1],tls=tls,cert=material['server_cert'],key=material['server_key'],peer_cert=material['client_cert'])
-    client=settings('client',listen_port=local,remote_port=public,tls=tls,server_name='ldbp-http',cert=material['client_cert'],key=material['client_key'],peer_cert=material['server_cert'])
+    client=settings('client',listen_port=local,remote_port=public,tls=tls,server_name='vxlb-http',cert=material['client_cert'],key=material['client_key'],peer_cert=material['server_cert'])
     try:
         with process(tmp_path,'server',server),process(tmp_path,'client',client):
             with socket.create_connection(('127.0.0.1',local),timeout=7) as connection:

@@ -82,8 +82,8 @@ def test_confirm_route_switch():
     assert ok
     assert "confirmed" in msg
     commands = " ".join(call.args[0] for call in mock_ssh.execute.call_args_list)
-    assert "touch /etc/ldbp/route-watchdog.confirm" in commands
-    assert "systemctl stop ldbp-route-watchdog.service" in commands
+    assert "touch /etc/vxlb/route-watchdog.confirm" in commands
+    assert "systemctl stop vxlb-route-watchdog.service" in commands
 
 
 def test_rollback_route_switch():
@@ -95,7 +95,7 @@ def test_rollback_route_switch():
     assert "restored" in msg
     commands = " ".join(call.args[0] for call in mock_ssh.execute.call_args_list)
     assert "restore" in commands
-    assert "systemctl stop ldbp-route-watchdog.service" in commands
+    assert "systemctl stop vxlb-route-watchdog.service" in commands
 
 
 def test_manager_integration_staged_and_executed():
