@@ -70,11 +70,14 @@ class SharedInfrastructureTests(unittest.TestCase):
         self.assertFalse(ok_bad_arch)
         self.assertIn("not supported", msg_bad)
 
-        # Verify BackPack does NOT have empty file hash (e3b0c442...)
+        # Bundled BackPack binaries now carry measured depot checksums so the
+        # offline installer can verify them instead of trusting file presence.
         bp_manifest = get_dependency_manifest("backpack")
         self.assertIsNotNone(bp_manifest)
-        self.assertIsNone(bp_manifest.architectures["x86_64"]["sha256"])
-        self.assertFalse(bp_manifest.architectures["x86_64"]["is_verified"])
+        self.assertEqual(bp_manifest.architectures["x86_64"]["sha256"], "ed03357f23b4ab63fb54f5e06f69778793c323ac099a4410660ad53f80e98107")
+        self.assertTrue(bp_manifest.architectures["x86_64"]["is_verified"])
+        self.assertEqual(bp_manifest.architectures["aarch64"]["sha256"], "62f2ad8b2c60feb573334ff64022cbda2e79792e1c735a3a59317230d0a29e1f")
+        self.assertTrue(bp_manifest.architectures["aarch64"]["is_verified"])
 
     def test_resource_allocator_subnets_and_vni(self):
         """Resource allocation logic for /30, /126, VNIs, and route tables."""

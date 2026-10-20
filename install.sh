@@ -2,6 +2,16 @@
 set -euo pipefail
 umask 022
 
+OFFLINE_MODE=0
+for arg in "$@"; do
+    if [ "$arg" = "--offline" ]; then
+        OFFLINE_MODE=1
+    fi
+done
+if [ "${VX_LB_OFFLINE:-0}" = "1" ]; then
+    OFFLINE_MODE=1
+fi
+
 echo "=========================================================="
 echo "      VX LB — Network Load Balancer & Tunnel Platform     "
 echo "             Fast Automated One-Line Installer            "
@@ -20,6 +30,10 @@ as_root() {
 
 install_system_packages() {
     echo "[+] Installing system prerequisites (Python 3, venv, git, curl)..."
+    if [ "$OFFLINE_MODE" -eq 1 ]; then
+        echo "[-] Offline mode: required system packages must already be installed (python3, venv, pip, git, curl)." >&2
+        return 1
+    fi
     if command -v apt-get &>/dev/null; then
         as_root apt-get update -y
         as_root apt-get install -y python3 python3-venv python3-pip git curl
@@ -55,20 +69,30 @@ else
     echo "[+] Remote one-line installation detected."
     echo "[+] Target installation directory: $INSTALL_DIR"
 
+    if [ "$OFFLINE_MODE" -eq 1 ]; then
+        echo "[-] Offline mode requires a local VX-LB source directory or archive; it cannot clone from GitHub." >&2
+        exit 1
+    fi
+
     if ! command -v git &>/dev/null || ! command -v python3 &>/dev/null; then
         install_system_packages
     fi
 
     if [ -d "$INSTALL_DIR/.git" ]; then
-        echo "[*] Existing installation found in $INSTALL_DIR. Updating to latest release..."
-        cd "$INSTALL_DIR"
-        # Untracked runtime data is preserved; tracked files are reset to upstream state.
-        as_root git fetch origin main
-        if ! as_root git pull --ff-only origin main; then
-            echo "[!] Local changes detected. Resetting tracked files to latest release (user data preserved)..."
-            as_root git reset --hard origin/main
+        if [ "$OFFLINE_MODE" -eq 1 ]; then
+            echo "[*] Offline mode: preserving existing checkout without contacting GitHub."
+            cd "$INSTALL_DIR"
+        else
+            echo "[*] Existing installation found in $INSTALL_DIR. Updating to latest release..."
+            cd "$INSTALL_DIR"
+            # Untracked runtime data is preserved; tracked files are reset to upstream state.
+            as_root git fetch origin main
+            if ! as_root git pull --ff-only origin main; then
+                echo "[!] Local changes detected. Resetting tracked files to latest release (user data preserved)..."
+                as_root git reset --hard origin/main
+            fi
+            as_root git submodule update --init --recursive 2>/dev/null || true
         fi
-        as_root git submodule update --init --recursive 2>/dev/null || true
     else
         echo "[+] Cloning VX-LB repository into $INSTALL_DIR..."
         as_root mkdir -p "$(dirname "$INSTALL_DIR")"
@@ -97,7 +121,13 @@ PYTHON="$VENV_DIR/bin/python"
 
 # 3. Install Python dependencies
 echo "[+] Checking and installing Python dependencies..."
-if [ -x "$VENV_DIR/bin/pip" ]; then
+if [ "$OFFLINE_MODE" -eq 1 ]; then
+    if [ -d "$SCRIPT_DIR/wheelhouse" ]; then
+        "$PYTHON" -m pip install --no-index --find-links "$SCRIPT_DIR/wheelhouse" -r "$SCRIPT_DIR/requirements.txt"
+    else
+        "$PYTHON" -c 'import rich, paramiko, pydantic, yaml'
+    fi
+elif [ -x "$VENV_DIR/bin/pip" ]; then
     "$VENV_DIR/bin/pip" install -q --upgrade pip 2>/dev/null || true
     "$VENV_DIR/bin/pip" install -q -r "$SCRIPT_DIR/requirements.txt" || true
 elif command -v pip3 &>/dev/null; then

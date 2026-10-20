@@ -34,17 +34,17 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
         executable_name="backpack",
         required_capabilities=[],
         architectures={
-            # BackPack binaries are installed on production servers via install.sh or host packages.
-            # No release binary hash was officially verified; empty file hash was removed.
+            # Bundled binary checksums are measured at bundle time and stay
+            # pinned in the depot for offline installs.
             "x86_64": {
-                "sha256": None,
+                "sha256": "ed03357f23b4ab63fb54f5e06f69778793c323ac099a4410660ad53f80e98107",
                 "source_url": None,
-                "is_verified": False
+                "is_verified": True
             },
             "aarch64": {
-                "sha256": None,
+                "sha256": "62f2ad8b2c60feb573334ff64022cbda2e79792e1c735a3a59317230d0a29e1f",
                 "source_url": None,
-                "is_verified": False
+                "is_verified": True
             }
         }
     ),

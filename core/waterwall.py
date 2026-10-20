@@ -659,16 +659,24 @@ def clean(ssh, node, iran):
     execute(ssh, f'rm -f {path(node)} /etc/systemd/system/{u} && systemctl daemon-reload')
 
 def install_waterwall(ssh, role: str, config: dict):
-    """Verifies binary existence and prerequisites for WaterWall.
-    
-    Returns (True, msg) if valid, or (False, error) if requirements or binary are missing.
-    """
+    """Verifies or installs WaterWall from the offline depot, then checks prerequisites."""
     profile = config.get("camouflage") or config.get("profile") or {}
-    binary = profile.get("binary", "/usr/local/bin/Waterwall")
-    cmd = f'test "$(id -u)" = 0 && test -x {shlex.quote(binary)} && command -v python3 && command -v iptables && command -v systemctl'
-    code, out, err = ssh.execute(cmd)
+    binary = profile.get("binary", BINARY_DEFAULT)
+    code, out, err = ssh.execute(f'test "$(id -u)" = 0 && test -x {shlex.quote(binary)} && command -v python3 && command -v iptables && command -v systemctl')
     if code != 0:
-        return False, f"WaterWall install check failed: root, binary ({binary}), or system tools missing: {err or out}"
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _, arch_raw, _ = ssh.execute("uname -m")
+        remote_arch = arch_raw.strip().lower()
+        arch_dir = "x86_64" if remote_arch in ("x86_64", "amd64") else "aarch64" if remote_arch in ("aarch64", "arm64") else remote_arch
+        candidate = os.path.join(base_dir, "bin", arch_dir, "Waterwall")
+        from core.dependency_manifest import get_dependency_manifest, verify_file_sha256
+        manifest = get_dependency_manifest("waterwall")
+        expected = (manifest.architectures.get(arch_dir, {}) if manifest else {}).get("sha256")
+        if os.path.isfile(candidate) and expected and verify_file_sha256(candidate, expected) and hasattr(ssh, "upload_binary"):
+            if ssh.upload_binary(candidate, binary, mode=0o755):
+                code, out, err = ssh.execute(f'test -x {shlex.quote(binary)} && command -v python3 && command -v iptables && command -v systemctl')
+        if code != 0:
+            return False, f"WaterWall install check failed: root, binary ({binary}), or system tools missing: {err or out}"
 
     helper_path = Path(__file__).with_name('waterwall_probe.py')
     if helper_path.exists():
