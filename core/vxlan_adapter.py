@@ -853,6 +853,8 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
         # Deploy Client Ports Relay on Iran node if client_ports configured
         client_ports = pool.get("client_ports", [])
         if client_ports:
+            from core.kernel_relay_ports import check_ports_free
+            check_ports_free(ir_ssh, client_ports)
             progress("استقرار سرویس فوروارد پورت‌های کلاینت...")
             relay_py, relay_unit = generate_relay_script_and_unit(iface, kh_cidr.split("/")[0], client_ports)
             publish(ir_ssh, f"/usr/local/bin/vxlb-{iface}-relay.py", relay_py)

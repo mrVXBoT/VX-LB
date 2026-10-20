@@ -64,6 +64,33 @@ else:raise RuntimeError('Relay listener verification failed')
     checked(ssh, 'python3 -c ' + shlex.quote(program) + ' ' + shlex.quote(service) + ' ' + ' '.join(map(str, ports)))
 
 
+def check_ports_free(ssh, ports):
+    # Fail fast when a requested client port is already bound by another process.
+    program = '''import subprocess,sys
+wanted=set(sys.argv[1:])
+rows=subprocess.check_output(['ss','-H','-lntup'],text=True).splitlines()
+busy=[]
+for r in rows:
+ parts=r.split()
+ if len(parts)<5:continue
+ proto=parts[0];local=parts[4]
+ port=local.rsplit(':',1)[-1]
+ if port not in wanted:continue
+ pid=[p for p in parts if p.startswith('pid=')]
+ pid=pid[0].split('=',1)[1].rstrip(',') if pid else '?'
+ busy.append(f'{proto}/{port} pid={pid} line={r.strip()}')
+if busy:
+ print('\\n'.join(sorted(set(busy))))
+ sys.exit(2)
+'''
+    code, out, err = ssh.execute(
+        'python3 -c ' + shlex.quote(program) + ' ' + ' '.join(shlex.quote(str(p)) for p in ports),
+        timeout=30,
+    )
+    if code:
+        raise RuntimeError('Client ports already in use: ' + (out or err).strip())
+
+
 def change_ports(name, requested):
     try:
         ports = validate_ports(requested)
@@ -93,6 +120,7 @@ def change_ports(name, requested):
                 for node, (path, service, script) in specs:
                     ssh = connect(node_credentials(node))
                     sessions.append(ssh)
+                    check_ports_free(ssh, ports)
                     backup = path + '.ports-' + job_id
                     checked(ssh, 'cp -p -- ' + shlex.quote(path) + ' ' + shlex.quote(backup) + ' 2>/dev/null || true')
                     backups.append((ssh, path, backup, service))
