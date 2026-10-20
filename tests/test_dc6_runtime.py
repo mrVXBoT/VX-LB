@@ -91,10 +91,21 @@ def test_firewall_cleanup_preserves_unrelated_ipv4_and_ipv6_rules(monkeypatch):
     assert not any('-F' in call or 'iptables-restore' in call for call in calls)
 
 
-@pytest.mark.parametrize('carrier,addresses',[('sit',('2001:db8::1','2001:db8::2')),('ip6gre',('192.0.2.1','192.0.2.2'))])
-def test_bad_address_family_never_saves_or_connects(carrier,addresses):
+@pytest.mark.parametrize('addresses',[('2001:db8::1','2001:db8::2')])
+def test_bad_address_family_never_saves_or_connects(addresses):
     with patch('core.storage.save_pool') as save,patch.object(runtime,'connect') as connect:
-        ok,message,pool=runtime.create('qa',{'ip':addresses[1]},[{'ip':addresses[0]}],['443'],carrier=carrier)
+        ok,message,pool=runtime.create('qa',{'ip':addresses[1]},[{'ip':addresses[0]}],['443'],carrier='sit')
     assert not ok and message and pool=={}
     save.assert_not_called()
     connect.assert_not_called()
+
+
+def test_ipv4_management_endpoints_can_resolve_ipv6_over_ssh():
+    iran = {'ip': '192.0.2.1'}
+    kharej = {'ip': '192.0.2.2'}
+    iran_ssh, kharej_ssh = MagicMock(), MagicMock()
+    iran_ssh.execute.return_value = (0, '2001:db8::1/64\n', '')
+    kharej_ssh.execute.return_value = (0, '2001:db8::2/64\n', '')
+    resolved = runtime._resolve_dc6_v6_endpoints(iran, kharej, iran_ssh, kharej_ssh, 'ip6gre')
+    assert resolved[0]['ipv6'] == '2001:db8::1'
+    assert resolved[1]['ipv6'] == '2001:db8::2'

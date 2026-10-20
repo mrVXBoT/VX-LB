@@ -62,12 +62,10 @@ def create(name: str, kharej: dict, servers: list, ports: list, mtu: int = 1280,
         else:
             for endpoint in [kharej, *servers]:
                 ip, v6 = str(endpoint.get("ip") or ""), str(endpoint.get("ipv6") or "")
-                if ":" not in ip and ":" not in v6:
-                    raise ValueError(
-                        f"حامل {carrier} نیازمند IPv6 عمومی است؛ سرور '{ip}' IPv6 ندارد — "
-                        "IPv6 را در فرم سرور وارد کنید یا حامل 'sit' را انتخاب کنید"
-                    )
-                validate_outer(_dc6_outer(endpoint, carrier), carrier)
+                if ":" in ip or ":" in v6:
+                    validate_outer(_dc6_outer(endpoint, carrier), carrier)
+                # An IPv4 management address is allowed here: add() connects
+                # over SSH and discovers the host's global IPv6 before deploy.
         if not ports or not servers:
             raise ValueError("Select at least one Iran server")
         if len({s["ip"] for s in servers}) != len(servers):
@@ -182,12 +180,15 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
             validate_outer(server.get("ip"), "sit")
             validate_outer(kharej.get("ip"), "sit")
         else:
-            has_v6 = lambda s: ":" in str(s.get("ip") or "") or ":" in str(s.get("ipv6") or "")
-            if not (has_v6(server) and has_v6(kharej)):
-                pass  # discovery over SSH will resolve or produce a clear error
-            else:
-                validate_outer(_dc6_outer(server, pool["carrier_type"]), pool["carrier_type"])
-                validate_outer(_dc6_outer(kharej, pool["carrier_type"]), pool["carrier_type"])
+            for endpoint in (server, kharej):
+                explicit_v6 = str(endpoint.get("ipv6") or "").strip()
+                endpoint_ip = str(endpoint.get("ip") or "").strip()
+                if explicit_v6:
+                    validate_outer(explicit_v6, pool["carrier_type"])
+                elif ":" in endpoint_ip:
+                    validate_outer(endpoint_ip, pool["carrier_type"])
+                # IPv4 `ip` is the SSH management endpoint; resolve the carrier
+                # address only after connecting to the host below.
     except ValueError as e:
         return False, f"DC6 carrier address is invalid: {e}"
 
