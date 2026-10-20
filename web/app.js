@@ -1117,6 +1117,8 @@ function confirmDialog(message, opts = {}) {
 function openAddServerModal() {
   document.getElementById("server-name-input").value = "";
   document.getElementById("server-ip-input").value = "";
+  const v6 = document.getElementById("server-ipv6-input");
+  if (v6) v6.value = "";
   document.getElementById("server-pass-input").value = "";
   document.getElementById("add-server-modal").classList.remove("hidden");
 }
@@ -1129,6 +1131,7 @@ async function submitAddServer(e) {
   const port = parseInt(document.getElementById("server-port-input").value) || 22;
   const user = document.getElementById("server-user-input").value.trim() || "root";
   const pass = document.getElementById("server-pass-input").value;
+  const ipv6 = (document.getElementById("server-ipv6-input")?.value || "").trim();
 
   const btn = document.getElementById("add-server-submit-btn");
   btn.disabled = true;
@@ -1137,7 +1140,7 @@ async function submitAddServer(e) {
   try {
     const res = await apiFetch("/api/servers/add", {
       method: "POST",
-      body: { type: role, name, ip, port, username: user, password: pass }
+      body: { type: role, name, ip, ipv6, port, username: user, password: pass }
     });
     if (res.success) {
       showToast(`سرور ${ip} با موفقیت افزوده شد`);
@@ -1194,6 +1197,7 @@ async function openCreatePoolModal() {
     const srvData = await apiFetch("/api/servers");
     const kharejs = srvData.kharej || [];
     const irans = srvData.iran || [];
+    poolCreateServers = { iran: irans, kharej: kharejs };
 
     if (!kharejs.length) {
       khSelect.innerHTML = "<option value=''>ابتدا سرور خارج در مخزن ثبت کنید</option>";
@@ -2357,31 +2361,44 @@ if (typeof window !== "undefined") {
 
 function _isIPv6(ip) { return typeof ip === 'string' && ip.includes(':'); }
 
+// Pool-create modal caches the latest /api/servers payload so DC6 hints can
+// consult each endpoint's stored IPv6, not only its management `ip` field.
+let poolCreateServers = { iran: [], kharej: [] };
+
+function _endpointHasV6(ip, list) {
+  if (_isIPv6(ip)) return true;
+  const s = (list || []).find(x => x && x.ip === ip);
+  return !!(s && _isIPv6(s.ipv6 || ""));
+}
+
 function updateDc6CarrierHint() {
   const carrierSel = document.getElementById('new-pool-dc6-carrier');
   if (!carrierSel) return;
   const kharejIp = document.getElementById('new-pool-kharej')?.value || '';
   const irans = Array.from(document.querySelectorAll("input[name='pool-iran-nodes']:checked")).map(cb => cb.value);
-  const endpoints = [kharejIp, ...irans].filter(Boolean);
-  if (!endpoints.length) return;
-  const allV6 = endpoints.every(_isIPv6);
-  const anyV4 = endpoints.some(ip => !_isIPv6(ip));
+  if (!kharejIp && !irans.length) return;
 
-  // Disable IPv6-only carriers when any endpoint lacks IPv6; default to sit then.
+  const khHasV6 = _endpointHasV6(kharejIp, poolCreateServers.kharej);
+  const allIranV6 = irans.length > 0 && irans.every(ip => _endpointHasV6(ip, poolCreateServers.iran));
+  const anyV4 = !khHasV6 || !allIranV6;
+
+  // IPv6-based carriers need global IPv6 on every endpoint (stored or SSH-discovered).
   ['ip6gre', 'ip6ip6'].forEach(val => {
     const opt = [...carrierSel.options].find(o => o.value === val);
-    if (opt) opt.disabled = anyV4;
+    if (opt) opt.disabled = false;  // keep selectable — backend auto-discovers IPv6
   });
   const sitOpt = [...carrierSel.options].find(o => o.value === 'sit');
   if (sitOpt) sitOpt.disabled = false;
-  if (anyV4 && carrierSel.value !== 'sit') carrierSel.value = 'sit';
 
   const hintEl = document.getElementById('dc6-carrier-hint');
   if (hintEl) {
-    hintEl.textContent = anyV4
-      ? 'حداقل یکی از سرورهای انتخابی فقط IPv4 دارد — حامل «sit» انتخاب شد. برای حامل‌های IPv6، سرور با IPv6 عمومی انتخاب کنید.'
-      : 'هر دو سرور IPv6 عمومی دارند؛ هر سه حامل در دسترس‌اند.';
-    hintEl.style.color = anyV4 ? 'var(--status-warn, #f59e0b)' : 'var(--text-muted)';
+    if (!anyV4) {
+      hintEl.textContent = 'همهٔ endpointها IPv6 عمومی دارند؛ هر سه حامل در دسترس‌اند.';
+      hintEl.style.color = 'var(--text-muted)';
+    } else {
+      hintEl.textContent = 'برخی endpointها IPv6 ثبت‌شده ندارند؛ هنگام راه‌اندازی تلاش می‌شود IPv6 از روی SSH کشف شود. در غیر این‌صورت حامل «sit» را انتخاب کنید.';
+      hintEl.style.color = 'var(--status-warn, #f59e0b)';
+    }
   }
 }
 

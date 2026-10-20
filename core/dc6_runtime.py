@@ -53,11 +53,23 @@ def create(name: str, kharej: dict, servers: list, ports: list, mtu: int = 1280,
         ports = validate_ports(ports)
         mtu = validate_dc6_mtu(mtu)
         carrier = validate_carrier_type(carrier)
-        validate_outer(kharej.get("ip"), carrier)
+        # For IPv6 carriers `ip` may be IPv4 while a global IPv6 lives in `ipv6`
+        # or is discoverable over SSH during add() — don't hard-fail here.
+        if carrier == "sit":
+            validate_outer(kharej.get("ip"), carrier)
+            for server in servers:
+                validate_outer(server.get("ip"), carrier)
+        else:
+            for endpoint in [kharej, *servers]:
+                ip, v6 = str(endpoint.get("ip") or ""), str(endpoint.get("ipv6") or "")
+                if ":" not in ip and ":" not in v6:
+                    raise ValueError(
+                        f"حامل {carrier} نیازمند IPv6 عمومی است؛ سرور '{ip}' IPv6 ندارد — "
+                        "IPv6 را در فرم سرور وارد کنید یا حامل 'sit' را انتخاب کنید"
+                    )
+                validate_outer(_dc6_outer(endpoint, carrier), carrier)
         if not ports or not servers:
             raise ValueError("Select at least one Iran server")
-        for server in servers:
-            validate_outer(server.get("ip"), carrier)
         if len({s["ip"] for s in servers}) != len(servers):
             raise ValueError("Duplicate Iran server")
         if name in get_pools():
@@ -101,6 +113,51 @@ def create(name: str, kharej: dict, servers: list, ports: list, mtu: int = 1280,
     )
 
 
+def _dc6_outer(server: dict, carrier: str) -> str:
+    """Outer address used for the DC6 carrier for this endpoint.
+
+    For IPv6-based carriers prefer the explicit `ipv6` field; `ip` may hold the
+    IPv4 management address. For SIT, `ip` is used as-is (it must be IPv4).
+    """
+    if carrier == "sit":
+        return str(server.get("ip") or "")
+    ip6 = str(server.get("ipv6") or "").strip()
+    if ip6:
+        return ip6
+    return str(server.get("ip") or "")
+
+
+def _discover_global_ipv6(ssh) -> str:
+    """Return the first global-scope IPv6 address found on the remote host."""
+    code, out, _ = ssh.execute(
+        "ip -6 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1"
+    )
+    if code:
+        return ""
+    return out.strip().splitlines()[0].strip() if out.strip() else ""
+
+
+def _resolve_dc6_v6_endpoints(server: dict, kharej: dict, ir_ssh, kh_ssh, carrier: str):
+    """Ensure both endpoints carry a usable global IPv6 in their `ipv6` field.
+
+    Order of preference per endpoint: stored `ipv6`, `ip` if already IPv6,
+    then SSH auto-discovery of a global-scope address. Mutates and returns the
+    endpoint dicts; returns (None, None) when either side cannot be resolved.
+    """
+    resolved = []
+    for endpoint, ssh in ((server, ir_ssh), (kharej, kh_ssh)):
+        v6 = str(endpoint.get("ipv6") or "").strip()
+        if not v6:
+            ip = str(endpoint.get("ip") or "").strip()
+            v6 = ip if ":" in ip else _discover_global_ipv6(ssh)
+        try:
+            endpoint["ipv6"] = validate_ipv6_address(v6)
+        except (ValueError, TypeError):
+            return None, None
+        resolved.append(endpoint)
+    return resolved[0], resolved[1]
+
+
 @serialized
 def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
     import json
@@ -119,8 +176,18 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
     if not ok:
         return False, message
     try:
-        validate_outer(server.get("ip"), pool["carrier_type"])
-        validate_outer(kharej.get("ip"), pool["carrier_type"])
+        # For IPv6 carriers, `ip` may be IPv4 while a global IPv6 exists in `ipv6`
+        # or discoverable over SSH — resolve inside the try block below.
+        if pool["carrier_type"] == "sit":
+            validate_outer(server.get("ip"), "sit")
+            validate_outer(kharej.get("ip"), "sit")
+        else:
+            has_v6 = lambda s: ":" in str(s.get("ip") or "") or ":" in str(s.get("ipv6") or "")
+            if not (has_v6(server) and has_v6(kharej)):
+                pass  # discovery over SSH will resolve or produce a clear error
+            else:
+                validate_outer(_dc6_outer(server, pool["carrier_type"]), pool["carrier_type"])
+                validate_outer(_dc6_outer(kharej, pool["carrier_type"]), pool["carrier_type"])
     except ValueError as e:
         return False, f"DC6 carrier address is invalid: {e}"
 
@@ -139,14 +206,20 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
         kh_ssh = connect(kharej)
         sessions.append(kh_ssh)
 
-        ok_ir, msg_ir = adapter.install(ir_ssh, "iran", {"remote_ip": kharej["ip"], "carrier_type": pool["carrier_type"]})
+        carrier = pool["carrier_type"]
+        if carrier != "sit":
+            server, kharej = _resolve_dc6_v6_endpoints(server, kharej, ir_ssh, kh_ssh, carrier)
+            if not server or not kharej:
+                return False, f"حامل {carrier} نیازمند IPv6 عمومی روی هر دو سرور است؛ IPv6 سرور را در فرم ثبت کنید یا روی سرور فعال کنید — یا حامل 'sit' را انتخاب کنید"
+
+        ok_ir, msg_ir = adapter.install(ir_ssh, "iran", {"remote_ip": _dc6_outer(kharej, carrier), "carrier_type": carrier})
         if not ok_ir:
             return False, f"Iran prerequisite check failed: {msg_ir}"
-        ok_kh, msg_kh = adapter.install(kh_ssh, "kharej", {"remote_ip": server["ip"], "carrier_type": pool["carrier_type"]})
+        ok_kh, msg_kh = adapter.install(kh_ssh, "kharej", {"remote_ip": _dc6_outer(server, carrier), "carrier_type": carrier})
         if not ok_kh:
             return False, f"Kharej prerequisite check failed: {msg_kh}"
 
-        conf = adapter.configure(iran_node=server, kharej_server=kharej, pool_config={"mtu": pool.get("dc6_mtu", 1280), "pool_name": pool_name, "carrier_type": pool["carrier_type"]})
+        conf = adapter.configure(iran_node=server, kharej_server=kharej, pool_config={"mtu": pool.get("dc6_mtu", 1280), "pool_name": pool_name, "carrier_type": carrier})
         iface = conf["interface"]
         svc = conf["service_name"]
 

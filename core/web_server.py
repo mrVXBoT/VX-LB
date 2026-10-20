@@ -824,6 +824,13 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 return self._send_json({"error": str(e)}, 400)
             username = body.get("username", "root").strip()
             password = body.get("password", "")
+            ipv6 = str(body.get("ipv6") or "").strip()
+            if ipv6:
+                from core.ipv6_tunnel_tools import validate_ipv6_address
+                try:
+                    ipv6 = validate_ipv6_address(ipv6)
+                except ValueError as e:
+                    return self._send_json({"error": str(e)}, 400)
 
             if not ip or not password:
                 return self._send_json({"error": "آدرس IP و رمز عبور الزامی است"}, 400)
@@ -843,6 +850,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             server_info = {
                 "name": name,
                 "ip": ip,
+                "ipv6": ipv6,
                 "port": port,
                 "username": username,
                 "password": password,

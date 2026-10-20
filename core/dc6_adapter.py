@@ -65,7 +65,9 @@ class DC6Adapter(BaseTunnelAdapter):
         mss = int(pool_config.get('mss_clamp', mtu-60))
         if not 536 <= mss <= mtu-60:
             raise ValueError('DC6 MSS does not fit the IPv6 private MTU')
-        local, remote = validate_outer(iran_node['ip'], carrier), validate_outer(kharej_server['ip'], carrier)
+        from core.dc6_runtime import _dc6_outer
+        local = validate_outer(_dc6_outer(iran_node, carrier), carrier)
+        remote = validate_outer(_dc6_outer(kharej_server, carrier), carrier)
         if local == remote:
             raise ValueError('DC6 endpoints must be different servers')
         iface = interface(pool_config.get('interface') or 'dc6-'+secrets.token_hex(5))
