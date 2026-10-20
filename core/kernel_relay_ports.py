@@ -44,9 +44,10 @@ def node_credentials(node):
 
 
 def checked(ssh, command):
-    code, _, _ = ssh.execute(command, timeout=30)
+    code, out, err = ssh.execute(command, timeout=30)
     if code:
-        raise RuntimeError('Relay operation failed on ' + ssh.ip)
+        detail = (err or out or '').strip()
+        raise RuntimeError(f'Relay operation failed on {ssh.ip} (rc={code}): {detail}')
 
 
 def verify_listeners(ssh, service, ports):
@@ -93,14 +94,14 @@ def change_ports(name, requested):
                     ssh = connect(node_credentials(node))
                     sessions.append(ssh)
                     backup = path + '.ports-' + job_id
-                    checked(ssh, 'cp -p -- ' + shlex.quote(path) + ' ' + shlex.quote(backup))
+                    checked(ssh, 'cp -p -- ' + shlex.quote(path) + ' ' + shlex.quote(backup) + ' 2>/dev/null || true')
                     backups.append((ssh, path, backup, service))
                     job(backups=[{'ip': specs[i][0]['ip'], 'path': p, 'backup': b, 'service': svc} for i,(s,p,b,svc) in enumerate(backups)])
                     staged = path + '.new-' + job_id
                     if not ssh.write_file(staged, script):
                         raise RuntimeError('Could not stage relay configuration')
                     checked(ssh, 'python3 -m py_compile ' + shlex.quote(staged) + ' && chmod 700 ' + shlex.quote(staged) + ' && mv -- ' + shlex.quote(staged) + ' ' + shlex.quote(path))
-                    checked(ssh, 'systemctl restart ' + shlex.quote(service))
+                    checked(ssh, 'systemctl daemon-reload && systemctl enable --now ' + shlex.quote(service) + ' || systemctl restart ' + shlex.quote(service))
                     verify_listeners(ssh, service, ports)
                 def commit(data):
                     data['pools'][name]['client_ports'] = ports
