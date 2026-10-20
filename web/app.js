@@ -573,9 +573,20 @@ function operationMarkup(pool, job, kind) {
   const description = kind === 'task' ? `<span>${job.kind === 'delete' ? 'حذف سرویس‌ها و منابع استخر' : job.kind === 'slipstream_settings' ? 'تغییر دامنه، resolver یا QPS تونل DNS' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS و بررسی انتقال داده' : 'تغییر پورت‌های استخر'}</span>` : kind === 'creation' ? '<span>راه‌اندازی سرورها و تونل‌های استخر</span>' : kind === 'gre' ? '<span>تنظیمات لینک خصوصی و فوروارد پورت</span>' : kind === 'transport' ? `<span class="operation-route" dir="rtl">از <bdi dir="ltr">${escapeHtml(job.from)}</bdi> به <bdi dir="ltr">${escapeHtml(job.to)}</bdi><small style="color:var(--text-muted);font-size:10px;"> · ${faNumber.format(job.completed || 0)} از ${faNumber.format(job.total || 0)} نود</small></span>` : `<span class="op-ip-pill"><bdi dir="ltr">${escapeHtml(job.ip)}</bdi></span>`;
   const clearBtn = !active && job.status !== 'rollback_failed' ? `<button type="button" class="op-dismiss-btn" data-pool="${escapeHtml(pool.name)}" data-kind="${escapeHtml(kind)}" data-id="${escapeHtml(targetId)}" onclick="clearPoolOperation(this.dataset.pool, this.dataset.kind, this.dataset.id, this)" title="پاک کردن این پیام" aria-label="پاک کردن پیام">${uiIcon("close")}</button>` : '';
 
+  const stages = ['اتصال', 'پیش‌نیاز', 'پیکربندی', 'رله', 'بررسی'];
+  const msgText = (job.message || '');
+  const stageIdx =
+    /بررسی|تأیید|verify|probe|echo|health/i.test(msgText) ? 4 :
+    /رله|فوروارد|relay|forward/i.test(msgText) ? 3 :
+    /پیکربندی|تونل|لینک|interface|unit|سرویس|service/i.test(msgText) ? 2 :
+    /پیش‌نیاز|install|prereq|ماژول|module/i.test(msgText) ? 1 :
+    0;
+  const stageBar = active ? `<div class="op-stage-track" aria-hidden="true">${stages.map((s, i) => `<div class="op-stage ${i < stageIdx ? 'done' : i === stageIdx ? 'current' : ''}"></div>`).join('')}</div><div class="op-step-label">${stages[stageIdx] || ''}</div>` : '';
+
   return `<div class="operation-item ${active ? 'is-active' : failed ? 'is-failed' : 'is-complete'}" data-status="${escapeHtml(job.status)}" ${active ? 'role="status" aria-live="polite"' : ''}>
     <div class="operation-heading">
       <div class="op-heading-title">
+        ${active ? '<span class="op-spinner" aria-hidden="true"></span>' : ''}
         <strong>${['slipstream_runtime','slipstream_settings'].includes(job.kind) ? 'به‌روزرسانی تنظیمات Slipstream' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS' : job.kind === 'relay_ports' ? 'به‌روزرسانی پورت‌های رله' : job.kind === 'waterwall_ports' ? 'به‌روزرسانی پورت‌های WaterWall' : job.kind === 'paqet_ports' ? 'به‌روزرسانی پورت‌های Paqet' : job.kind === 'https_ports' ? 'به‌روزرسانی پورت‌های HTTPS' : operationLabels[kind] || 'عملیات'}</strong>
         <span class="status-badge ${failed ? 'filtered' : active ? 'canary' : 'healthy'}">${failed ? 'نیازمند بررسی' : active ? 'در حال انجام' : job.status === 'rolled_back' ? 'بازگردانی شد' : 'پایان یافت'}</span>
       </div>
@@ -584,6 +595,7 @@ function operationMarkup(pool, job, kind) {
     <div class="op-desc-line">
       ${description}
       ${job.message ? `<p class="op-msg">${escapeHtml(withoutEmoji(job.message || ''))}</p>` : ''}
+      ${stageBar}
     </div>
     ${job.error ? `<details class="operation-error"><summary>جزئیات خطا</summary><pre dir="auto">${escapeHtml(withoutEmoji(job.error))}</pre></details>` : ''}
     ${job.status === 'rollback_failed' && kind === 'gre' ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="recoverGreSettings(this.dataset.pool,this)">بازگردانی تنظیمات ${job.kind === 'slipstream_runtime' ? 'Slipstream' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS' : job.kind === 'relay_ports' ? 'پورت‌ها' : 'GRE'}</button>` : ''}${job.status === 'rollback_failed' && kind !== 'gre' ? `<div class="operation-actions"><button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="retryTransportRollback(this.dataset.pool,this)">تلاش دوباره برای بازگردانی</button><button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" onclick="abandonTransportChange(this.dataset.pool,this)">رها کردن عملیات شکست‌خورده</button></div>` : ''}
@@ -680,7 +692,7 @@ function renderPools(pools) {
   }
   pools = visiblePools;
 
-  container.innerHTML = (pools.some(poolIsBusy) ? '<p id="pool-lock-notice" class="pool-lock-notice" role="status">عملیات استخر در حال انجام است؛ تغییر تنظیمات تا پایان آن موقتاً غیرفعال است. می‌توانید بخش‌های دیگر پنل را ببینید.</p>' : '') + pools.map(p => {
+  container.innerHTML = (pools.some(poolIsBusy) ? '<p id="pool-lock-notice" class="pool-lock-notice" role="status"><span class="lock-spinner" aria-hidden="true"></span><span>عملیات استخر در حال انجام است — تغییرات تا پایان آن قفل است.</span></p>' : '') + pools.map(p => {
     const dns = poolDnsState(p);
     const poolDomain = p.subdomain && p.subdomain !== 'Not set' && p.subdomain !== 'تعیین نشده' ? p.subdomain : '';
     const transportJob = p.transport_change;
@@ -831,7 +843,7 @@ function renderPools(pools) {
 
         <div class="nodes-list-body">
           ${nodesHtml}
-          ${Object.values(p.node_additions || {}).filter(job => ['queued','running'].includes(job.status)).map(job => `<div class="node-item-row node-addition-row" role="status" aria-live="polite" data-status="${escapeHtml(job.status)}"><div class="node-info-col"><div class="node-header-line"><span class="node-name">${escapeHtml(withoutEmoji(job.name))}</span><span class="status-badge ${job.status === 'failed' ? 'filtered' : job.status === 'succeeded' ? 'healthy' : 'canary'}">${({queued:'در صف',running:'در حال افزودن',succeeded:'اضافه شد',failed:'ناموفق'})[job.status] || 'در حال بررسی'}</span></div><bdi class="node-ip-text" dir="ltr">${escapeHtml(job.ip)}</bdi><p class="node-reason-text">${escapeHtml(job.message)}</p>${job.error ? `<p class="node-addition-error" dir="auto">${escapeHtml(job.error)}</p>` : ''}</div>${job.status === 'failed' ? `<button type="button" class="node-log-btn" data-pool="${escapeHtml(p.name)}" onclick="openAddNodeModal(this.dataset.pool)">بررسی و تلاش مجدد</button>` : ''}</div>`).join('')}
+          ${Object.values(p.node_additions || {}).filter(job => ['queued','running'].includes(job.status)).map(job => `<div class="node-item-row node-addition-row" role="status" aria-live="polite" data-status="${escapeHtml(job.status)}"><div class="node-info-col"><div class="node-header-line"><span class="op-spinner" aria-hidden="true"></span><span class="node-name">${escapeHtml(withoutEmoji(job.name))}</span><span class="status-badge canary">${({queued:'در صف',running:'در حال افزودن',succeeded:'اضافه شد',failed:'ناموفق'})[job.status] || 'در حال بررسی'}</span></div><bdi class="node-ip-text" dir="ltr">${escapeHtml(job.ip)}</bdi><p class="node-reason-text">${escapeHtml(job.message)}</p>${job.error ? `<p class="node-addition-error" dir="auto">${escapeHtml(job.error)}</p>` : ''}</div></div>`).join('')}
         </div>
 
         ${poolActionErrors.has(p.name) ? `<div class="pool-action-error" role="alert"><span>${escapeHtml(poolActionErrors.get(p.name))}</span><button type="button" class="node-log-btn" data-pool="${escapeHtml(p.name)}" onclick="clearPoolActionError(this.dataset.pool)">بستن پیام</button></div>` : ''}
