@@ -11,11 +11,17 @@ from core.ipv6_tunnel_tools import validate_ipv6_address
 
 def validate_outer(value, carrier):
     if carrier == 'sit':
-        address = ipaddress.IPv4Address(value)
+        try:
+            address = ipaddress.IPv4Address(value)
+        except (ipaddress.AddressValueError, ValueError):
+            raise ValueError(f"حامل SIT نیازمند آدرس IPv4 معتبر است؛ '{value}' IPv4 نیست")
         if address.is_unspecified or address.is_multicast or address.is_loopback:
             raise ValueError('SIT requires a unicast outer IPv4 address')
         return str(address)
-    return validate_ipv6_address(value)
+    try:
+        return validate_ipv6_address(value)
+    except ValueError:
+        raise ValueError(f"حامل {carrier} نیازمند IPv6 عمومی است؛ سرور '{value}' IPv4 دارد — حامل 'sit' را انتخاب کنید یا IPv6 سرور را فعال کنید")
 
 
 def validate_dc6_mtu(value):

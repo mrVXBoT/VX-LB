@@ -1206,11 +1206,15 @@ async function openCreatePoolModal() {
     } else {
       irBox.innerHTML = irans.map(s => `
         <label class="checkbox-row">
-          <input type="checkbox" name="pool-iran-nodes" value="${s.ip}" checked>
+          <input type="checkbox" name="pool-iran-nodes" value="${s.ip}" checked onchange="updateDc6CarrierHint()">
           <span>${escapeHtml(s.name)} (${s.ip})</span>
         </label>
       `).join("");
     }
+    const khSel = document.getElementById('new-pool-kharej');
+    if (khSel) khSel.onchange = updateDc6CarrierHint;
+    const dc6Carrier = document.getElementById('new-pool-dc6-carrier');
+    if (dc6Carrier) dc6Carrier.onchange = updateDc6CarrierHint;
   } catch (e) {
     khSelect.innerHTML = `<option value="">${copy.loadFailed}</option>`;
     irBox.innerHTML = `<p class="field-hint" role="alert">${escapeHtml(copy.loadFailed)} <button type="button" class="node-log-btn" onclick="openCreatePoolModal()">تلاش دوباره</button></p>`;
@@ -2351,6 +2355,36 @@ if (typeof window !== "undefined") {
   window.submitTransportChange = submitTransportChange;
 }
 
+function _isIPv6(ip) { return typeof ip === 'string' && ip.includes(':'); }
+
+function updateDc6CarrierHint() {
+  const carrierSel = document.getElementById('new-pool-dc6-carrier');
+  if (!carrierSel) return;
+  const kharejIp = document.getElementById('new-pool-kharej')?.value || '';
+  const irans = Array.from(document.querySelectorAll("input[name='pool-iran-nodes']:checked")).map(cb => cb.value);
+  const endpoints = [kharejIp, ...irans].filter(Boolean);
+  if (!endpoints.length) return;
+  const allV6 = endpoints.every(_isIPv6);
+  const anyV4 = endpoints.some(ip => !_isIPv6(ip));
+
+  // Disable IPv6-only carriers when any endpoint lacks IPv6; default to sit then.
+  ['ip6gre', 'ip6ip6'].forEach(val => {
+    const opt = [...carrierSel.options].find(o => o.value === val);
+    if (opt) opt.disabled = anyV4;
+  });
+  const sitOpt = [...carrierSel.options].find(o => o.value === 'sit');
+  if (sitOpt) sitOpt.disabled = false;
+  if (anyV4 && carrierSel.value !== 'sit') carrierSel.value = 'sit';
+
+  const hintEl = document.getElementById('dc6-carrier-hint');
+  if (hintEl) {
+    hintEl.textContent = anyV4
+      ? 'حداقل یکی از سرورهای انتخابی فقط IPv4 دارد — حامل «sit» انتخاب شد. برای حامل‌های IPv6، سرور با IPv6 عمومی انتخاب کنید.'
+      : 'هر دو سرور IPv6 عمومی دارند؛ هر سه حامل در دسترس‌اند.';
+    hintEl.style.color = anyV4 ? 'var(--status-warn, #f59e0b)' : 'var(--text-muted)';
+  }
+}
+
 function updateGreCreateFields() {
   const protoEl = document.getElementById('new-pool-proto');
   if (!protoEl) return;
@@ -2462,6 +2496,7 @@ function updateGreCreateFields() {
       const el = document.getElementById(id);
       if (el) el.disabled = !dc6;
     });
+    if (dc6) updateDc6CarrierHint();
   }
 
   // Quantum Family (KCP, Quantum+, Quantum Gaming)
