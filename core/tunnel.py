@@ -39,7 +39,7 @@ SUPPORTED_TRANSPORTS = {
     "20": ("waterwall", "WaterWall VLESS/TLS/Mux (flexible node-based routing)"),
     "21": ("paqet", "Paqet (آزمایشی — مسیر TCP/UDP با باینری رسمی آزموده شد)"),
     "22": ("geneve_ipsec", "Geneve + IPsec (آزمایشی — آزمون کرنلی لینک تأیید شد)"),
-    "23": ("vxlan", "VXLAN (آزمایشی؛ بدون رمزنگاری و استتار — سه متد P2P/Bridge/FDB)"),
+    "23": ("vxlan", "VXLAN (بدون رمزنگاری — سه متد P2P/Bridge/FDB؛ برای رمزنگاری VXLAN+IPsec را انتخاب کنید)"),
     "24": ("wireguard", "WireGuard (رمزنگاری Curve25519 + ChaCha20 — آزمون کرنلی لینک تأیید شد)"),
     "25": ("gre6", "GRE6 (آزمایشی — بدون رمزنگاری و استتار)"),
     "26": ("ip6ip6", "IP6IP6 (آزمایشی — بدون رمزنگاری و استتار)"),
@@ -58,11 +58,12 @@ SUPPORTED_TRANSPORTS = {
     "38": ("spoof-icmp", "ParsaKSH ICMP Spoof (تونل داده در بسته‌های ICMP Echo)"),
     "39": ("qs-dns-hybrid", "QS-Tunnel Hybrid (آپلود DNS-Query بیس۳۲ + دانلود Raw IP-Spoof)"),
     "40": ("hyperion-x", "HYPERION-X Tri-Vector (شاهکار سه‌مسیره ضدگلوله با Dark Knock و تغییر چهره هوشمند)"),
+    "41": ("vxlan_ipsec", "VXLAN + IPsec (آزمایشی — رمزنگاری AES-256-GCM با strongSwan، لینک کرنلی)"),
 }
 
 NON_BACKPACK_TRANSPORTS = {
     "gre", "xhttp", "xhttps", "gre_xhttp", "reality", "waterwall", "paqet",
-    "geneve_ipsec", "vxlan", "gre6", "ip6ip6", "wireguard", "slipstream",
+    "geneve_ipsec", "vxlan", "vxlan_ipsec", "gre6", "ip6ip6", "wireguard", "slipstream",
     "quantum", "quantum+", "quantum-gaming", "tun", "dc6", "nova", "http", "https",
     "fake-sni", "split-tls", "hop-ttl-injection", "tcp-state-desync",
     "l3-ip-spoof", "l7-header-mutation", "udp-raw-spoof", "dns-spoof", "spoof",

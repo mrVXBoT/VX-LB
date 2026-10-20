@@ -96,7 +96,7 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 def public_node_security(node):
     engine=node.get('engine')
     if engine=='spoof' and node.get('spoof') and node.get('http_connect'):return 'tls'
-    for engines,key in [(('gre','gre_ipv4'),'gre'),(('geneve','geneve_ipsec'),'geneve')]:
+    for engines,key in [(('gre','gre_ipv4'),'gre'),(('geneve','geneve_ipsec'),'geneve'),(('vxlan_ipsec',),'vxsec')]:
         if engine in engines:
             config=(node.get(key,{}).get('configs') or [{}])[0]
             return 'ipsec' if config.get('security',{}).get('mode')=='ipsec' else 'unencrypted'
@@ -255,6 +255,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                         "gre6": {key:n.get("gre6",{}).get(key) for key in ("mtu","interface","local_ipv6","remote_ipv6","local_private","remote_private")} if n.get("engine") == "gre6" else None,
                         "ip6ip6": {key:n.get("ip6ip6",{}).get(key) for key in ("mtu","interface","local_ipv6","remote_ipv6","local_private","remote_private")} if n.get("engine") == "ip6ip6" else None,
                         "geneve": {key:n.get("geneve",{}).get(key) for key in ("vni","mtu","local_private","remote_private")} if n.get("engine") in ("geneve", "geneve_ipsec") else None,
+                        "vxsec": {key:n.get("vxsec",{}).get(key) for key in ("vni","dst_port","mtu","local_private","remote_private")} if n.get("engine") == "vxlan_ipsec" else None,
                         "vxlan": {key:n.get("vxlan",{}).get(key) for key in ("vni","dst_port","mtu","method","method_title","iface","bridge","local_private","remote_private")} if n.get("engine") == "vxlan" else None,
                         "wireguard": {key: n.get("wireguard", {}).get(key) for key in ("interface", "tunnel_port", "mtu", "local_private", "remote_private", "iran_public_key", "kharej_public_key", "ipv4_subnet")} if n.get("engine") == "wireguard" else None,
                         "tun": {key:n.get("tun",{}).get(key) for key in ("interface","mtu","local_private","remote_private")} if n.get("engine") == "tun" else None,
@@ -290,6 +291,8 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "ip6ip6_mtu": p_val.get("ip6ip6_mtu"),
                     "geneve_mtu": p_val.get("geneve_mtu"),
                     "vxlan_mtu": p_val.get("vxlan_mtu"),
+                    "vxsec_mtu": p_val.get("vxsec_mtu"),
+                    "vxsec_dst_port": p_val.get("vxsec_dst_port"),
                     "vxlan_method": p_val.get("vxlan_method"),
                     "dst_port": p_val.get("dst_port"),
                     "wireguard_mtu": p_val.get("wireguard_mtu") or p_val.get("mtu"),
@@ -583,6 +586,12 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 iface = target_node.get("vxlan", {}).get("iface") or f"vx-{node_name}"
                 svc = f"vxlb-vxlan-{iface}.service"
                 relay_svc = f"vxlb-{iface}-relay.service"
+                _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
+            elif eng == 'vxlan_ipsec':
+                node_name = target_node.get("node_name", "")
+                iface = (target_node.get("vxsec", {}).get("configs") or [{}])[0].get("interface") or node_name
+                svc = f"vxlb-vxsec-{iface}.service"
+                relay_svc = f"vxlb-vxsec-{iface}-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
             else:
                 _, log_text, _ = ssh.execute("tail -n 60 /var/log/vxlb-user-connections.log 2>/dev/null || echo 'No connection logs yet.'")
@@ -905,6 +914,12 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             elif transport in ("geneve", "geneve_ipsec"):
                 extra_args["geneve_mtu"] = body.get("geneve_mtu", 1280)
                 extra_args["vni"] = body.get("vni")
+            elif transport == "vxlan_ipsec":
+                extra_args.update({
+                    "vni": body.get("vni"),
+                    "dst_port": body.get("dst_port", 4789),
+                    "vxsec_mtu": body.get("vxsec_mtu") or body.get("mtu") or 1280,
+                })
             elif transport == "vxlan":
                 extra_args.update({
                     "vni": body.get("vni"),
@@ -1125,6 +1140,12 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             from core.vxlan_adapter import change_mtu
             name = str(body.get("pool", "")).strip()
             ok, message = change_mtu(name, int(body.get("mtu", 1400)))
+            return self._send_json({"success": ok, "message": message, **({"error": message} if not ok else {})}, 200 if ok else 409)
+
+        elif path == "/api/pools/vxlan-ipsec-settings":
+            from core.vxlan_ipsec import change_mtu
+            name = str(body.get("pool", "")).strip()
+            ok, message = change_mtu(name, int(body.get("mtu", 1280)))
             return self._send_json({"success": ok, "message": message, **({"error": message} if not ok else {})}, 200 if ok else 409)
 
         elif path == "/api/pools/vxlan-status":

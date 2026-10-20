@@ -713,7 +713,7 @@ def create(
         "nodes": [],
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "security": "none",
-        "security_disclaimer": "آزمایشی؛ بدون رمزنگاری و استتار — آزمون کرنلی هنوز اجرا نشده",
+        "security_disclaimer": "بدون رمزنگاری — لینک کرنلی تأیید شد؛ برای ترافیک حساس از VXLAN+IPsec استفاده کنید",
     }
     save_pool(name, pool_data)
 

@@ -737,7 +737,7 @@ function renderPools(pools) {
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
               </button>
-              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : (n.transport || "").startsWith("quantum") ? `${escapeHtml(n.transport)} · KCP Fast3 · ${escapeHtml(String(n.tunnel_port || p.tunnel_port || "443"))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))} · گواهی اختصاصی` : n.engine === "waterwall" ? `WaterWall · VLESS / TLS 1.3 / Mux · ${escapeHtml(n.waterwall?.profile?.server_name || p.camouflage?.server_name || "")}:${escapeHtml(String(n.waterwall?.outer_port || ""))}` : n.engine === "paqet" ? `Paqet · Raw KCP · ${escapeHtml(String(n.paqet?.tunnel_port || n.tunnel_port || p.tunnel_port || "443"))}` : n.engine === "xray" ? `Xray · ${(n.transport === "gre_xhttp" ? "GRE / XHTTP / TLS" : escapeHtml(n.transport))} · ${escapeHtml(n.https?.server_name)}:${escapeHtml(n.https?.outer_port)}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام) · آزمایشگاه ایزوله` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
+              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : (n.transport || "").startsWith("quantum") ? `${escapeHtml(n.transport)} · KCP Fast3 · ${escapeHtml(String(n.tunnel_port || p.tunnel_port || "443"))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))} · گواهی اختصاصی` : n.engine === "waterwall" ? `WaterWall · VLESS / TLS 1.3 / Mux · ${escapeHtml(n.waterwall?.profile?.server_name || p.camouflage?.server_name || "")}:${escapeHtml(String(n.waterwall?.outer_port || ""))}` : n.engine === "paqet" ? `Paqet · Raw KCP · ${escapeHtml(String(n.paqet?.tunnel_port || n.tunnel_port || p.tunnel_port || "443"))}` : n.engine === "xray" ? `Xray · ${(n.transport === "gre_xhttp" ? "GRE / XHTTP / TLS" : escapeHtml(n.transport))} · ${escapeHtml(n.https?.server_name)}:${escapeHtml(n.https?.outer_port)}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
             </div>
             ${n.gre_https ? `<div class="gre-private-route"><span>GRE داخل HTTPS:</span><bdi dir="ltr">${escapeHtml(n.gre_https.local_private)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre_https.remote_private)}</bdi><span>MTU ${escapeHtml(n.gre_https.mtu)}</span></div>` : ''}
             ${(n.engine === 'tun' || p.transport === 'tun') ? `<div class="gre-private-route"><span>لینک TUN:</span><bdi dir="ltr">${escapeHtml(n.tun?.iran_inner || "10.210.1.1")}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.tun?.kharej_inner || "10.210.1.2")}</bdi><span>(${escapeHtml(n.tun?.interface || "tun")}) · لایه 3 کرنل</span></div>` : ''}
@@ -745,6 +745,7 @@ function renderPools(pools) {
             ${n.engine === 'gre' ? `<div class="gre-private-route"><span>لینک خصوصی:</span><bdi dir="ltr">${escapeHtml(n.gre?.local_private)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre?.remote_private)}</bdi></div>` : ''}
             ${(['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec') ? `<div class="gre-private-route"><span>لینک Geneve:</span><bdi dir="ltr">${escapeHtml(n.geneve?.local_private)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.geneve?.remote_private)}</bdi><span>(VNI ${escapeHtml(String(n.geneve?.vni || ""))})</span></div>` : ''}
             ${(n.engine === 'vxlan' || p.transport === 'vxlan') ? `<div class="gre-private-route"><span>لینک VXLAN:</span><bdi dir="ltr">${escapeHtml(n.vxlan?.local_private || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.vxlan?.remote_private || p.kharej_ip)}</bdi><span>(پروفایل: ${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")} · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))}) · <strong style="color:var(--amber, #f59e0b);">بدون رمزنگاری</strong></span></div>` : ''}
+            ${(n.engine === 'vxlan_ipsec' || p.transport === 'vxlan_ipsec') ? `<div class="gre-private-route"><span>لینک VXLAN+IPsec:</span><bdi dir="ltr">${escapeHtml(n.vxsec?.local_private || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.vxsec?.remote_private || p.kharej_ip)}</bdi><span>(VNI ${escapeHtml(String(n.vxsec?.vni || ""))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || "4789"))}) · <strong style="color:var(--success, #22c55e);">IPsec رمزنگاری‌شده</strong></span></div>` : ''}
             ${(n.engine === 'wireguard' || p.transport === 'wireguard') ? `<div class="gre-private-route"><span>لینک WireGuard:</span><bdi dir="ltr">${escapeHtml(n.wireguard?.local_private || "-")}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.wireguard?.remote_private || "-")}</bdi><span>(${escapeHtml(n.wireguard?.interface || n.node_name || "-")}) · <strong style="color:var(--amber, #f59e0b);">${escapeHtml(n.wireguard?.status_note || "آزمایشی — آزمون واقعی اجرا نشده")}</strong></span></div>` : ''}
             ${(n.engine === 'gre6' || p.transport === 'gre6') ? `<div class="gre-private-route"><span>لینک GRE6:</span><bdi dir="ltr">${escapeHtml(n.gre6?.local_private || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre6?.remote_private || p.kharej_ip)}</bdi><span>(اینترفیس ${escapeHtml(n.gre6?.interface || n.node_name || "-")}) · <strong style="color:var(--amber, #f59e0b);">بدون رمزنگاری (Cleartext)</strong></span></div>` : ''}
             ${(n.engine === 'ip6ip6' || p.transport === 'ip6ip6') ? `<div class="gre-private-route"><span>لینک IP6IP6:</span><bdi dir="ltr">${escapeHtml(n.ip6ip6?.local_private || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.ip6ip6?.remote_private || p.kharej_ip)}</bdi><span>(اینترفیس ${escapeHtml(n.ip6ip6?.interface || n.node_name || "-")} · اختصاصی IPv6) · <strong style="color:var(--amber, #f59e0b);">بدون رمزنگاری (Cleartext)</strong></span></div>` : ''}
@@ -839,7 +840,7 @@ function renderPools(pools) {
           <div class="pool-actions-main pool-management-actions">
             <button class="btn-secondary sm" data-arg0="${escapeHtml(p.name)}" onclick="openAddNodeModal(this.dataset.arg0)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>${uiIcon("plus")}<span>افزودن نود ایران</span></button>
             <button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openTransportModal(this.dataset.pool)" ${mutationsLocked || !p.nodes?.length ? `disabled aria-disabled="true" title="${escapeHtml(mutationsLocked ? lockReason : 'استخر هنوز نود فعالی ندارد')}"` : ''}>تغییر نوع تونل</button>
-            ${(p.engine === "wireguard" || p.transport === "wireguard") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openWireguardSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات و آزمون WireGuard</button>` : (p.engine === "vxlan" || p.transport === "vxlan") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openVxlanSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات و وضعیت VXLAN</button>` : (p.engine === "gre6" || p.transport === "gre6") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGre6SettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات GRE6</button>` : (p.engine === "ip6ip6" || p.transport === "ip6ip6") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openIp6ip6SettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات IP6IP6</button>` : (['geneve','geneve_ipsec'].includes(p.engine) || p.transport === "geneve_ipsec") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGeneveSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات Geneve</button>` : p.transport === "gre" ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGreSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات GRE</button>` : p.engine === "slipstream" ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openSlipstreamSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات Slipstream</button>` : ""}
+            ${(p.engine === "wireguard" || p.transport === "wireguard") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openWireguardSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات و آزمون WireGuard</button>` : (p.engine === "vxlan" || p.transport === "vxlan") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openVxlanSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات و وضعیت VXLAN</button>` : (p.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openVxsecSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات VXLAN+IPsec</button>` : (p.engine === "gre6" || p.transport === "gre6") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGre6SettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات GRE6</button>` : (p.engine === "ip6ip6" || p.transport === "ip6ip6") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openIp6ip6SettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات IP6IP6</button>` : (['geneve','geneve_ipsec'].includes(p.engine) || p.transport === "geneve_ipsec") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGeneveSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات Geneve</button>` : p.transport === "gre" ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGreSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات GRE</button>` : p.engine === "slipstream" ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openSlipstreamSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات Slipstream</button>` : ""}
             <button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="configurePoolRotation(this.dataset.pool)" ${mutationsLocked || !p.cf_enabled || (p.nodes || []).length < 2 ? `disabled aria-disabled="true" title="برای چرخش Cloudflare حداقل دو نود و تنظیم DNS لازم است"` : ''}>زمان‌بندی چرخش IP</button>
             <button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="rotatePoolNow(this.dataset.pool, this)" ${mutationsLocked || !p.cf_enabled || (p.nodes || []).length < 2 ? `disabled aria-disabled="true" title="برای چرخش Cloudflare حداقل دو نود و تنظیم DNS لازم است"` : ''}>چرخش الان</button>
             <button class="btn-secondary sm" data-arg0="${escapeHtml(p.name)}" data-domain="${escapeHtml(p.subdomain || "")}" onclick="openPoolCfModal(this.dataset.arg0, this.dataset.domain)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیم DNS</button>
@@ -1252,6 +1253,11 @@ async function submitCreatePool(e) {
              dst_port: document.getElementById("new-pool-vxlan-port")?.value || "4789",
              vxlan_mtu: document.getElementById("new-pool-vxlan-mtu")?.value || "1280",
              bridge_name: document.getElementById("new-pool-vxlan-bridge")?.value || ""
+           } :
+           transport === "vxlan_ipsec" ? {
+             vni: document.getElementById("new-pool-vxsec-vni")?.value || null,
+             dst_port: document.getElementById("new-pool-vxsec-port")?.value || "4789",
+             vxsec_mtu: document.getElementById("new-pool-vxsec-mtu")?.value || "1280"
            } :
            transport === "wireguard" ? {
              wireguard_port: document.getElementById("new-pool-wireguard-port")?.value || '51820',
@@ -2057,7 +2063,8 @@ const ENGINE_TRANSPORTS = {
       { value: "gre", label: "GRE با IPsec — بدون استتار HTTPS", hint: "تونل لایه 3 رسمی با رمزگذاری سخت‌افزاری IPsec AES-GCM" },
       { value: "gre6", label: "GRE6 (آزمایشی — بدون رمزنگاری و استتار)", hint: "کپسوله‌سازی GRE روی آدرس‌های Native IPv6 بدون رمزنگاری" },
       { value: "ip6ip6", label: "IP6IP6 (آزمایشی — بدون رمزنگاری و استتار)", hint: "تونل مستقیم نقطه به نقطه بین سرورهای دارای IPv6 عمومی" },
-      { value: "vxlan", label: "VXLAN (آزمایشی؛ بدون رمزنگاری و استتار — سه متد P2P/Bridge/FDB)", hint: "گسترش شبکه محلی L2 با سه روش Point-to-Point، Bridge و FDB" },
+      { value: "vxlan", label: "VXLAN (بدون رمزنگاری — سه متد P2P/Bridge/FDB)", hint: "گسترش شبکه محلی L2 با سه روش Point-to-Point، Bridge و FDB — برای رمزنگاری VXLAN+IPsec را انتخاب کنید" },
+      { value: "vxlan_ipsec", label: "VXLAN + IPsec (آزمایشی — رمزنگاری AES-256-GCM / strongSwan)", hint: "لینک VXLAN کپسوله‌شده در IPsec ESP احرازشده؛ نیازمند strongSwan/charon روی هر دو سرور" },
       { value: "geneve_ipsec", label: "Geneve + IPsec (آزمایشی — آزمون کرنلی لینک تأیید شد)", hint: "پروتکل مجازی‌سازی نسل جدید شبکه با افزونه‌های متادیتا و رمزنگاری" }
     ]
   },
@@ -2395,6 +2402,16 @@ function updateGreCreateFields() {
     });
   }
 
+  const vxsec = mode === 'vxlan_ipsec';
+  const vxsecDiv = document.getElementById('vxsec-create-fields');
+  if (vxsecDiv) {
+    vxsecDiv.classList.toggle('hidden', !vxsec);
+    ['new-pool-vxsec-vni', 'new-pool-vxsec-port', 'new-pool-vxsec-mtu'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !vxsec;
+    });
+  }
+
   const paqet = mode === 'paqet';
   const paqetDiv = document.getElementById('paqet-create-fields');
   if (paqetDiv) {
@@ -2635,6 +2652,40 @@ async function submitVxlanSettings(event) {
     if (result.success) {
       closeModal('vxlan-settings-modal');
       showToast('MTU اینترفیس‌های VXLAN اعمال و بررسی شد');
+    } else {
+      showToast(result.error || result.message || 'خطا در اعمال MTU');
+    }
+    lastRenderedPools = '';
+    await fetchStatus(true);
+  } catch (error) {
+    showToast('نتیجهٔ تغییر MTU تأیید نشد؛ وضعیت را بررسی کنید');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+let vxsecSettingsPool = '';
+function openVxsecSettingsModal(name) {
+  const pool = cachedStatus?.pools.find(p => p.name === name);
+  if (!pool || (pool.engine !== 'vxlan_ipsec' && pool.transport !== 'vxlan_ipsec')) return;
+  vxsecSettingsPool = name;
+  document.getElementById('vxsec-settings-summary').textContent = `${name} · VXLAN + IPsec · VNI ${pool.vni || pool.nodes?.[0]?.vxsec?.vni || 'خودکار'} · UDP ${pool.vxsec_dst_port || '4789'}`;
+  document.getElementById('vxsec-settings-mtu').value = pool.vxsec_mtu || pool.nodes?.[0]?.vxsec?.mtu || 1280;
+  document.getElementById('vxsec-settings-modal').classList.remove('hidden');
+}
+
+async function submitVxsecSettings(event) {
+  event.preventDefault();
+  const button = document.getElementById('vxsec-settings-submit');
+  button.disabled = true;
+  try {
+    const result = await apiFetch('/api/pools/vxlan-ipsec-settings', {
+      method: 'POST',
+      body: { pool: vxsecSettingsPool, mtu: document.getElementById('vxsec-settings-mtu').value }
+    });
+    if (result.success) {
+      closeModal('vxsec-settings-modal');
+      showToast('MTU اینترفیس‌های VXLAN+IPsec اعمال و بررسی شد');
     } else {
       showToast(result.error || result.message || 'خطا در اعمال MTU');
     }

@@ -868,7 +868,7 @@
           </div>
           <div id="vxlan-create-fields" class="input-group hidden">
             <p class="field-hint" style="color: var(--accent-warning, #f59e0b);">
-              <strong>هشدار امنیتی:</strong> پروتکل VXLAN (RFC 7348) یک کپسوله‌سازی لایه 2 در UDP (پورت 4789) است و <strong>کاملاً بدون رمزنگاری و بدون استتار</strong> می‌باشد. وضعیت فعلی: <strong>آزمایشی؛ بدون رمزنگاری و استتار — آزمون کرنلی لینک تأیید شد</strong>.
+              <strong>هشدار امنیتی:</strong> پروتکل VXLAN (RFC 7348) یک کپسوله‌سازی لایه 2 در UDP (پورت 4789) است و <strong>کاملاً بدون رمزنگاری و بدون استتار</strong> می‌باشد. وضعیت فعلی: <strong>بدون رمزنگاری — آزمون کرنلی لینک تأیید شد</strong>؛ برای ترافیک حساس از «VXLAN + IPsec» استفاده کنید.
             </p>
             <div class="input-group">
               <label class="field-label" for="new-pool-vxlan-method">روش پیاده‌سازی VXLAN (3 پروفایل مرجع)</label>
@@ -894,6 +894,12 @@
               <label class="field-label" for="new-pool-vxlan-bridge">نام بریج اختصاصی (اختیاری؛ برای روش‌های 2 و 3)</label>
               <input type="text" id="new-pool-vxlan-bridge" class="field-input" placeholder="خودکار (br-vx-...)" dir="ltr" maxlength="15" disabled>
             </div>
+          </div>
+          <div id="vxsec-create-fields" class="input-group hidden">
+            <p class="field-hint">VXLAN با IPsec AES-256-GCM (strongSwan/IKEv2) اجرا می‌شود و بسته‌های خام UDP/4789 در صورت قطع رمزنگاری مسدود می‌گردند. وضعیت فعلی: <strong>آزمایشی</strong> (نیازمند charon-systemd و ماژول کرنل vxlan روی هر دو سرور).</p>
+            <div class="input-group"><label class="field-label" for="new-pool-vxsec-vni">شناسه شبکه مجازی VNI (اختیاری، 1 تا 16777215)</label><input type="number" id="new-pool-vxsec-vni" class="field-input" placeholder="خودکار (از 4000 به بالا)" min="1" max="16777215" step="1" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="new-pool-vxsec-port">پورت مقصد UDP (پیش‌فرض 4789)</label><input type="number" id="new-pool-vxsec-port" class="field-input" value="4789" min="1" max="65535" step="1" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="new-pool-vxsec-mtu">MTU اینترفیس VXLAN+IPsec (576 تا 1400)</label><input type="number" id="new-pool-vxsec-mtu" class="field-input" value="1280" min="576" max="1400" step="1" dir="ltr" disabled></div>
           </div>
           <div id="gre6-create-fields" class="input-group hidden">
             <p class="field-hint" style="color: var(--amber, #f59e0b);">هشدار امنیتی: پروتکل GRE6 (RFC 7676) کاملاً خام، شفاف و بدون رمزنگاری یا استتار است. هر دو سرور ایران و خارج باید دارای آدرس IPv6 معتبر و روت‌پذیر باشند.</p>
@@ -1217,6 +1223,9 @@
     </div>
   </div>
 
+  <div id="vxsec-settings-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1"><div class="sheet-handle"></div><div class="sheet-header"><div><h4 class="sheet-title">تنظیمات اینترفیس VXLAN + IPsec</h4><p id="vxsec-settings-summary" class="sheet-subtitle"></p></div><button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('vxsec-settings-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div><div class="sheet-content"><form onsubmit="submitVxsecSettings(event)"><div class="input-group"><label class="field-label" for="vxsec-settings-mtu">MTU اینترفیس خصوصی (576 تا 1400)</label><input id="vxsec-settings-mtu" type="number" class="field-input" min="576" max="1400" step="1" required dir="ltr"><p class="field-hint">تغییر روی دو سمت هر نود اعمال و با بررسی ارتباط تأیید می‌شود. در صورت خطا، MTU قبلی بازگردانده می‌شود.</p></div><button id="vxsec-settings-submit" class="btn-primary full-btn" type="submit"><span>اعمال و بررسی MTU</span></button></form></div></div>
+  </div>
   <div id="geneve-settings-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
     <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1"><div class="sheet-handle"></div><div class="sheet-header"><div><h4 class="sheet-title">تنظیمات اینترفیس Geneve</h4><p id="geneve-settings-summary" class="sheet-subtitle"></p></div><button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('geneve-settings-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div><div class="sheet-content"><form onsubmit="submitGeneveSettings(event)"><div class="input-group"><label class="field-label" for="geneve-settings-mtu">MTU اینترفیس خصوصی (576 تا 1420)</label><input id="geneve-settings-mtu" type="number" class="field-input" min="576" max="1420" step="1" required dir="ltr"><p class="field-hint">تغییر روی دو سمت هر نود اعمال و با بررسی ارتباط تأیید می‌شود. در صورت خطا، MTU قبلی بازگردانده می‌شود.</p></div><button id="geneve-settings-submit" class="btn-primary full-btn" type="submit"><span>اعمال و بررسی MTU Geneve</span></button></form></div></div>
   </div>

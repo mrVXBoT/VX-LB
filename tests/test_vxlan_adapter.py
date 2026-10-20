@@ -448,13 +448,19 @@ class VxlanAdapterTests(unittest.TestCase):
         self.assertIsInstance(ad, VxlanDedicatedAdapter)
 
     def test_supported_transports_includes_vxlan(self):
-        """SUPPORTED_TRANSPORTS contains vxlan option with experimental tag."""
+        """SUPPORTED_TRANSPORTS contains vxlan option flagged as unencrypted."""
         from core.tunnel import SUPPORTED_TRANSPORTS
         found = any(v[0] == "vxlan" for v in SUPPORTED_TRANSPORTS.values())
         self.assertTrue(found)
         label = next(v[1] for v in SUPPORTED_TRANSPORTS.values() if v[0] == "vxlan")
-        self.assertIn("آزمایشی", label)
         self.assertIn("بدون رمزنگاری", label)
+
+    def test_supported_transports_includes_vxlan_ipsec(self):
+        """SUPPORTED_TRANSPORTS contains the encrypted vxlan_ipsec option."""
+        from core.tunnel import SUPPORTED_TRANSPORTS, NON_BACKPACK_TRANSPORTS
+        found = any(v[0] == "vxlan_ipsec" for v in SUPPORTED_TRANSPORTS.values())
+        self.assertTrue(found)
+        self.assertIn("vxlan_ipsec", NON_BACKPACK_TRANSPORTS)
 
     def test_relay_generation(self):
         """generate_relay_script_and_unit creates valid python script and systemd unit."""

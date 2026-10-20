@@ -123,6 +123,18 @@ class LoadBalancerManager:
         if transport == 'waterwall':
             from core.waterwall import create
             return create(pool_name, kharej_server, iran_servers, client_ports, camouflage, callback)
+        if transport == 'vxlan_ipsec':
+            from core.vxlan_ipsec import create
+            return create(
+                name=pool_name,
+                kharej=kharej_server,
+                servers=iran_servers,
+                ports=client_ports,
+                mtu=int(kwargs.get("vxsec_mtu") or kwargs.get("mtu") or 1280),
+                vni=kwargs.get("vni"),
+                dst_port=kwargs.get("dst_port") or kwargs.get("tunnel_port") or 4789,
+                callback=callback,
+            )
         if transport == 'vxlan':
             from core.vxlan_adapter import create
             return create(
@@ -349,6 +361,9 @@ class LoadBalancerManager:
         if pool.get('engine') in ('geneve', 'geneve_ipsec') or pool.get('transport') in ('geneve', 'geneve_ipsec'):
             from core.geneve import add
             return add(pool_name, new_iran_server, callback)
+        if pool.get('engine') == 'vxlan_ipsec' or pool.get('transport') == 'vxlan_ipsec':
+            from core.vxlan_ipsec import add
+            return add(pool_name, new_iran_server, callback)
         if pool.get('engine') == 'vxlan' or pool.get('transport') == 'vxlan':
             from core.vxlan_adapter import add
             return add(pool_name, new_iran_server, callback)
@@ -499,6 +514,9 @@ class LoadBalancerManager:
         if pool.get('engine') in ('geneve', 'geneve_ipsec') or pool.get('transport') in ('geneve', 'geneve_ipsec'):
             from core.geneve import remove
             return remove(pool_name, iran_ip, callback)
+        if pool.get('engine') == 'vxlan_ipsec' or pool.get('transport') == 'vxlan_ipsec':
+            from core.vxlan_ipsec import remove
+            return remove(pool_name, iran_ip, callback)
         if pool.get('engine') == 'vxlan' or pool.get('transport') == 'vxlan':
             from core.vxlan_adapter import remove
             return remove(pool_name, iran_ip, callback)
@@ -592,6 +610,9 @@ class LoadBalancerManager:
             return remove_pool(pool_name, callback)
         if pool.get('engine') in ('geneve', 'geneve_ipsec') or pool.get('transport') in ('geneve', 'geneve_ipsec'):
             from core.geneve import remove_pool
+            return remove_pool(pool_name, callback)
+        if pool.get('engine') == 'vxlan_ipsec' or pool.get('transport') == 'vxlan_ipsec':
+            from core.vxlan_ipsec import remove_pool
             return remove_pool(pool_name, callback)
         if pool.get('engine') == 'vxlan' or pool.get('transport') == 'vxlan':
             from core.vxlan_adapter import remove_pool
@@ -704,6 +725,17 @@ class LoadBalancerManager:
                 ports = [*pool.get('client_ports', []), *validate_ports(new_ports)]
             except ValueError as error:
                 return False, str(error)
+            return change_ports(pool_name, ports)
+        if engine == 'vxlan_ipsec' or pool.get('transport') == 'vxlan_ipsec':
+            from core.vxlan_ipsec import change_ports
+            try:
+                ports = [*pool.get('client_ports', []), *validate_ports(new_ports)]
+            except ValueError as error:
+                return False, str(error)
+            if not ports:
+                return False, 'Cannot remove the only forwarded port'
+            if set(map(str, ports)) == set(map(str, pool.get('client_ports', []))):
+                return False, 'No port change was requested'
             return change_ports(pool_name, ports)
         if engine in ('geneve', 'geneve_ipsec') or pool.get('transport') in ('geneve', 'geneve_ipsec'):
             from core.geneve import change_ports
@@ -862,6 +894,17 @@ class LoadBalancerManager:
                 ports = [p for p in pool.get('client_ports', []) if str(p) != validate_port(port_to_remove)]
             except ValueError as error:
                 return False, str(error)
+            return change_ports(pool_name, ports)
+        if engine == 'vxlan_ipsec' or pool.get('transport') == 'vxlan_ipsec':
+            from core.vxlan_ipsec import change_ports
+            try:
+                ports = [p for p in pool.get('client_ports', []) if str(p) != validate_port(port_to_remove)]
+            except ValueError as error:
+                return False, str(error)
+            if not ports:
+                return False, 'Cannot remove the only forwarded port'
+            if set(map(str, ports)) == set(map(str, pool.get('client_ports', []))):
+                return False, 'No port change was requested'
             return change_ports(pool_name, ports)
         if engine in ('geneve', 'geneve_ipsec') or pool.get('transport') in ('geneve', 'geneve_ipsec'):
             from core.geneve import change_ports

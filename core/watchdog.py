@@ -138,6 +138,11 @@ class TelemetryWatchdog:
             status, reason, details = health(pool_name, node, client_ports or [])
             self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
             return status, reason, [], details
+        if node.get('engine') == 'vxlan_ipsec' or node.get('transport') == 'vxlan_ipsec':
+            from core.vxlan_ipsec import health
+            status, reason, details = health(pool_name, node, client_ports or [])
+            self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
+            return status, reason, [], details
         if node.get('engine') == 'vxlan' or node.get('transport') == 'vxlan':
             from core.vxlan_adapter import health
             status, reason, details = health(pool_name, node, client_ports or [])
