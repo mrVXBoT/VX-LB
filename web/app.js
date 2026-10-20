@@ -309,6 +309,36 @@ async function handleLogin(e) {
   }
 }
 
+async function restartPanel(btn) {
+  const state = document.getElementById("panel-restart-state");
+  if (btn) { btn.disabled = true; btn.querySelector("span").textContent = "در حال راه‌اندازی مجدد..."; }
+  try {
+    const res = await apiFetch("/api/system/restart", { method: "POST", body: {} });
+    if (state) { state.classList.remove("hidden"); state.textContent = res.message || "در حال راه‌اندازی مجدد..."; }
+    // Poll until the fresh panel answers, then reload the page.
+    const deadline = Date.now() + 45000;
+    const probe = async () => {
+      try { const r = await fetch("/api/status", { cache: "no-store" }); if (r.ok) return true; } catch (e) {}
+      return false;
+    };
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 2000));
+      if (await probe()) { location.reload(); return; }
+    }
+    if (state) state.textContent = "پنل هنوز بالا نیامده است؛ صفحه را به‌صورت دستی تازه کنید.";
+    if (btn) btn.disabled = false;
+  } catch (e) {
+    // Connection drop is expected while the old process exits — start polling.
+    const deadline = Date.now() + 45000;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 2000));
+      try { const r = await fetch("/api/status", { cache: "no-store" }); if (r.ok) { location.reload(); return; } } catch (e2) {}
+    }
+    if (state) { state.classList.remove("hidden"); state.textContent = "پنل هنوز بالا نیامده است؛ صفحه را به‌صورت دستی تازه کنید."; }
+    if (btn) { btn.disabled = false; btn.querySelector("span").textContent = "راه‌اندازی مجدد پنل وب"; }
+  }
+}
+
 function handleLogout() {
   // Invalidate the server-side token too (it otherwise lives 7 days).
   try {

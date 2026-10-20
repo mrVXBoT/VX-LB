@@ -1560,6 +1560,35 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             ok, result = start_task(pool_name, 'ports_' + action, body.get('ports',[]) if action=='add' else body.get('port',''))
             return self._send_json({"success": True, "accepted": True, "job": result} if ok else {"error": result}, 202 if ok else 409)
 
+        elif path == "/api/system/restart":
+            # Restart the panel in place: a detached helper briefly waits for
+            # this response to flush, terminates the current process, then
+            # starts a fresh copy on the same port.
+            import signal
+            port = get_web_port() or 8088
+            script = os.path.abspath(__file__)
+            helper = (
+                "import os,sys,time,subprocess,signal;"
+                "time.sleep(1);"
+                f"target={os.getpid()!r};"
+                "\n"
+                "try:\n"
+                "    os.kill(target, signal.SIGTERM)\n"
+                "except OSError:\n"
+                "    pass\n"
+                "deadline=time.time()+30\n"
+                "while time.time()<deadline:\n"
+                "    try:\n"
+                "        os.kill(target,0); time.sleep(0.3); continue\n"
+                "    except OSError:\n"
+                "        break\n"
+                f"subprocess.Popen([sys.executable,{script!r},'--foreground',{port!r}],"
+                "stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,"
+                "stdin=subprocess.DEVNULL,start_new_session=True)"
+            )
+            _spawn_detached([sys.executable, "-c", helper])
+            return self._send_json({"success": True, "message": "پنل در حال راه‌اندازی مجدد است؛ چند ثانیه صبر کنید و صفحه را تازه کنید"})
+
         elif path == "/api/password":
             new_pass = body.get("new_password", "")
             if len(new_pass) < 8:
@@ -1672,11 +1701,8 @@ def open_web_port(port: int) -> tuple[bool, str]:
         return False, (result.stderr or result.stdout or "iptables failed").strip()
     return False, "no supported firewall tool found"
 
-def start_background_web(port: int = 8088) -> bool:
-    if is_web_running():
-        return True
+def _spawn_detached(cmd):
     import subprocess
-    cmd = [sys.executable, os.path.abspath(__file__), "--foreground", str(port)]
     subprocess.Popen(
         cmd,
         stdout=subprocess.DEVNULL,
@@ -1684,6 +1710,13 @@ def start_background_web(port: int = 8088) -> bool:
         stdin=subprocess.DEVNULL,
         start_new_session=True
     )
+
+
+def start_background_web(port: int = 8088) -> bool:
+    if is_web_running():
+        return True
+    cmd = [sys.executable, os.path.abspath(__file__), "--foreground", str(port)]
+    _spawn_detached(cmd)
     # Give it a moment to bind and write pid
     for _ in range(15):
         time.sleep(0.2)

@@ -543,6 +543,18 @@
         </form>
       </div>
 
+      <!-- Panel Restart Card -->
+      <div class="card-panel">
+        <div class="card-panel-head">
+          <h4>راه‌اندازی مجدد پنل</h4>
+        </div>
+        <p class="card-desc-text">پس از به‌روزرسانی پلتفرم (<code dir="ltr">git pull</code> یا اجرای مجدد installer)، با این دکمه پنل وب را بدون SSH ری‌استارت کنید تا کد جدید لود شود. چند ثانیه بعد صفحه را تازه کنید.</p>
+        <button type="button" id="panel-restart-btn" class="btn-secondary sm" onclick="restartPanel(this)">
+          <span>راه‌اندازی مجدد پنل وب</span>
+        </button>
+        <p id="panel-restart-state" class="empty-hint hidden" role="status" style="margin-top:10px;"></p>
+      </div>
+
       <!-- Logout Card -->
       <div class="card-panel">
         <div class="card-panel-head">
