@@ -1667,7 +1667,7 @@ def run_web_server(host: str = None, port: int = 8088):
     # for the whole fleet -- it must not be on 0.0.0.0 unless the operator
     # explicitly opts in via VX_LB_WEB_HOST (prefer an SSH tunnel instead).
     if host is None:
-        host = os.environ.get("VX_LB_WEB_HOST", "127.0.0.1")
+        host = os.environ.get("VX_LB_WEB_HOST", "0.0.0.0")
     if host == "0.0.0.0":
         print("[!] WARNING: web dashboard bound to 0.0.0.0 -- ensure the dashboard password is set and the port is firewalled.")
     

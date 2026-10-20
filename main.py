@@ -4,6 +4,7 @@
 import os
 import sys
 import time
+import socket
 from functools import wraps
 from rich.console import Console
 from rich.table import Table
@@ -1181,23 +1182,36 @@ def manage_web_menu():
         w_pid = get_web_pid() if is_running else 0
         w_port = get_web_port()
         
-        # Get server IP for display
-        kh_servers = get_servers("kharej")
-        kh_ip = kh_servers[0]["ip"] if kh_servers else "YOUR_SERVER_IP"
-        
         web_pass = load_data().get("web_password")
         pass_status = "[bold green]Configured[/bold green]" if web_pass else "[yellow]Not set — use option [5] below[/yellow]"
         status_text = f"[bold green]RUNNING (PID: {w_pid})[/bold green]" if is_running else "[bold red]STOPPED[/bold red]"
-        bind_host = os.environ.get("VX_LB_WEB_HOST", "127.0.0.1")
+        bind_host = os.environ.get("VX_LB_WEB_HOST", "0.0.0.0")
 
         console.print("[bold cyan]=== Mobile Web Dashboard (Phone Control Panel) ===[/bold cyan]\n")
         console.print(f"  [white]Status:[/white] {status_text}")
         console.print(f"  [white]Bind Address:[/white] [yellow]{bind_host}[/yellow]  (VX_LB_WEB_HOST to change)")
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as _s:
+                _s.connect(("8.8.8.8", 80))
+                public_ip = _s.getsockname()[0]
+        except Exception:
+            public_ip = "YOUR_SERVER_IP"
+
         console.print(f"  [white]Listening Port:[/white] [yellow]{w_port}[/yellow]")
-        console.print(f"  [white]Local URL:[/white] [cyan]http://127.0.0.1:{w_port}[/cyan]")
-        console.print(f"  [white]Remote Access:[/white] [dim]dashboard binds localhost; use an SSH tunnel:[/dim]")
-        console.print(f"  [dim]  ssh -L {w_port}:127.0.0.1:{w_port} root@{kh_ip}[/dim]")
-        console.print(f"  [white]Web Password:[/white] {pass_status}\n")
+        console.print(f"  [white]Dashboard URL:[/white] [cyan]http://{public_ip}:{w_port}[/cyan]")
+        console.print(f"  [white]Web Password:[/white] {pass_status}")
+
+        try:
+            import io as _io
+            import qrcode as _qr
+            _q = _qr.QRCode(border=1)
+            _q.add_data(f"http://{public_ip}:{w_port}")
+            _q.make(fit=True)
+            _buf = _io.StringIO()
+            _q.print_ascii(out=_buf, invert=True)
+            console.print(_buf.getvalue())
+        except ImportError:
+            pass
         
         console.print("  [1] ▶️  Start Mobile Dashboard in Background")
         console.print("  [2] ⏹️  Stop Mobile Dashboard")
@@ -1215,7 +1229,7 @@ def manage_web_menu():
                 console.print(f"[cyan]Starting Web Dashboard on port {w_port}...[/cyan]")
                 if start_background_web(w_port):
                     console.print(f"[bold green]Success: Web Dashboard started successfully! (PID: {get_web_pid()})[/bold green]")
-                    console.print(f"[cyan]📱 From your phone/PC: ssh -L {w_port}:127.0.0.1:{w_port} root@{kh_ip}  →  http://127.0.0.1:{w_port}[/cyan]")
+                    console.print(f"[cyan]📱 Dashboard URL: http://{public_ip}:{w_port}[/cyan]")
                 else:
                     console.print("[bold red]Error: Failed to start Web Dashboard.[/bold red]")
             Prompt.ask("\nPress Enter to continue")
@@ -1464,12 +1478,18 @@ if __name__ == "__main__":
         _cli_set_web_password()
     elif "--web" in sys.argv:
         w_port = get_web_port()
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as _s:
+                _s.connect(("8.8.8.8", 80))
+                public_ip = _s.getsockname()[0]
+        except OSError:
+            public_ip = "YOUR_SERVER_IP"
         if is_web_running():
             console.print(f"[yellow]Web Dashboard is already running on port {w_port} (PID: {get_web_pid()}).[/yellow]")
         else:
             console.print(f"[cyan]Starting Web Dashboard on port {w_port}...[/cyan]")
             if start_background_web(w_port):
-                console.print(f"[bold green]Web Dashboard started successfully at http://127.0.0.1:{w_port} (PID: {get_web_pid()})[/bold green]")
+                console.print(f"[bold green]Web Dashboard started successfully at http://{public_ip}:{w_port} (PID: {get_web_pid()})[/bold green]")
             else:
                 console.print("[bold red]Failed to start Web Dashboard.[/bold red]")
         sys.exit(0)
