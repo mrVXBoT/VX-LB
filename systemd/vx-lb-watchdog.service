@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory="%WORKING_DIR%"
-ExecStart="%WORKING_DIR%/.venv/bin/python" "%WORKING_DIR%/daemon.py" --foreground
+WorkingDirectory=%WORKING_DIR%
+ExecStart=%WORKING_DIR%/.venv/bin/python %WORKING_DIR%/daemon.py --foreground
 Restart=always
 RestartSec=10
 KillMode=process
