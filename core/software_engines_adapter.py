@@ -76,7 +76,7 @@ class SoftwareEngineBaseAdapter(BaseTunnelAdapter):
         if ok == 0:
             return True, f"{binary_name} verified at {out.strip()}"
 
-        # Air-gapped fallback: check local bundled bin/
+        # Air-gapped fallback: check local bundled bin/ with SHA-256 verification
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         _, arch_raw, _ = ssh.execute("uname -m")
         remote_arch = arch_raw.strip().lower()
@@ -88,8 +88,16 @@ class SoftwareEngineBaseAdapter(BaseTunnelAdapter):
             os.path.join(base_dir, "data", "binaries", arch_dir, binary_name),
             os.path.join(base_dir, "data", "binaries", binary_name),
         ]
+        manifest = get_dependency_manifest(binary_name)
+        expected_sha = manifest.architectures.get(arch_dir, {}).get("sha256") if manifest else None
+
         for candidate in candidate_paths:
             if os.path.exists(candidate) and os.path.isfile(candidate):
+                if expected_sha:
+                    import hashlib
+                    with open(candidate, "rb") as f:
+                        if hashlib.sha256(f.read()).hexdigest() != expected_sha:
+                            continue  # Skip unverified/mismatched binaries
                 uploaded = ssh.upload_binary(candidate, f"/usr/local/bin/{binary_name}", mode=0o755)
                 if uploaded:
                     c, o, _ = ssh.execute(f"which {binary_name} || test -f /usr/local/bin/{binary_name}")

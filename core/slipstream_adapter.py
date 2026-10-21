@@ -43,7 +43,12 @@ class SlipstreamAdapter(BaseTunnelAdapter):
         self.binary_name = "slipstream"
 
     def install(self, ssh: SSHManager, role: str, config: dict) -> Tuple[bool, str]:
-        """Verify or install slipstream binary on remote host."""
+        """Verify or install slipstream binary on remote host.
+
+        Local-first policy: prefer the verified bundled depot over any network
+        fetch. A remote download is attempted only when the operator explicitly
+        opts in via ``config["allow_download"]`` and no local artifact exists.
+        """
         if role not in ("iran", "kharej"):
             return False, "Slipstream role must be iran or kharej"
         manifest = get_dependency_manifest("slipstream-server" if role == "kharej" else "slipstream")
@@ -55,6 +60,40 @@ class SlipstreamAdapter(BaseTunnelAdapter):
         if not artifact.get("is_verified") or not expected:
             return False, "Slipstream release has no verified checksum"
         destination = "/usr/local/bin/" + manifest.executable_name
+        arch_clean = arch.strip()
+
+        # 1. If the destination already matches the pinned SHA-256, done.
+        probe = (
+            f"if [ -x {shlex.quote(destination)} ]; then "
+            f"sha256sum {shlex.quote(destination)} | awk '{{print $1}}'; fi"
+        )
+        code, out, _ = ssh.execute(probe)
+        if code == 0 and out.strip().lower() == expected.lower():
+            ssh.execute(f"chmod 755 {shlex.quote(destination)}")
+            return True, f"Slipstream {manifest.pinned_version} already installed with verified SHA-256"
+
+        # 2. Local-first: try the bundled depot before any remote network use.
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        candidate = os.path.join(base_dir, "bin", arch_clean, manifest.executable_name)
+        if os.path.isfile(candidate):
+            import hashlib
+            with open(candidate, "rb") as f:
+                if hashlib.sha256(f.read()).hexdigest() == expected:
+                    if hasattr(ssh, "upload_binary") and ssh.upload_binary(candidate, destination, mode=0o755):
+                        code, out, _ = ssh.execute(
+                            f"sha256sum {shlex.quote(destination)} | awk '{{print $1}}'"
+                        )
+                        if code == 0 and out.strip().lower() == expected.lower():
+                            return True, f"Slipstream installed from local bundled binary ({arch_clean})"
+                        return False, "Slipstream local upload succeeded but post-install checksum failed"
+
+        # 3. Remote download only when the operator explicitly allows it.
+        if not config.get("allow_download"):
+            return False, (
+                "Slipstream verified local binary unavailable and remote download "
+                "is disabled (strict offline). Bundle bin/%s/%s or set allow_download=True."
+                % (arch_clean, manifest.executable_name)
+            )
 
         # Download beside the destination; verify before replacing an existing
         # executable. A failure leaves the installed file untouched.
@@ -87,18 +126,6 @@ finally:
         )
         code, out, err = ssh.execute(command, timeout=120)
         if code:
-            # Air-gapped fallback if remote download failed (e.g. no internet/GitHub on remote host)
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            arch_clean = arch.strip()
-            candidate = os.path.join(base_dir, "bin", arch_clean, manifest.executable_name)
-            if os.path.exists(candidate) and os.path.isfile(candidate):
-                import hashlib
-                with open(candidate, "rb") as f:
-                    actual_sha = hashlib.sha256(f.read()).hexdigest()
-                if actual_sha == expected and hasattr(ssh, "upload_binary"):
-                    if ssh.upload_binary(candidate, destination, mode=0o755):
-                        return True, f"Slipstream installed from local bundled binary ({arch_clean}) after remote fetch failure"
-
             return False, f"Failed to install verified Slipstream binary: {err or out}"
         return True, f"Slipstream {manifest.pinned_version} {manifest.executable_name} successfully installed with SHA-256 verification"
 

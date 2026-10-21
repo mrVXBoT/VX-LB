@@ -47,13 +47,27 @@ class WireGuardAdapter(BaseTunnelAdapter):
         super().__init__(engine_id)
 
     def install(self, ssh: SSHManager, role: str, config: dict) -> Tuple[bool, str]:
-        """Verifies WireGuard kernel module, wg, wg-quick and system preflight requirements."""
+        """Verifies WireGuard kernel module, wg, wg-quick and system preflight requirements.
+
+        Strict-offline default: ``auto_install`` alone does NOT reach for APT.
+        The operator must also set ``allow_os_packages=True`` in the pool or
+        call config so that a remote ``apt-get`` / ``dnf`` never fires during
+        an air-gapped deployment.
+        """
         # Check module & tools
         check_cmd = "modprobe wireguard 2>/dev/null; which wg wg-quick ip"
         ok, out, err = ssh.execute(check_cmd)
 
         if ok != 0:
-            if config.get("auto_install", False):
+            wants_install = bool(config.get("auto_install", False))
+            allow_os_pkgs = bool(config.get("allow_os_packages", False))
+            if wants_install and not allow_os_pkgs:
+                return False, (
+                    "WireGuard OS packages missing; strict-offline mode refuses "
+                    "to reach apt/dnf. Bundle the WireGuard OS dependency pack or "
+                    "set allow_os_packages=True explicitly."
+                )
+            if wants_install and allow_os_pkgs:
                 install_cmd = "DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get install -y -qq wireguard wireguard-tools"
                 inst_ok, inst_out, inst_err = ssh.execute(install_cmd)
                 if inst_ok != 0:
@@ -705,12 +719,17 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
         sessions.append(kh_ssh)
 
         progress("بررسی پیش‌نیازهای WireGuard...")
+        # Local-first: install via verified binaries only. OS package installs
+        # require the operator to opt in explicitly via pool config so we never
+        # hit APT on a host that should remain air-gapped.
+        allow_os = bool(pool.get("allow_os_packages"))
         for ssh, r in ((ir_ssh, "iran"), (kh_ssh, "kharej")):
-            ok_inst, msg_inst = adapter.install(ssh, r, {"auto_install": False})
+            ok_inst, msg_inst = adapter.install(ssh, r, {
+                "auto_install": True,
+                "allow_os_packages": allow_os,
+            })
             if not ok_inst:
-                ok_inst, msg_inst = adapter.install(ssh, r, {"auto_install": True})
-                if not ok_inst:
-                    raise RuntimeError(msg_inst)
+                raise RuntimeError(msg_inst)
 
         # Generate configs
         pool_cfg = {

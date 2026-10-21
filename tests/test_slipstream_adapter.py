@@ -25,9 +25,21 @@ class SlipstreamAdapterTests(unittest.TestCase):
         import tempfile
         from pathlib import Path
         ssh = MagicMock()
-        ssh.execute.side_effect = [(0, "x86_64", ""), (0, "", "")]
-        self.assertTrue(self.adapter.install(ssh, "iran", {})[0])
-        script = shlex.split(ssh.execute.call_args_list[1][0][0])[2]
+        # Local depot yields no usable binary, allow_download enables the
+        # network fallback path exercised below.
+        ssh.execute.side_effect = [
+            (0, "x86_64", ""),  # uname -m
+            (1, "", ""),        # sha256sum: destination missing
+            (0, "", ""),        # remote download command
+        ]
+        with patch("os.path.isfile", return_value=False):
+            self.assertTrue(self.adapter.install(ssh, "iran", {"allow_download": True})[0])
+        # Extract the embedded python -c program from the remote download call.
+        download_call = next(
+            c for c in ssh.execute.call_args_list
+            if "urlopen" in c[0][0]
+        )
+        script = shlex.split(download_call[0][0])[2]
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             source, destination = root / "download", root / "installed"
@@ -43,6 +55,42 @@ class SlipstreamAdapterTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(destination.read_bytes(), b"new binary")
             self.assertEqual(destination.stat().st_mode & 0o777, 0o755)
+
+    def test_installer_is_local_first_and_never_downloads_by_default(self):
+        import hashlib
+        import os
+        ssh = MagicMock()
+        # Remote destination missing; local bundled binary present.
+        local = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "bin", "x86_64", "slipstream-client",
+        )
+        with open(local, "rb") as f:
+            expected = hashlib.sha256(f.read()).hexdigest()
+        ssh.execute.side_effect = [
+            (0, "x86_64", ""),          # uname -m
+            (1, "", ""),                # sha256sum: missing remotely
+            (0, expected, ""),          # post-upload verify
+        ]
+        ssh.upload_binary.return_value = True
+        ok, msg = self.adapter.install(ssh, "iran", {})
+        self.assertTrue(ok, msg)
+        ssh.upload_binary.assert_called_once()
+        # No urlopen / download was invoked.
+        self.assertFalse(any("urlopen" in str(c) for c in ssh.execute.call_args_list))
+
+    def test_installer_refuses_to_download_when_no_local_binary(self):
+        ssh = MagicMock()
+        ssh.execute.side_effect = [
+            (0, "x86_64", ""),
+            (1, "", ""),
+        ]
+        with patch("os.path.isfile", return_value=False):
+            ok, msg = self.adapter.install(ssh, "iran", {})
+        self.assertFalse(ok)
+        self.assertIn("strict offline", msg)
+        # No download attempt was made.
+        self.assertFalse(any("urlopen" in str(c) for c in ssh.execute.call_args_list))
 
     def test_configure_uses_official_commands_and_separate_secure_relay(self):
         from core.slipstream_deploy import identity_material

@@ -26,9 +26,9 @@ execute=http.execute
 deploy=http.deploy
 
 
-def install(ssh):
+def install(ssh,allow_download=False):
     http.install(ssh)
-    nfqws2_install.install(ssh)
+    nfqws2_install.install(ssh,allow_download=allow_download)
 
 
 def allocate(iran,kharej,server,pool):

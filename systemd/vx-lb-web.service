@@ -1,0 +1,23 @@
+[Unit]
+Description=VX-LB Web Dashboard (loopback-only by default)
+Documentation=file:%WORKING_DIR%/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory="%WORKING_DIR%"
+Environment=VX_LB_WEB_HOST=127.0.0.1
+Environment=VX_LB_WEB_PORT=8088
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart="%WORKING_DIR%/.venv/bin/python" "%WORKING_DIR%/core/web_server.py" --foreground ${VX_LB_WEB_PORT}
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

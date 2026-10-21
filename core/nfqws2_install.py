@@ -36,17 +36,23 @@ def archive_bundle(path):
     return result
 
 
-def cached_archive():
+def cached_archive(allow_download=False):
     directory=Path(DATA_DIR)/'cache';directory.mkdir(mode=0o700,parents=True,exist_ok=True)
     target=directory/('zapret2-'+VERSION+'.tar.gz')
     if target.exists():
         archive_bundle(target);return target
-    # Bundled offline copy: prefer the depot over network when internet is down.
+    # Bundled offline copy: prefer the depot over any network when internet is
+    # down. In strict-offline deployments we never reach for ARCHIVE_URL.
     bundled = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / 'bin' / 'x86_64' / ('zapret2-'+VERSION+'.tar.gz')
     if bundled.is_file():
         archive_bundle(bundled)
         shutil.copy(bundled, target)
         return target
+    if not allow_download:
+        raise FileNotFoundError(
+            f"NFQWS2 archive missing from local depot; run VX-LB depot preflight "
+            f"or pass allow_download=True explicitly. Expected: {bundled}"
+        )
     temporary=directory/('.nfqws2-'+secrets.token_hex(8)+'.download')
     try:
         digest=hashlib.sha256();size=0;deadline=time.monotonic()+600
@@ -97,7 +103,7 @@ def check(ssh,directory=None):
     return code==0
 
 
-def install(ssh,archive_path=None):
+def install(ssh,archive_path=None,allow_download=False):
     execute(ssh,'test "$(id -u)" = 0 && command -v python3 systemctl iptables modprobe ss')
     if execute(ssh,'uname -s')!='Linux' or execute(ssh,'uname -m')!='x86_64':
         raise ValueError('Pinned packet engine currently requires Linux x86_64')
@@ -105,7 +111,7 @@ def install(ssh,archive_path=None):
         raise ValueError('Packet engine requires a modern per-queue Linux kernel')
     execute(ssh,'modprobe nfnetlink_queue')
     if not check(ssh):
-        bundle=archive_bundle(archive_path or cached_archive())
+        bundle=archive_bundle(archive_path or cached_archive(allow_download=allow_download))
         parent=str(Path(LIBRARY_DIRECTORY).parent);stage=parent+'/.stage-'+secrets.token_hex(16)
         try:
             execute(ssh,'install -d -m 755 '+shlex.quote(parent)+' && install -d -m 700 '+shlex.quote(stage))

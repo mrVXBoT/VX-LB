@@ -198,11 +198,30 @@ else
 fi
 echo "[+] Command linked: $BIN_DIR/vx-lb (directory must be on PATH)"
 
-# 5. Setup Systemd Watchdog Service
 SERVICE_NAME="vx-lb-watchdog"
-SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
-if [ "$NO_SERVICE" -eq 0 ] && command -v systemctl &>/dev/null && [ -d /run/systemd/system ] && [ -f "$SCRIPT_DIR/systemd/vx-lb-watchdog.service" ]; then
+# 5. Setup Systemd services (watchdog + optional web dashboard)
+install_unit() {
+    local unit_name="$1" template="$2"
+    local target="/etc/systemd/system/${unit_name}.service"
+    local tmp
+    tmp="$(mktemp)"
+    "$PYTHON" - "$SCRIPT_DIR" "$template" "$tmp" <<'PY'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+template = (root / sys.argv[2]).read_text()
+Path(sys.argv[3]).write_text(template.replace("%WORKING_DIR%", str(root)))
+PY
+    if [ "$CAN_INSTALL_SERVICE" -eq 1 ]; then
+        cp "$tmp" "$target"
+    else
+        sudo cp "$tmp" "$target"
+    fi
+    rm -f "$tmp"
+}
+
+if [ "$NO_SERVICE" -eq 0 ] && command -v systemctl &>/dev/null && [ -d /run/systemd/system ]; then
     CAN_INSTALL_SERVICE=0
     if [ "$EUID" -eq 0 ]; then
         CAN_INSTALL_SERVICE=1
@@ -211,34 +230,36 @@ if [ "$NO_SERVICE" -eq 0 ] && command -v systemctl &>/dev/null && [ -d /run/syst
     fi
 
     if [ "$CAN_INSTALL_SERVICE" -gt 0 ]; then
-        echo "[+] Configuring background watchdog systemd service..."
-        SERVICE_TMP="$(mktemp)"
-        trap 'rm -f "$SERVICE_TMP"' EXIT
-        "$PYTHON" - "$SCRIPT_DIR" "$SERVICE_TMP" <<'PY'
-from pathlib import Path
-import sys
-root = Path(sys.argv[1])
-template = (root / "systemd/vx-lb-watchdog.service").read_text()
-Path(sys.argv[2]).write_text(template.replace("%WORKING_DIR%", str(root)))
-PY
-
-        if [ "$CAN_INSTALL_SERVICE" -eq 1 ]; then
-            cp "$SERVICE_TMP" "$SERVICE_FILE"
-            if [ -f "$SERVICE_FILE" ]; then
+        if [ -f "$SCRIPT_DIR/systemd/vx-lb-watchdog.service" ]; then
+            echo "[+] Configuring background watchdog systemd service..."
+            install_unit "vx-lb-watchdog" "systemd/vx-lb-watchdog.service"
+            if [ "$CAN_INSTALL_SERVICE" -eq 1 ]; then
                 systemctl daemon-reload
-                systemctl enable --now "${SERVICE_NAME}.service"
-                if [ "$UPDATE" = 1 ]; then systemctl restart "${SERVICE_NAME}.service"; fi
-                echo "✅ Systemd service installed and started: ${SERVICE_NAME}.service"
-            fi
-        elif [ "$CAN_INSTALL_SERVICE" -eq 2 ]; then
-            if sudo cp "$SERVICE_TMP" "$SERVICE_FILE" 2>/dev/null; then
-                sudo systemctl daemon-reload
-                sudo systemctl enable --now "${SERVICE_NAME}.service"
-                if [ "$UPDATE" = 1 ]; then sudo systemctl restart "${SERVICE_NAME}.service"; fi
-                echo "✅ Systemd service installed and started: ${SERVICE_NAME}.service"
+                systemctl enable --now vx-lb-watchdog.service
+                if [ "$UPDATE" = 1 ]; then systemctl restart vx-lb-watchdog.service; fi
             else
-                echo "ℹ️  Systemd service setup skipped (can be registered later via sudo)."
+                sudo systemctl daemon-reload
+                sudo systemctl enable --now vx-lb-watchdog.service
+                if [ "$UPDATE" = 1 ]; then sudo systemctl restart vx-lb-watchdog.service; fi
             fi
+            echo "✅ Systemd service installed and started: vx-lb-watchdog.service"
+        fi
+
+        # Register the web dashboard unit so the panel survives reboot. It is
+        # installed disabled by default to preserve the existing UX where the
+        # operator starts it via `vx-lb --web`.
+        if [ -f "$SCRIPT_DIR/systemd/vx-lb-web.service" ]; then
+            install_unit "vx-lb-web" "systemd/vx-lb-web.service"
+            if [ "$CAN_INSTALL_SERVICE" -eq 1 ]; then
+                systemctl daemon-reload
+                systemctl enable vx-lb-web.service
+                if [ "$UPDATE" = 1 ]; then systemctl try-restart vx-lb-web.service || true; fi
+            else
+                sudo systemctl daemon-reload
+                sudo systemctl enable vx-lb-web.service
+                if [ "$UPDATE" = 1 ]; then sudo systemctl try-restart vx-lb-web.service || true; fi
+            fi
+            echo "✅ Systemd service registered (disabled): vx-lb-web.service"
         fi
     else
         echo "ℹ️  Systemd service registration requires sudo/root (optional for standalone CLI)."
