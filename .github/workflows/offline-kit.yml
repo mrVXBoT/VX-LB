@@ -23,6 +23,20 @@ jobs:
           retention-days: 14
           compression-level: 0
           if-no-files-found: error
+  regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install application from verified local payload
+        env:
+          VX_LB_BIN_DIR: ${{ runner.temp }}/vxlb-bin
+        run: bash install.sh --offline --no-service
+      - name: Install test tooling
+        run: .venv/bin/python -m pip install pytest==9.0.2
+      - name: Run Python and dashboard regressions
+        run: |
+          .venv/bin/python -m pytest -q
+          node tests/test_web_client.cjs
   install:
     needs: package
     runs-on: ubuntu-24.04
@@ -49,10 +63,10 @@ jobs:
           docker run --rm --network none --platform linux/${{ matrix.arch }} \
             -v "$PWD/payload:/opt/vx-lb" -w /opt/vx-lb \
             python:${{ matrix.python }}-slim-bookworm \
-            bash -ec 'bash install.sh --check; bash install.sh --no-service; bash install.sh --offline --no-service; .venv/bin/python -m pip check; vx-lb --list-capabilities'
+            bash -ec 'bash install.sh --check; bash install.sh --no-service; bash install.sh --offline --no-service; .venv/bin/python -m pip check; vx-lb --list-capabilities; .venv/bin/python scripts/check_backpack_offline.py'
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [package, install]
+    needs: [package, install, regression]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

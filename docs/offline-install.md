@@ -81,6 +81,14 @@ over a reachable SSH connection use the bundled binaries. This does not make
 Cloudflare API calls, DNS resolution or remote SSH possible across an unavailable
 network. It also does not prove every transport works on every kernel or distro.
 
+BackPack installation uses the same local-only path for the adapter, legacy
+pools and TUN runtime. A working installed executable is kept. New uploads must
+match the architecture's pinned SHA-256. Missing/corrupt local payloads,
+unsupported CPUs, failed uploads and failed execution checks return an error;
+they never trigger a download from the upstream BackPack repository. An upstream
+repository disappearing therefore does not remove our stored binaries. This is
+binary redistribution, not a source mirror or fork.
+
 Remote nodes still need appropriate system tools (for example iproute2 and
 firewall tools), service management, kernel modules/capabilities and any dynamic
 libraries required by the selected engine. WireGuard needs distro-specific

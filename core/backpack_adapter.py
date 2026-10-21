@@ -23,18 +23,8 @@ class BackPackAdapter(BaseTunnelAdapter):
         super().__init__("backpack")
 
     def install(self, ssh: SSHManager, role: str, config: dict) -> Tuple[bool, str]:
-        """Installs backpack binary if not already present."""
-        if hasattr(ssh, "install_backpack"):
-            return ssh.install_backpack()
-        ok, out, _ = ssh.execute("which backpack || test -f /usr/local/bin/backpack")
-        if ok == 0:
-            return True, "Backpack binary already installed"
-        # Binary installation hook
-        cmd = "curl -fsSL https://raw.githubusercontent.com/mrvxbot/backpack/main/install.sh | bash"
-        ok, out, err = ssh.execute(cmd)
-        if ok != 0:
-            return False, f"Failed to install backpack: {err or out}"
-        return True, "Backpack installed successfully"
+        """Use the same verified local-only installer as legacy pools and TUNs."""
+        return SSHManager.ensure_backpack_installed(ssh)
 
     def configure(self, iran_node: dict, kharej_server: dict, pool_config: dict) -> dict:
         """Generates configuration files and systemd service specifications."""

@@ -6,14 +6,7 @@ import os
 import warnings
 from typing import Tuple, Optional
 from core.validation import shquote
-
-# Security: the BackPack installer is fetched from a third-party repo at a
-# mutable branch. Override with VX_LB_BACKPACK_INSTALL_URL after auditing the
-# script, or vendor a pinned release tarball with a SHA256 check.
-BACKPACK_INSTALL_URL = os.environ.get(
-    "VX_LB_BACKPACK_INSTALL_URL",
-    "https://raw.githubusercontent.com/AminMGMT/BackPack/main/install.sh",
-)
+from core.dependency_manifest import validate_binary_prerequisites
 
 # VX-LB's own known_hosts file for Trust-On-First-Use (TOFU) host key pinning.
 _KNOWN_HOSTS_FILE = os.path.join(
@@ -271,44 +264,52 @@ for p in ports:
             self.execute(f"rm -f {shquote(temporary_path)}")
 
     def ensure_backpack_installed(self) -> Tuple[bool, str]:
-        """Checks if BackPack binary exists at /usr/local/bin/backpack, installs if missing.
-        
-        Prioritizes bundled offline binary in bin/ for air-gapped / wartime survival.
+        """Keep a working binary or install a checksum-verified local copy only.
+
+        No runtime path downloads or executes an upstream installer, including
+        when the local depot is absent or the remote upload/probe fails.
         """
-        code, out, _ = self.execute("[ -x /usr/local/bin/backpack ] && /usr/local/bin/backpack --help >/dev/null 2>&1 && echo 'installed'")
-        if "installed" in out:
+        binary = "/usr/local/bin/backpack"
+        probe = f"[ -x {binary} ] && {binary} --help >/dev/null 2>&1 && echo 'installed'"
+        code, out, _ = self.execute(probe)
+        if code == 0 and out.strip() == "installed":
             return True, "BackPack is already installed"
 
-        # 1. Offline Air-Gapped installation from bundled bin/
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        _, arch_raw, _ = self.execute("uname -m")
+        code, arch_raw, err = self.execute("uname -m")
+        if code != 0:
+            return False, f"Cannot determine BackPack host architecture: {err or arch_raw}"
         remote_arch = arch_raw.strip().lower()
-        arch_dir = "x86_64" if ("x86_64" in remote_arch or "amd64" in remote_arch) else ("aarch64" if ("aarch64" in remote_arch or "arm64" in remote_arch) else remote_arch)
+        arch_dir = {"amd64": "x86_64", "arm64": "aarch64"}.get(remote_arch, remote_arch)
+        valid, message = validate_binary_prerequisites("backpack", arch_dir)
+        if not valid:
+            return False, message
 
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         candidate_paths = [
             os.path.join(base_dir, "bin", arch_dir, "backpack"),
             os.path.join(base_dir, "bin", "backpack"),
             os.path.join(base_dir, "data", "binaries", arch_dir, "backpack"),
             os.path.join(base_dir, "data", "binaries", "backpack"),
         ]
-
+        rejected = []
         for candidate in candidate_paths:
-            if os.path.exists(candidate) and os.path.isfile(candidate):
-                uploaded = self.upload_binary(candidate, "/usr/local/bin/backpack", mode=0o755)
-                if uploaded:
-                    c, o, _ = self.execute("[ -x /usr/local/bin/backpack ] && /usr/local/bin/backpack --help >/dev/null 2>&1 && echo 'installed'")
-                    if "installed" in o:
-                        return True, "BackPack installed from local bundled binary (Air-gapped / Offline)"
+            if not os.path.isfile(candidate):
+                continue
+            valid, message = validate_binary_prerequisites("backpack", arch_dir, candidate)
+            if not valid:
+                rejected.append(message)
+                continue
+            if not self.upload_binary(candidate, binary, mode=0o755):
+                return False, "BackPack local binary upload failed; no external download attempted"
+            code, out, err = self.execute(probe)
+            if code == 0 and out.strip() == "installed":
+                return True, f"BackPack installed from verified local binary ({arch_dir})"
+            return False, f"BackPack local binary failed its execution check: {err or out}"
 
-        # 2. Online fallback as last resort if local bundled binary not present
-        install_cmd = f"bash <(curl -fsSL {shquote(BACKPACK_INSTALL_URL)})"
-        code, out, err = self.execute(install_cmd, timeout=120)
-
-        # Verify
-        c, o, _ = self.execute("[ -x /usr/local/bin/backpack ] && /usr/local/bin/backpack --help >/dev/null 2>&1 && echo 'installed'")
-        if "installed" in o:
-            return True, "BackPack installed successfully"
-        return False, f"Failed to install BackPack: {err or out}"
+        detail = "; ".join(rejected) if rejected else f"no local binary for {arch_dir}"
+        return False, (f"BackPack offline depot unavailable: {detail}. "
+                       "Restore the verified binary from the VX-LB release kit; "
+                       "no external download attempted")
 
     def write_file(self, remote_path: str, content: str) -> bool:
         """Writes content to a remote file."""
