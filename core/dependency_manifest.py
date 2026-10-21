@@ -62,9 +62,10 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
                 "is_verified": True
             },
             "aarch64": {
-                "sha256": None,
+                "sha256": "c2d20a7045250497083afea0d79db0672f6c89a25aaaf37c92de034d6b764b04",
                 "source_url": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-arm64-v8a.zip",
-                "is_verified": False
+                "archive_type": "zip", "archive_member": "xray",
+                "is_verified": True
             }
         }
     ),
@@ -84,9 +85,10 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
                 "is_verified": True
             },
             "aarch64": {
-                "sha256": None,
-                "source_url": None,
-                "is_verified": False
+                "sha256": "aa3bb31f4feb19253b3e0f4091b7bf5d09b2975a0b2efc109f184abe5154fb05",
+                "source_url": "https://github.com/radkesvat/WaterWall/releases/download/v1.46.96/Waterwall-linux-gcc-arm64.zip",
+                "archive_type": "zip", "archive_member": "Waterwall",
+                "is_verified": True
             }
         }
     ),
@@ -106,9 +108,10 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
                 "is_verified": True
             },
             "aarch64": {
-                "sha256": None,
-                "source_url": None,
-                "is_verified": False
+                "sha256": "f6db279a57a772a250efffe4bb0a79b112495331568ccc0f6e5f4398bbe962e3",
+                "source_url": "https://github.com/hanselime/paqet/releases/download/v1.0.0-alpha.21/paqet-linux-arm64-v1.0.0-alpha.21.tar.gz",
+                "archive_type": "tar.gz", "archive_member": "paqet_linux_arm64",
+                "is_verified": True
             }
         }
     ),
@@ -121,9 +124,16 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
         required_capabilities=["cap_net_admin"],
         architectures={
             "x86_64": {
-                "sha256": None,
-                "source_url": "https://github.com/TrustTunnel/TrustTunnel/releases/download/v1.1.0/trusttunnel-amd64",
-                "is_verified": False
+                "sha256": "9bb15f4e30e2ff196cf0aa387462c42387d9405ddfeb5caad133838560fa33cd",
+                "source_url": "https://github.com/TrustTunnel/TrustTunnel/releases/download/v1.1.0/trusttunnel-v1.1.0-linux-x86_64.tar.gz",
+                "archive_type": "tar.gz", "archive_member": "trusttunnel_endpoint",
+                "is_verified": True
+            },
+            "aarch64": {
+                "sha256": "0aa249672b1aa3a6fa7eadfb72159b7d965f6f006681f97a2528eed9161541c3",
+                "source_url": "https://github.com/TrustTunnel/TrustTunnel/releases/download/v1.1.0/trusttunnel-v1.1.0-linux-aarch64.tar.gz",
+                "archive_type": "tar.gz", "archive_member": "trusttunnel_endpoint",
+                "is_verified": True
             }
         }
     ),
@@ -144,15 +154,22 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
     "backhaul": BinaryManifest(
         name="Backhaul",
         engine_id="backhaul",
-        pinned_version="v0.6.4",
+        pinned_version="v0.7.2",
         license_spdx="MIT",
         executable_name="backhaul",
         required_capabilities=[],
         architectures={
             "x86_64": {
-                "sha256": None,
-                "source_url": "https://github.com/Musix/backhaul/releases/download/v0.6.4/backhaul_linux_amd64.tar.gz",
-                "is_verified": False
+                "sha256": "7f1b1439d7fe1d15ae0b376e15614fe13d8a12f6e07a90263e310ea2a9d601fb",
+                "source_url": "https://github.com/Musixal/Backhaul/releases/download/v0.7.2/backhaul_linux_amd64.tar.gz",
+                "archive_type": "tar.gz", "archive_member": "backhaul",
+                "is_verified": True
+            },
+            "aarch64": {
+                "sha256": "f8533e29fac489b179e191c81f6bdcb0247302dc01ad1c06a8f5664f32f5ba6b",
+                "source_url": "https://github.com/Musixal/Backhaul/releases/download/v0.7.2/backhaul_linux_arm64.tar.gz",
+                "archive_type": "tar.gz", "archive_member": "backhaul",
+                "is_verified": True
             }
         }
     ),
@@ -165,9 +182,16 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
         required_capabilities=[],
         architectures={
             "x86_64": {
-                "sha256": None,
+                "sha256": "3231238ffc16588e8bbb035336885f5e88b2fa5972202d1f29af74bdd3cbba5f",
                 "source_url": "https://github.com/fatedier/frp/releases/download/v0.61.0/frp_0.61.0_linux_amd64.tar.gz",
-                "is_verified": False
+                "archive_type": "tar.gz", "archive_member": "frps",
+                "is_verified": True
+            },
+            "aarch64": {
+                "sha256": "f8419e5460762de873301aa9fbe15f90364bb0ca89e841ad4ff291dc371b53d1",
+                "source_url": "https://github.com/fatedier/frp/releases/download/v0.61.0/frp_0.61.0_linux_arm64.tar.gz",
+                "archive_type": "tar.gz", "archive_member": "frps",
+                "is_verified": True
             }
         }
     ),
@@ -180,9 +204,16 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
         required_capabilities=[],
         architectures={
             "x86_64": {
-                "sha256": None,
-                "source_url": "https://github.com/rapiz1/rathole/releases/download/v0.5.0/rathole-x86_64-unknown-linux-musl.zip",
-                "is_verified": False
+                "sha256": "d2202f2aa3a432135bddbe1c6104600c6577cd4507a70e77c08741c7ad879926",
+                "source_url": "https://github.com/rathole-org/rathole/releases/download/v0.5.0/rathole-x86_64-unknown-linux-gnu.zip",
+                "archive_type": "zip", "archive_member": "rathole",
+                "is_verified": True
+            },
+            "aarch64": {
+                "sha256": "c95474d2ecdc031b3bb20c495595a0d6c6440c1ff7748f594d7ecd5315d36e8f",
+                "source_url": "https://github.com/rathole-org/rathole/releases/download/v0.5.0/rathole-aarch64-unknown-linux-musl.zip",
+                "archive_type": "zip", "archive_member": "rathole",
+                "is_verified": True
             }
         }
     ),
@@ -195,9 +226,16 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
         required_capabilities=[],
         architectures={
             "x86_64": {
-                "sha256": None,
+                "sha256": "a5201a49dcee2331795c41a0458b55f91393883eb9529661a65c3264e8a28237",
                 "source_url": "https://github.com/go-gost/gost/releases/download/v3.0.0-rc10/gost_3.0.0-rc10_linux_amd64.tar.gz",
-                "is_verified": False
+                "archive_type": "tar.gz", "archive_member": "gost",
+                "is_verified": True
+            },
+            "aarch64": {
+                "sha256": "7570796ee7d3233eb425d2fe642b6894d6e795d7a8cf1de4522ddd8107f2dd7b",
+                "source_url": "https://github.com/go-gost/gost/releases/download/v3.0.0-rc10/gost_3.0.0-rc10_linux_arm64.tar.gz",
+                "archive_type": "tar.gz", "archive_member": "gost",
+                "is_verified": True
             }
         }
     ),
@@ -210,9 +248,14 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
         required_capabilities=[],
         architectures={
             "x86_64": {
-                "sha256": None,
+                "sha256": "6dc6cb49fcaeeeaf8127aa1fe0124f9f65e20fac2ae4e8227b086d2be30c6944",
                 "source_url": "https://github.com/apernet/hysteria/releases/download/app%2Fv2.6.0/hysteria-linux-amd64",
-                "is_verified": False
+                "is_verified": True
+            },
+            "aarch64": {
+                "sha256": "4eaa4a290b0a04f831c8df5e4a571b9a5b779a83265f748a452f2ff90288d218",
+                "source_url": "https://github.com/HyNetworks/hysteria/releases/download/app/v2.6.0/hysteria-linux-arm64",
+                "is_verified": True
             }
         }
     ),

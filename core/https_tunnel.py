@@ -7,6 +7,7 @@ Neither mode offers a direct fallback to the Iran client.
 import copy
 import ipaddress
 import json
+import os
 import re
 import secrets
 import shlex
@@ -277,8 +278,25 @@ def add(name,server,callback=None):
         progress('بررسی Xray، گواهی و دسترسی دو سرور')
         iran=connect(server);sessions.append(iran);kharej=connect(pool['kharej_server']);sessions.append(kharej)
         p=pool['camouflage'];binary=shlex.quote(p['binary'])
+        # Offline fallback: upload the bundled xray binary when the host lacks it.
+        from core.dependency_manifest import get_dependency_manifest, verify_file_sha256
         for ssh in sessions:
-            execute(ssh,'test "$(id -u)" = 0 && test -x '+binary+' && command -v python3 && command -v iptables && command -v systemctl')
+            binary=p['binary'];quoted=shlex.quote(binary)
+            res=ssh.execute('test -x '+quoted) if hasattr(ssh, 'execute') else None
+            code=res[0] if isinstance(res,(tuple,list)) and len(res)>0 else (res if isinstance(res,int) else None)
+            if code is not None and code != 0 and os.environ.get("VX_LB_XRAY_OFFLINE_DEPOT") != "0":
+                arch_res=ssh.execute("uname -m")
+                arch_raw=arch_res[1] if isinstance(arch_res,(tuple,list)) and len(arch_res)>1 else (arch_res if isinstance(arch_res,str) else "")
+                arch=arch_raw.strip().lower()
+                arch_dir="x86_64" if arch in ("x86_64","amd64") else "aarch64" if arch in ("aarch64","arm64") else arch
+                manifest=get_dependency_manifest("xray")
+                info=(manifest.architectures.get(arch_dir) or {}) if manifest else {}
+                candidate=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"bin",arch_dir,"xray")
+                if info.get("sha256") and os.path.isfile(candidate) and verify_file_sha256(candidate,info["sha256"]) and hasattr(ssh,"upload_binary"):
+                    if ssh.upload_binary(candidate,binary,mode=0o755):
+                        res=ssh.execute('test -x '+quoted)
+                        code=res[0] if isinstance(res,(tuple,list)) and len(res)>0 else (res if isinstance(res,int) else None)
+            execute(ssh,'test "$(id -u)" = 0 && test -x '+quoted+' && command -v python3 && command -v iptables && command -v systemctl')
             execute(ssh,'''systemctl --version | python3 -c 'import sys; assert int(sys.stdin.readline().split()[1]) >= 247, "systemd 247+ is required for private credentials"' ''')
             write(ssh,HELPER,Path(__file__).with_name('https_probe.py').read_text())
             execute(ssh,'test ! -e '+path(node)+' && test ! -e /etc/systemd/system/'+unit(node))

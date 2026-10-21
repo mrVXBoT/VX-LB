@@ -1,9 +1,11 @@
 """Verified immutable packet-engine package installation, separate from tunnels."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import secrets
 import shlex
+import shutil
 import tarfile
 import tempfile
 import time
@@ -39,6 +41,12 @@ def cached_archive():
     target=directory/('zapret2-'+VERSION+'.tar.gz')
     if target.exists():
         archive_bundle(target);return target
+    # Bundled offline copy: prefer the depot over network when internet is down.
+    bundled = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / 'bin' / 'x86_64' / ('zapret2-'+VERSION+'.tar.gz')
+    if bundled.is_file():
+        archive_bundle(bundled)
+        shutil.copy(bundled, target)
+        return target
     temporary=directory/('.nfqws2-'+secrets.token_hex(8)+'.download')
     try:
         digest=hashlib.sha256();size=0;deadline=time.monotonic()+600
