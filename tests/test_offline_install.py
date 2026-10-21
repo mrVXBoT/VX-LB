@@ -195,3 +195,35 @@ def test_update_fast_forwards_and_executes_new_installer(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     assert 'updated-installer-executed' in result.stdout
     assert (checkout / 'data/inventory.json').read_text() == 'precious runtime data'
+
+
+def test_existing_read_only_install_reexecutes_with_sudo(tmp_path):
+    if os.geteuid() == 0:
+        pytest.skip('Permission escalation path applies to ordinary users')
+    kit = tmp_path / 'kit'
+    kit.mkdir()
+    shutil.copy2(ROOT / 'install.sh', kit / 'install.sh')
+    (kit / 'main.py').write_text('# app\n')
+    commands = tmp_path / 'commands'
+    commands.mkdir()
+    sudo = commands / 'sudo'
+    sudo.write_text('#!/bin/sh\nprintf "sudo-reexec:%s\\n" "$*"\n')
+    sudo.chmod(0o755)
+    kit.chmod(0o555)
+    try:
+        env = {**os.environ, 'PATH': f"{commands}:{os.environ['PATH']}",
+               'VX_LB_BIN_DIR': str(tmp_path / 'custom-bin')}
+        result = subprocess.run(['bash', str(kit / 'install.sh'), '--offline', '--no-service'],
+                                env=env, text=True, capture_output=True)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert 'sudo-reexec:env VX_LB_OFFLINE=1' in result.stdout
+        assert f'VX_LB_BIN_DIR={tmp_path}/custom-bin' in result.stdout
+        assert f'bash {kit}/install.sh --offline --no-service' in result.stdout
+        assert not (kit / '.venv').exists()
+        # Check-only mode must not invoke sudo even for a read-only installation.
+        check = subprocess.run(['bash', str(kit / 'install.sh'), '--check'],
+                               env=env, text=True, capture_output=True)
+        assert 'sudo-reexec' not in check.stdout
+        assert check.returncode != 0  # Fixture deliberately has no payload.
+    finally:
+        kit.chmod(0o755)

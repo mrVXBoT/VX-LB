@@ -43,6 +43,14 @@ as_root() {
     else echo "Root or sudo is required for system package installation." >&2; return 1
     fi
 }
+reexec_as_root() {
+    local installer_path="$1"
+    shift
+    as_root env VX_LB_OFFLINE="$OFFLINE_MODE" \
+        VX_LB_BIN_DIR="${VX_LB_BIN_DIR:-}" VX_LB_INSTALL_DIR="$INSTALL_DIR" \
+        bash "$installer_path" "$@"
+}
+
 install_system_packages() {
     if [ "$OFFLINE_MODE" = 1 ] || [ "$CHECK_ONLY" = 1 ]; then
         echo "Python 3 with venv is required. Install OS prerequisites before going offline." >&2
@@ -87,11 +95,22 @@ if [ -z "$DETECTED_DIR" ]; then
     if [ -w "$INSTALL_DIR" ]; then
         exec bash "$INSTALL_DIR/install.sh" "$@"
     fi
-    as_root bash "$INSTALL_DIR/install.sh" "$@"
+    reexec_as_root "$INSTALL_DIR/install.sh" "$@"
     exit $?
 fi
 SCRIPT_DIR="$(cd "$DETECTED_DIR" && pwd)"
 cd "$SCRIPT_DIR"
+
+# A bootstrap rerun may find an installation created by root on the first run.
+# Preflight remains readable without sudo; mutations need the installation owner.
+if [ "$CHECK_ONLY" = 0 ] && { [ ! -w "$SCRIPT_DIR" ] || { [ -d "$SCRIPT_DIR/.venv" ] && [ ! -w "$SCRIPT_DIR/.venv" ]; }; }; then
+    if [ "$EUID" -eq 0 ]; then
+        echo "Installation directory or .venv is not writable: $SCRIPT_DIR" >&2
+        exit 1
+    fi
+    reexec_as_root "$SCRIPT_DIR/install.sh" "$@"
+    exit $?
+fi
 
 if [ "$UPDATE" = 1 ] && [ "${VX_LB_UPDATE_APPLIED:-0}" != 1 ]; then
     if [ ! -d .git ]; then
