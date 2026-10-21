@@ -165,7 +165,7 @@ class CloudflareManager:
         page = 1
         while True:
             params["page"] = str(page)
-            res = self._request("GET", "?" + urllib.parse.urlencode(params), base=CF_API)
+            res = self._request("GET", "/zones?" + urllib.parse.urlencode(params), base=CF_API)
             if not res.get("success"):
                 return {"success": False, "zones": [], "error": _error_message(res, "خواندن Zoneها ناموفق بود")}
             zones.extend(res.get("result", []))
