@@ -72,12 +72,22 @@ install_system_packages() {
 }
 
 DETECTED_DIR=""
+REQUIRED_PAYLOAD=("main.py" "scripts/verify_offline_payload.py" "requirements.txt")
+is_complete_install() {
+    local d="$1"
+    [ -d "$d" ] || return 1
+    local f
+    for f in "${REQUIRED_PAYLOAD[@]}"; do
+        [ -f "$d/$f" ] || return 1
+    done
+    return 0
+}
 if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
     CANDIDATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "$CANDIDATE_DIR/main.py" ]; then DETECTED_DIR="$CANDIDATE_DIR"; fi
+    if is_complete_install "$CANDIDATE_DIR"; then DETECTED_DIR="$CANDIDATE_DIR"; fi
 fi
 INSTALL_DIR="${VX_LB_INSTALL_DIR:-/opt/vx-lb}"
-if [ -z "$DETECTED_DIR" ] && [ -f "$INSTALL_DIR/main.py" ]; then
+if [ -z "$DETECTED_DIR" ] && is_complete_install "$INSTALL_DIR"; then
     DETECTED_DIR="$INSTALL_DIR"
 fi
 
@@ -89,8 +99,18 @@ if [ -z "$DETECTED_DIR" ]; then
     if ! command -v git &>/dev/null || ! command -v python3 &>/dev/null; then
         install_system_packages
     fi
+    if [ -e "$INSTALL_DIR" ] && [ ! -d "$INSTALL_DIR/.git" ]; then
+        # An earlier attempt may have left a partial directory; refuse to
+        # silently overwrite it.
+        echo "$INSTALL_DIR exists but is not a VX-LB checkout. Remove it or set VX_LB_INSTALL_DIR." >&2
+        exit 1
+    fi
     echo "[+] Downloading application and offline payload to $INSTALL_DIR..."
-    as_root git clone https://github.com/mrVXBoT/VX-LB.git "$INSTALL_DIR"
+    if [ -d "$INSTALL_DIR/.git" ]; then
+        as_root git -C "$INSTALL_DIR" fetch --ff-only origin main && as_root git -C "$INSTALL_DIR" reset --hard origin/main
+    else
+        as_root git clone https://github.com/mrVXBoT/VX-LB.git "$INSTALL_DIR"
+    fi
     # Use the downloaded installer, including any newer validation logic.
     if [ -w "$INSTALL_DIR" ]; then
         exec bash "$INSTALL_DIR/install.sh" "$@"
