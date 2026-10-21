@@ -53,3 +53,6 @@ data/*.log
 *~
 .DS_Store
 reference_repos/
+
+# Installer UI development dependencies
+node_modules/

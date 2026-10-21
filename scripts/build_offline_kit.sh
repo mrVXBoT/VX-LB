@@ -33,7 +33,7 @@ PY
 # top-level files. The archive includes the empty data directory only at install.
 TMP="$(mktemp "${OUT}.XXXXXX")"
 trap 'rm -f "$TMP"' EXIT
-tar --exclude='__pycache__' --exclude='*.pyc' \
+tar --exclude='__pycache__' --exclude='*.pyc' --exclude='node_modules' \
     -czf "$TMP" \
     main.py daemon.py vx-lb run.sh install.sh requirements.txt \
     requirements-offline.lock offline-manifest.json \

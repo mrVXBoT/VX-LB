@@ -83,9 +83,16 @@ def test_unknown_depot_architecture_fails():
     assert 'Unsupported depot architectures' in result.stderr
 
 
+def complete_installer_fixture(root):
+    (root / 'scripts').mkdir(exist_ok=True)
+    (root / 'scripts/verify_offline_payload.py').write_text('# fixture\n')
+    (root / 'requirements.txt').write_text('')
+
+
 def test_update_preserves_tracked_changes(tmp_path):
     shutil.copy2(ROOT / 'install.sh', tmp_path / 'install.sh')
     (tmp_path / 'main.py').write_text('# original\n')
+    complete_installer_fixture(tmp_path)
     subprocess.run(['git', 'init', '-q', str(tmp_path)], check=True)
     subprocess.run(['git', '-C', str(tmp_path), 'add', '.'], check=True)
     subprocess.run(['git', '-C', str(tmp_path), '-c', 'user.name=Test', '-c',
@@ -156,7 +163,13 @@ def test_real_install_without_network_or_system_pip(tmp_path):
     assert not (root / 'data').exists()
     assert not (tmp_path / 'commands').exists()
     run('--no-service')  # No --offline flag: automatic offline detection.
-    run('--offline', '--no-service')  # Idempotent reinstall.
+    # Reinstall with no compatible Node runtime: the Bash UI is self-contained.
+    (denied / 'node').write_text('#!/bin/sh\nexit 127\n')
+    (denied / 'node').chmod(0o755)
+    fallback = run('--offline', '--no-service')
+    assert 'VX-LB installed successfully' in fallback.stdout
+    assert 'Installation plan' not in fallback.stdout
+    assert '\x1b' not in fallback.stdout
     result = subprocess.run(['unshare', '-Urn', str(tmp_path / 'commands/vx-lb'), '--list-capabilities'],
                             text=True, capture_output=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -182,6 +195,7 @@ def test_update_fast_forwards_and_executes_new_installer(tmp_path):
         subprocess.run(['git', '-C', str(upstream), 'config', key, value], check=True)
     shutil.copy2(ROOT / 'install.sh', upstream / 'install.sh')
     (upstream / 'main.py').write_text('# app\n')
+    complete_installer_fixture(upstream)
     subprocess.run(['git', '-C', str(upstream), 'add', '.'], check=True)
     subprocess.run(['git', '-C', str(upstream), 'commit', '-qm', 'initial'], check=True)
     checkout = tmp_path / 'checkout'
@@ -204,6 +218,7 @@ def test_existing_read_only_install_reexecutes_with_sudo(tmp_path):
     kit.mkdir()
     shutil.copy2(ROOT / 'install.sh', kit / 'install.sh')
     (kit / 'main.py').write_text('# app\n')
+    complete_installer_fixture(kit)
     commands = tmp_path / 'commands'
     commands.mkdir()
     sudo = commands / 'sudo'

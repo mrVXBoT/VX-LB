@@ -32,6 +32,13 @@ bash <(curl -fsSL https://raw.githubusercontent.com/mrVXBoT/VX-LB/main/install.s
 
 The installer prepares the Python environment, installs the application in `/opt/vx-lb`, and creates the `vx-lb` command. It configures the watchdog service when systemd and the required permissions are available.
 
+The installer shows named stages, a VX-LB `numbers_5` animation, elapsed times,
+and a compact command summary. Detailed command output is saved in a private
+`/tmp/vx-lb-install.*.log` file; failures show the last lines and the full log path.
+Redirected output uses static messages, and `NO_COLOR=1` disables colors.
+A bundled `@poppinss/cliui` renderer is used when a compatible Node.js runtime is
+already available; the Bash interface works without Node or npm, including offline.
+
 To install from a local checkout instead:
 
 ```bash
