@@ -41,6 +41,16 @@ cd VX-LB
 ./run.sh
 ```
 
+Local installation now automatically uses the verified offline payload. For an
+existing installation, rerun `bash /opt/vx-lb/install.sh` without downloads; use
+`--update` explicitly to fetch newer code. `--check` verifies offline readiness
+without installing. Fresh one-line installation still requires internet access.
+
+For installation during an outage, transfer a prebuilt kit and its checksum,
+extract into an empty directory, and run `bash install.sh`. See the
+[offline installation guide](docs/offline-install.md) for supported Python/CPU
+combinations, kit building, recovery, and OS prerequisites.
+
 ## Usage
 
 ```bash

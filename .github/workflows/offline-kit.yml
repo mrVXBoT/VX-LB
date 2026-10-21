@@ -1,0 +1,66 @@
+name: Offline installation
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and verify every dependency target
+        run: bash scripts/build_offline_kit.sh "$RUNNER_TEMP/vxlb-offline.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: offline-kit
+          path: |
+            ${{ runner.temp }}/vxlb-offline.tar.gz
+            ${{ runner.temp }}/vxlb-offline.tar.gz.sha256
+          retention-days: 14
+  install:
+    needs: package
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: offline-kit
+      - uses: docker/setup-qemu-action@v3
+      - name: Pull runtime before disconnecting network
+        run: docker pull --platform linux/${{ matrix.arch }} python:${{ matrix.python }}-slim-bookworm
+      - name: Install twice and launch CLI with no network
+        run: |
+          sha256sum -c vxlb-offline.tar.gz.sha256
+          mkdir payload
+          tar -xzf vxlb-offline.tar.gz -C payload
+          docker run --rm --network none --platform linux/${{ matrix.arch }} \
+            -v "$PWD/payload:/opt/vx-lb" -w /opt/vx-lb \
+            python:${{ matrix.python }}-slim-bookworm \
+            bash -ec 'bash install.sh --check; bash install.sh --no-service; bash install.sh --offline --no-service; .venv/bin/python -m pip check; vx-lb --list-capabilities'
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [package, install]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: offline-kit
+      - name: Attach verified kit to a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" --draft --generate-notes
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = true || { echo "Refusing to replace assets on a published release" >&2; exit 1; }
+          gh release upload "$RELEASE_TAG" vxlb-offline.tar.gz vxlb-offline.tar.gz.sha256 --clobber

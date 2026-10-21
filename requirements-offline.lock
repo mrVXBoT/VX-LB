@@ -1,0 +1,20 @@
+# Exact versions used by the offline kit. Refresh explicitly, then rebuild wheels.
+annotated-types==0.8.0
+bcrypt==5.0.0
+cffi==2.1.1
+cryptography==50.0.2
+invoke==3.0.3
+markdown-it-py==4.2.0
+mdurl==0.1.2
+paramiko==5.1.0
+pycparser==3.11
+pydantic==2.14.1
+pydantic-core==2.50.1
+pygments==2.21.0
+pynacl==1.6.2
+pyyaml==6.0.3
+qrcode==8.2
+rich==15.0.0
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+pip==26.0.1

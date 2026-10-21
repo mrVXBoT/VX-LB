@@ -1,21 +1,12 @@
 #!/usr/bin/env python3
 """Verify the local offline binary depot against the pinned manifest."""
 import os
-import platform
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from core.dependency_manifest import PLATFORM_DEPENDENCIES, verify_file_sha256
-
-ALIASES = {
-    "slipstream": ("slipstream-client",),
-    "slipstream-server": ("slipstream-server",),
-    "waterwall": ("Waterwall",),
-    "paqet": ("paqet",),
-    "backpack": ("backpack",),
-}
 
 DEPOT_ENGINES = (
     "backpack", "waterwall", "paqet", "slipstream", "slipstream-server",
@@ -41,12 +32,16 @@ ALIASES = {
 def main() -> int:
     failures = []
     required_archs = sys.argv[1:] or ["x86_64"]
+    unknown = set(required_archs) - {'x86_64', 'aarch64'}
+    if unknown:
+        print(f"Unsupported depot architectures: {', '.join(sorted(unknown))}", file=sys.stderr)
+        return 1
     for name in DEPOT_ENGINES:
         manifest = PLATFORM_DEPENDENCIES[name]
         for arch in required_archs:
             info = manifest.architectures.get(arch)
             if info is None:
-                print(f"-- {name}/{arch}: no manifest entry, skipping")
+                failures.append(f"missing manifest entry {name}/{arch}")
                 continue
             expected = info.get("sha256")
             candidates = ALIASES.get(name, (manifest.executable_name,))
