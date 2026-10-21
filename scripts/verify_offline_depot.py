@@ -19,7 +19,7 @@ ALIASES = {
 
 DEPOT_ENGINES = (
     "backpack", "waterwall", "paqet", "slipstream", "slipstream-server",
-    "xray", "trusttunnel", "backhaul", "frp", "rathole", "gost", "hysteria2",
+    "xray", "trusttunnel", "backhaul", "frp", "frpc", "rathole", "gost", "hysteria2",
 )
 ALIASES = {
     "slipstream": ("slipstream-client",),
@@ -31,6 +31,7 @@ ALIASES = {
     "trusttunnel": ("trusttunnel",),
     "backhaul": ("backhaul",),
     "frp": ("frps",),
+    "frpc": ("frpc",),
     "rathole": ("rathole",),
     "gost": ("gost",),
     "hysteria2": ("hysteria",),

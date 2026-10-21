@@ -173,6 +173,28 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
             }
         }
     ),
+    "frpc": BinaryManifest(
+        name="FRP client",
+        engine_id="frp",
+        pinned_version="v0.61.0",
+        license_spdx="Apache-2.0",
+        executable_name="frpc",
+        required_capabilities=[],
+        architectures={
+            "x86_64": {
+                "sha256": "0007a720afc328a15e5b30c093c81cc63d6b6a4aa418f57d3677855393c30103",
+                "source_url": "https://github.com/fatedier/frp/releases/download/v0.61.0/frp_0.61.0_linux_amd64.tar.gz",
+                "archive_type": "tar.gz", "archive_member": "frpc",
+                "is_verified": True
+            },
+            "aarch64": {
+                "sha256": "5a8b0d748263d9879439b5c8c8010095572cfb9a280300edbf130280a32415a4",
+                "source_url": "https://github.com/fatedier/frp/releases/download/v0.61.0/frp_0.61.0_linux_arm64.tar.gz",
+                "archive_type": "tar.gz", "archive_member": "frpc",
+                "is_verified": True
+            }
+        }
+    ),
     "frp": BinaryManifest(
         name="FRP",
         engine_id="frp",

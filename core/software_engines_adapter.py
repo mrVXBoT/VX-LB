@@ -69,10 +69,12 @@ class SoftwareEngineBaseAdapter(BaseTunnelAdapter):
         self.config_ext = config_ext
 
     def install(self, ssh: SSHManager, role: str, config: dict) -> Tuple[bool, str]:
-        cmd = f"which {self.binary_name} || test -f /usr/local/bin/{self.binary_name}"
+        # FRP uses role-specific binaries: frpc on iran/client, frps on kharej/server.
+        binary_name = "frpc" if (self.binary_name == "frps" and role == "iran") else self.binary_name
+        cmd = f"which {binary_name} || test -f /usr/local/bin/{binary_name}"
         ok, out, _ = ssh.execute(cmd)
         if ok == 0:
-            return True, f"{self.binary_name} verified at {out.strip()}"
+            return True, f"{binary_name} verified at {out.strip()}"
 
         # Air-gapped fallback: check local bundled bin/
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -81,20 +83,20 @@ class SoftwareEngineBaseAdapter(BaseTunnelAdapter):
         arch_dir = "x86_64" if ("x86_64" in remote_arch or "amd64" in remote_arch) else ("aarch64" if ("aarch64" in remote_arch or "arm64" in remote_arch) else remote_arch)
 
         candidate_paths = [
-            os.path.join(base_dir, "bin", arch_dir, self.binary_name),
-            os.path.join(base_dir, "bin", self.binary_name),
-            os.path.join(base_dir, "data", "binaries", arch_dir, self.binary_name),
-            os.path.join(base_dir, "data", "binaries", self.binary_name),
+            os.path.join(base_dir, "bin", arch_dir, binary_name),
+            os.path.join(base_dir, "bin", binary_name),
+            os.path.join(base_dir, "data", "binaries", arch_dir, binary_name),
+            os.path.join(base_dir, "data", "binaries", binary_name),
         ]
         for candidate in candidate_paths:
             if os.path.exists(candidate) and os.path.isfile(candidate):
-                uploaded = ssh.upload_binary(candidate, f"/usr/local/bin/{self.binary_name}", mode=0o755)
+                uploaded = ssh.upload_binary(candidate, f"/usr/local/bin/{binary_name}", mode=0o755)
                 if uploaded:
-                    c, o, _ = ssh.execute(f"which {self.binary_name} || test -f /usr/local/bin/{self.binary_name}")
+                    c, o, _ = ssh.execute(f"which {binary_name} || test -f /usr/local/bin/{binary_name}")
                     if c == 0:
-                        return True, f"{self.binary_name} installed from local bundled binary (Air-gapped / Offline)"
+                        return True, f"{binary_name} installed from local bundled binary (Air-gapped / Offline)"
 
-        return False, f"Binary '{self.binary_name}' not found on host or local bin/ depot."
+        return False, f"Binary '{binary_name}' not found on host or local bin/ depot."
 
     def start(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
         svc = identifier if identifier.endswith(".service") else f"vxlb-{self.engine_id}-{identifier}.service"
