@@ -40,6 +40,7 @@ const context = vm.createContext({
 vm.runInContext(fs.readFileSync(path.join(root, 'web/copy.fa.js'), 'utf8'), context);
 vm.runInContext(fs.readFileSync(path.join(root, 'web/app.js'), 'utf8'), context);
 const run = code => vm.runInContext(code, context);
+const originalApiFetch = context.apiFetch;
 (async () => {
   run(`updateHeroMetrics({pools: [], daemon_running: false})`);
   assert.equal(element('healthy-count').textContent, '0');
@@ -476,6 +477,36 @@ console.log('PASS: topology details and single zoom handler after refresh');
   const topoHtml = fs.readFileSync(path.join(root,'web/topology.html'),'utf8');
   assert.doesNotMatch(topoHtml, /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u, 'topology must not embed emoji');
   console.log('PASS: topology has no emoji');
+
+  // A successful profile response must render cards, zones and record tooltips.
+  context.apiFetch = originalApiFetch;
+  const cfToasts = [];
+  const savedCfToast = context.showToast;
+  context.showToast = message => cfToasts.push(message);
+  context.fetch = async url => {
+    let payload;
+    if (url === '/api/cloudflare/profiles') {
+      payload = {profiles:[1,2,3].map(i=>({id:'cf-'+i,label:'Profile '+i,enabled:true,token_hint:'••••1234',last_validated_at:'2026-10-22T00:00:00Z',zone_count:1}))};
+    } else if (url.endsWith('/zones')) {
+      payload = {zones:[{id:'zone-one',name:'example.test',status:'active'}]};
+    } else {
+      payload = {records:[{id:'record-one',type:'TXT',name:'example.test',content:'quoted "value" <test>',ttl:1,proxied:false}]};
+    }
+    return {status:200,ok:true,json:async()=>payload};
+  };
+  await run('cfLoadProfiles()');
+  assert.doesNotThrow(()=>run('renderCfProfiles()'));
+  assert.equal(element('cf-profile-count-badge').textContent,'3');
+  assert.match(element('cf-profiles-list').innerHTML,/Profile 3/);
+  assert.match(element('cf-profiles-list').innerHTML,/onclick="cfSelectProfile\(this.dataset.profile\)"/);
+  await run(`cfSelectProfile('cf-1')`);
+  assert.match(element('cf-zones-list').innerHTML,/example.test/);
+  assert.match(element('cf-zones-list').innerHTML,/cfSelectZone\(this.dataset.zone,this.dataset.name\)/);
+  await run(`cfSelectZone('zone-one','example.test')`);
+  assert.match(element('cf-records-table-wrap').innerHTML,/quoted &quot;value&quot; &lt;test&gt;/);
+  assert.deepEqual(cfToasts,[],'rendering failures must not masquerade as profile fetch errors');
+  context.showToast = savedCfToast;
+  console.log('PASS: Cloudflare profiles, zones and DNS records render through the request flow');
 
   // 7.12: app.js user-facing strings contain no pictographic emoji.
   const appSrc = fs.readFileSync(path.join(root,'web/app.js'),'utf8');

@@ -3091,10 +3091,10 @@ function renderCfProfiles() {
         ${p.enabled ? '' : '<span class="cf-off-tag">غیرفعال</span>'}
       </div>
       <div class="cf-profile-actions">
-        <button type="button" class="btn-secondary sm" onclick="cfSelectProfile('${escAttr(p.id)}')"><span>Zoneها</span></button>
-        <button type="button" class="btn-secondary sm" onclick="openCfProfileEditModal('${escAttr(p.id)}')"><span>ویرایش</span></button>
-        <button type="button" class="btn-secondary sm" onclick="cfToggleProfile('${escAttr(p.id)}', ${!p.enabled})"><span>${p.enabled ? 'غیرفعال' : 'فعال'}</span></button>
-        <button type="button" class="btn-danger sm" onclick="cfDeleteProfile('${escAttr(p.id)}')"><span>حذف</span></button>
+        <button type="button" class="btn-secondary sm" data-profile="${escapeHtml(p.id)}" onclick="cfSelectProfile(this.dataset.profile)"><span>Zoneها</span></button>
+        <button type="button" class="btn-secondary sm" data-profile="${escapeHtml(p.id)}" onclick="openCfProfileEditModal(this.dataset.profile)"><span>ویرایش</span></button>
+        <button type="button" class="btn-secondary sm" data-profile="${escapeHtml(p.id)}" onclick="cfToggleProfile(this.dataset.profile, ${!p.enabled})"><span>${p.enabled ? 'غیرفعال' : 'فعال'}</span></button>
+        <button type="button" class="btn-danger sm" data-profile="${escapeHtml(p.id)}" onclick="cfDeleteProfile(this.dataset.profile)"><span>حذف</span></button>
       </div>
     </div>`).join("");
 }
@@ -3137,7 +3137,7 @@ function renderCfZones() {
     return;
   }
   list.innerHTML = cfZones.map(z => `
-    <button type="button" class="cf-zone-chip ${z.id === cfSelectedZone ? 'active' : ''}" onclick="cfSelectZone('${escAttr(z.id)}','${escAttr(z.name)}')">
+    <button type="button" class="cf-zone-chip ${z.id === cfSelectedZone ? 'active' : ''}" data-zone="${escapeHtml(z.id)}" data-name="${escapeHtml(z.name)}" onclick="cfSelectZone(this.dataset.zone,this.dataset.name)">
       <span class="cf-status-dot ${z.status === 'active' ? 'on' : 'off'}"></span>
       <span class="cf-zone-name" dir="ltr">${escapeHtml(z.name)}</span>
       <span class="cf-zone-status">${escapeHtml(z.status || '')}</span>
@@ -3199,7 +3199,7 @@ function cfRenderRecords() {
       <tr>
         <td class="cf-cell-name" dir="ltr">${escapeHtml(r.name)}</td>
         <td><span class="cf-type-tag">${escapeHtml(r.type)}</span></td>
-        <td class="cf-cell-content" dir="ltr" title="${escAttr(cfRecordContent(r))}">${escapeHtml(cfRecordContent(r))}</td>
+        <td class="cf-cell-content" dir="ltr" title="${escapeHtml(cfRecordContent(r))}">${escapeHtml(cfRecordContent(r))}</td>
         <td dir="ltr">${r.ttl === 1 ? 'Auto' : new Intl.NumberFormat('en-US').format(r.ttl)}</td>
         <td>${r.proxied ? '<span class="cf-proxied on">Proxied</span>' : '<span class="cf-proxied">DNS only</span>'}</td>
         <td class="cf-cell-actions">
