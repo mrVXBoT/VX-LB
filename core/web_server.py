@@ -1304,10 +1304,11 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 p = data.get("pools", {}).get(name)
                 if not p:
                     return
-                # Clear transport_change if completed or rolled_back
+                # Dismiss terminal messages, including failed preflight/connection attempts.
+                # rollback_failed retains its separate recovery/abandon workflow.
                 if kind in ("transport", "all"):
                     tc = p.get("transport_change")
-                    if tc and tc.get("status") in ("succeeded", "rolled_back", "abandoned"):
+                    if tc and tc.get("status") in ("succeeded", "failed", "rolled_back", "abandoned"):
                         p.pop("transport_change", None)
                 # Clear node_removals
                 if kind in ("removal", "all"):

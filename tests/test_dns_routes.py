@@ -58,6 +58,28 @@ class DnsRouteApiTests(unittest.TestCase):
             self.assertEqual(self.request('POST', '/api/pools/remove_node', body)[0], 400)
         start.assert_not_called()
 
+    def test_failed_transport_message_is_actually_removed(self):
+        self.data['pools']['A']['nodes'] = []
+        self.data['pools']['A']['transport_change'] = {'status': 'failed', 'message': 'SSH unavailable'}
+        status, body, _ = self.request('POST', '/api/pools/clear-operation', {'pool': 'A', 'kind': 'transport'})
+        self.assertEqual(status, 200)
+        self.assertTrue(body['success'])
+        self.assertNotIn('transport_change', self.data['pools']['A'])
+
+    def test_clear_all_removes_failed_transport_message(self):
+        self.data['pools']['A']['transport_change'] = {'status': 'failed'}
+        self.assertEqual(self.request('POST', '/api/pools/clear-operation', {'pool': 'A', 'kind': 'all'})[0], 200)
+        self.assertNotIn('transport_change', self.data['pools']['A'])
+
+    def test_clear_operation_preserves_active_and_rollback_failed_jobs(self):
+        for job_status in ('changing', 'rolling_back', 'rollback_failed'):
+            with self.subTest(status=job_status):
+                self.data['pools']['A']['transport_change'] = {'status': job_status}
+                status, body, _ = self.request('POST', '/api/pools/clear-operation', {'pool': 'A', 'kind': 'transport'})
+                self.assertEqual(status, 409)
+                self.assertNotIn('success', body)
+                self.assertEqual(self.data['pools']['A']['transport_change']['status'], job_status)
+
     def test_all_subdomains_preview_is_read_only_and_requires_auth(self):
         self.manager.subdomain_records.return_value = {'success':True,'names':['ssh.example.test'],'records':[{'name':'ssh.example.test','content':'192.0.2.1','id':'private'}]}
         body={'api_token':'test','zone_id':'zone','subdomain':'example.test'}

@@ -130,6 +130,23 @@ const run = code => vm.runInContext(code, context);
   context.confirmDialog = previousConfirm;
   context.showToast = previousToast;
   context.fetchStatus = previousRefresh;
+  // Dismissing a failed transport message refreshes immediately, even with focus.
+  const dismissState = {pools:[{name:'one',nodes:[],transport_change:{status:'failed',message:'SSH unavailable'}}]};
+  context.fetch = async (url, options) => {
+    if (url === '/api/pools/clear-operation') {
+      assert.equal(JSON.parse(options.body).kind,'transport');
+      delete dismissState.pools[0].transport_change;
+      return {status:200,ok:true,json:async()=>({success:true,message:'cleared'})};
+    }
+    return {status:200,ok:true,json:async()=>dismissState};
+  };
+  context.dismissState = dismissState;
+  run(`renderPools(dismissState.pools)`);
+  assert.match(element('pools-container').innerHTML,/data-status="failed"/);
+  element('pools-container').contains = () => true;
+  await run(`clearPoolOperation('one','transport','',null)`);
+  assert.doesNotMatch(element('pools-container').innerHTML,/data-status="failed"/);
+  element('pools-container').contains = () => false;
   // Creation and pool jobs must lock mutations and remain visible after refresh.
   assert.equal(run(`poolIsBusy({creation_job:{status:'queued'}})`), true);
   assert.equal(run(`poolIsBusy({operation_task:{status:'running'}})`), true);
