@@ -87,9 +87,6 @@ if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
     if is_complete_install "$CANDIDATE_DIR"; then DETECTED_DIR="$CANDIDATE_DIR"; fi
 fi
 INSTALL_DIR="${VX_LB_INSTALL_DIR:-/opt/vx-lb}"
-if [ -z "$DETECTED_DIR" ] && is_complete_install "$INSTALL_DIR"; then
-    DETECTED_DIR="$INSTALL_DIR"
-fi
 
 if [ -z "$DETECTED_DIR" ]; then
     if [ "$OFFLINE_MODE" = 1 ] || [ "$CHECK_ONLY" = 1 ]; then
@@ -231,7 +228,8 @@ from pathlib import Path
 import sys
 root = Path(sys.argv[1])
 template = (root / sys.argv[2]).read_text()
-Path(sys.argv[3]).write_text(template.replace("%WORKING_DIR%", str(root)))
+out = template.replace('"%WORKING_DIR%"', str(root)).replace("%WORKING_DIR%", str(root))
+Path(sys.argv[3]).write_text(out)
 PY
     if [ "$CAN_INSTALL_SERVICE" -eq 1 ]; then
         cp "$tmp" "$target"
