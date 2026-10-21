@@ -43,6 +43,21 @@ class DnsRouteApiTests(unittest.TestCase):
         self.data['pools']['A']['node_removals'] = {'192.0.2.1':job}
         self.assertEqual(self.request('POST','/api/pools/remove_node',{'pool':'A','iran_ip':'192.0.2.1'})[0],409)
 
+    def test_explicit_inventory_removal_is_forwarded_to_worker(self):
+        with patch.object(web, 'start_node_removal', return_value=(True, {'status': 'queued'})) as start:
+            status, _, _ = self.request('POST', '/api/pools/remove_node', {
+                'pool': 'A', 'iran_ip': '192.0.2.1', 'forget': True})
+        self.assertEqual(status, 202)
+        start.assert_called_once_with('A', '192.0.2.1', forget=True)
+
+    def test_inventory_removal_requires_auth_and_a_real_boolean(self):
+        with patch.object(web, 'start_node_removal') as start:
+            body = {'pool': 'A', 'iran_ip': '192.0.2.1', 'forget': True}
+            self.assertEqual(self.request('POST', '/api/pools/remove_node', body, auth=False)[0], 401)
+            body['forget'] = 'false'
+            self.assertEqual(self.request('POST', '/api/pools/remove_node', body)[0], 400)
+        start.assert_not_called()
+
     def test_all_subdomains_preview_is_read_only_and_requires_auth(self):
         self.manager.subdomain_records.return_value = {'success':True,'names':['ssh.example.test'],'records':[{'name':'ssh.example.test','content':'192.0.2.1','id':'private'}]}
         body={'api_token':'test','zone_id':'zone','subdomain':'example.test'}

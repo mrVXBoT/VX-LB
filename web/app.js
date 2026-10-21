@@ -598,7 +598,7 @@ function poolIsBusy(pool) {
 }
 function operationMarkup(pool, job, kind) {
   const active = ['queued','running','preflight','changing','validating','rolling_back'].includes(job.status);
-  const failed = ['failed','rollback_failed'].includes(job.status);
+  const failed = ['failed','rollback_failed'].includes(job.status) || job.cleanup_pending === true;
   const targetId = kind === 'transport' ? '' : (job.ip || '');
   const description = kind === 'task' ? `<span>${job.kind === 'delete' ? 'حذف سرویس‌ها و منابع استخر' : job.kind === 'slipstream_settings' ? 'تغییر دامنه، resolver یا QPS تونل DNS' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS و بررسی انتقال داده' : 'تغییر پورت‌های استخر'}</span>` : kind === 'creation' ? '<span>راه‌اندازی سرورها و تونل‌های استخر</span>' : kind === 'gre' ? '<span>تنظیمات لینک خصوصی و فوروارد پورت</span>' : kind === 'transport' ? `<span class="operation-route" dir="rtl">از <bdi dir="ltr">${escapeHtml(job.from)}</bdi> به <bdi dir="ltr">${escapeHtml(job.to)}</bdi><small style="color:var(--text-muted);font-size:10px;"> · ${faNumber.format(job.completed || 0)} از ${faNumber.format(job.total || 0)} نود</small></span>` : `<span class="op-ip-pill"><bdi dir="ltr">${escapeHtml(job.ip)}</bdi></span>`;
   const clearBtn = !active && job.status !== 'rollback_failed' ? `<button type="button" class="op-dismiss-btn" data-pool="${escapeHtml(pool.name)}" data-kind="${escapeHtml(kind)}" data-id="${escapeHtml(targetId)}" onclick="clearPoolOperation(this.dataset.pool, this.dataset.kind, this.dataset.id, this)" title="پاک کردن این پیام" aria-label="پاک کردن پیام">${uiIcon("close")}</button>` : '';
@@ -627,6 +627,7 @@ function operationMarkup(pool, job, kind) {
       ${job.message ? `<p class="op-msg">${escapeHtml(withoutEmoji(job.message || ''))}</p>` : ''}
       ${stageBar}
     </div>
+    ${kind === 'removal' && job.status === 'failed' && (pool.nodes || []).some(n => n.ip === job.ip) ? `<button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" data-ip="${escapeHtml(job.ip)}" onclick="removeNodeFromPool(this.dataset.pool,this.dataset.ip,this,true)" ${poolIsBusy(pool) ? 'disabled' : ''}>حذف از پنل بدون پاک‌سازی</button>` : ''}
     ${job.error ? `<details class="operation-error"><summary>جزئیات خطا</summary><pre dir="auto">${escapeHtml(withoutEmoji(job.error))}</pre></details>` : ''}
     ${job.status === 'rollback_failed' && kind === 'gre' ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="recoverGreSettings(this.dataset.pool,this)">بازگردانی تنظیمات ${job.kind === 'slipstream_runtime' ? 'Slipstream' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS' : job.kind === 'relay_ports' ? 'پورت‌ها' : 'GRE'}</button>` : ''}${job.status === 'rollback_failed' && kind !== 'gre' ? `<div class="operation-actions"><button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="retryTransportRollback(this.dataset.pool,this)">تلاش دوباره برای بازگردانی</button><button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" onclick="abandonTransportChange(this.dataset.pool,this)">رها کردن عملیات شکست‌خورده</button></div>` : ''}
   </div>`;
@@ -636,8 +637,8 @@ function renderPoolOperations(pool) {
     ...Object.values(pool.node_additions || {}).map(job => [job,'addition']),
     ...(pool.transport_change ? [[pool.transport_change,'transport']] : []),
     ...(pool.gre_update ? [[pool.gre_update,'gre']] : [])];
-  const finished = jobs.filter(([job]) => ['succeeded','rolled_back','abandoned'].includes(job.status));
-  const attention = jobs.filter(([job]) => ['failed','rollback_failed'].includes(job.status));
+  const finished = jobs.filter(([job]) => ['succeeded','rolled_back','abandoned'].includes(job.status) && !job.cleanup_pending);
+  const attention = jobs.filter(([job]) => ['failed','rollback_failed'].includes(job.status) || job.cleanup_pending);
   // Pending additions have their own server row. Other active work is grouped here.
   const active = jobs.filter(([job,kind]) => kind !== 'addition' && ['queued','running','preflight','changing','validating','rolling_back'].includes(job.status));
   return active.map(([job,kind]) => operationMarkup(pool,job,kind)).join('') + attention.map(([job,kind]) => operationMarkup(pool,job,kind)).join('') +
@@ -1464,15 +1465,18 @@ async function abandonTransportChange(poolName, button) {
   finally { button.disabled = false; }
 }
 
-async function removeNodeFromPool(poolName, iranIp, button) {
-  if (!await confirmDialog(`آیا از جدا کردن سرور ${iranIp} از استخر ${poolName} اطمینان دارید؟`, { title: 'جدا کردن نود', confirmText: 'جدا کردن' })) return;
+async function removeNodeFromPool(poolName, iranIp, button, forget = false) {
+  const message = forget
+    ? `نود ${iranIp} فقط از پنل حذف شود؟ به سرورها متصل نمی‌شویم. سرویس‌ها و رکوردهای DNS ممکن است باقی بمانند و پاک‌سازی آن‌ها نیاز به بررسی جداگانه دارد.`
+    : `آیا از جدا کردن سرور ${iranIp} از استخر ${poolName} اطمینان دارید؟`;
+  if (!await confirmDialog(message, { title: forget ? 'حذف از پنل بدون پاک‌سازی' : 'جدا کردن نود', confirmText: forget ? 'فقط از پنل حذف شود' : 'جدا کردن' })) return;
   if (button) { button.disabled = true; button.setAttribute("aria-busy", "true"); }
   showToast(`در حال ثبت حذف نود ${iranIp}...`);
 
   try {
     const res = await apiFetch("/api/pools/remove_node", {
       method: "POST",
-      body: { pool: poolName, iran_ip: iranIp }
+      body: { pool: poolName, iran_ip: iranIp, ...(forget ? {forget: true} : {}) }
     });
     if (res.success) {
       showToast("حذف شروع شد؛ مراحل و نتیجه در کارت استخر نمایش داده می‌شود");

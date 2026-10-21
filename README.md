@@ -67,6 +67,12 @@ vx-lb --web                    # Start the dashboard in the background
 sudo systemctl status vx-lb-watchdog
 ```
 
+If node cleanup fails because a server was decommissioned, the failed removal
+shows **حذف از پنل بدون پاک‌سازی** (remove from the panel without cleanup). After
+confirmation this removes pool membership without SSH or DNS changes. Unverified
+cleanup details are retained server-side under `pending_node_cleanup`; remote
+services, DNS records and resource reservations still require separate review.
+
 The dashboard normally listens on `127.0.0.1:8088`. For remote access, forward the port over SSH:
 
 ```bash

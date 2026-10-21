@@ -99,6 +99,37 @@ const run = code => vm.runInContext(code, context);
   assert.match(element('pools-container').innerHTML, /data-status="succeeded"/);
   assert.doesNotMatch(element('pools-container').innerHTML, /node-del-btn/);
   element('pools-container').contains = () => false;
+  // Offline-node removal is an explicit action after failed cleanup.
+  run(`renderPools([{name:'one',nodes:[{ip:'192.0.2.1'}],node_removals:{a:{ip:'192.0.2.1',status:'failed',message:'SSH unavailable'}}}])`);
+  assert.match(element('pools-container').innerHTML, /حذف از پنل بدون پاک‌سازی/);
+  assert.match(element('pools-container').innerHTML, /removeNodeFromPool\(this.dataset.pool,this.dataset.ip,this,true\)/);
+  run(`renderPools([{name:'one',nodes:[],node_removals:{a:{ip:'192.0.2.1',status:'succeeded',cleanup_pending:true,message:'پاک‌سازی تأیید نشده'}}}])`);
+  assert.match(element('pools-container').innerHTML, /is-failed/);
+  assert.doesNotMatch(element('pools-container').innerHTML, /operation-history/);
+  const previousConfirm = context.confirmDialog;
+  const previousToast = context.showToast;
+  const previousRefresh = context.fetchStatus;
+  const removalRequests = [];
+  context.confirmDialog = async () => false;
+  context.fetch = async (url, options) => {
+    removalRequests.push({url, body:JSON.parse(options.body)});
+    return {status:202,ok:true,json:async()=>({success:true})};
+  };
+  context.showToast = () => {};
+  context.fetchStatus = async () => {};
+  await run(`removeNodeFromPool('one','192.0.2.1',null,true)`);
+  assert.equal(removalRequests.length,0,'cancelling must not submit a deletion');
+  context.confirmDialog = async message => {
+    assert.match(message,/متصل نمی‌شویم/);
+    assert.match(message,/DNS/);
+    return true;
+  };
+  await run(`removeNodeFromPool('one','192.0.2.1',null,true)`);
+  assert.equal(removalRequests[0].body.forget,true);
+  assert.equal(removalRequests[0].body.iran_ip,'192.0.2.1');
+  context.confirmDialog = previousConfirm;
+  context.showToast = previousToast;
+  context.fetchStatus = previousRefresh;
   // Creation and pool jobs must lock mutations and remain visible after refresh.
   assert.equal(run(`poolIsBusy({creation_job:{status:'queued'}})`), true);
   assert.equal(run(`poolIsBusy({operation_task:{status:'running'}})`), true);

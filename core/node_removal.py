@@ -14,33 +14,38 @@ def update(pool, ip, **fields):
         jobs[ip].update(fields, updated_at=time.strftime('%Y-%m-%d %H:%M:%S'))
     atomic_update(write)
 
-def start(pool, ip, force=False):
+def start(pool, ip, force=False, forget=False):
     data = load_data()
     if busy(data): return False, 'عملیات دیگری در جریان است یا نیاز به رسیدگی دارد'
     entry = data.get('pools', {}).get(pool)
     if not entry or not any(n['ip'] == ip for n in entry.get('nodes', [])):
         return False, 'نود در این استخر یافت نشد'
-    job = {'id': uuid.uuid4().hex, 'status':'queued', 'message':'حذف در صف اجرا است', 'ip':ip, 'force': force}
+    job = {'id': uuid.uuid4().hex, 'status':'queued', 'message':'حذف در صف اجرا است', 'ip':ip, 'force': force, 'forget': forget}
     def write(data): data['pools'][pool].setdefault('node_removals', {})[ip] = job
     atomic_update(write)
     try:
-        threading.Thread(target=run, args=(pool, ip, force), daemon=True).start()
+        threading.Thread(target=run, args=(pool, ip, force, forget), daemon=True).start()
     except Exception:
         update(pool, ip, status='failed', message='اجرای حذف شروع نشد؛ دوباره تلاش کنید')
         return False, 'اجرای حذف شروع نشد؛ دوباره تلاش کنید'
     return True, job
 
-def run(pool, ip, force=False):
+def run(pool, ip, force=False, forget=False):
     with mutation_lock():
         try:
             update(pool, ip, status='running', message='در حال آماده‌سازی حذف نود')
             messages = {'Tearing down tunnel from Kharej server...':'در حال حذف تانل سمت خارج',
                         'Tearing down tunnel from Iran server...':'در حال حذف تانل سمت ایران'}
-            try:
-                ok, message = LoadBalancerManager.remove_node(pool, ip, callback=lambda m:update(pool, ip, message=messages.get(m,m)), force=force)
-            except TypeError:
-                ok, message = LoadBalancerManager.remove_node(pool, ip, callback=lambda m:update(pool, ip, message=messages.get(m,m)))
-            update(pool, ip, status='succeeded' if ok else 'failed', message='نود از استخر حذف شد' if ok else message)
+            if forget:
+                ok, message = LoadBalancerManager.forget_node(pool, ip)
+            else:
+                try:
+                    ok, message = LoadBalancerManager.remove_node(pool, ip, callback=lambda m:update(pool, ip, message=messages.get(m,m)), force=force)
+                except TypeError:
+                    ok, message = LoadBalancerManager.remove_node(pool, ip, callback=lambda m:update(pool, ip, message=messages.get(m,m)))
+            update(pool, ip, status='succeeded' if ok else 'failed',
+                   cleanup_pending=bool(ok and forget),
+                   message=message if forget or not ok else 'نود از استخر حذف شد')
         except Exception as error:
             update(pool, ip, status='failed', message='حذف کامل نشد: '+str(error))
 

@@ -1036,7 +1036,13 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             if not pool_name or not iran_ip:
                 return self._send_json({"error": "نام استخر و آی‌پی سرور ایران الزامی است"}, 400)
 
-            ok, msg = start_node_removal(pool_name, iran_ip, force=force)
+            forget = body.get("forget", False)
+            if not isinstance(forget, bool):
+                return self._send_json({"error": "گزینهٔ حذف از پنل باید boolean باشد"}, 400)
+            if forget:
+                ok, msg = start_node_removal(pool_name, iran_ip, forget=True)
+            else:
+                ok, msg = start_node_removal(pool_name, iran_ip, force=force)
             if ok:
                 return self._send_json({"success": True, "job": msg}, 202)
             else:

@@ -23,6 +23,7 @@ class NodeRemovalTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(job['status'], 'queued')
         self.assertFalse(node_removal.start('one', '192.0.2.1')[0])
+        self.assertFalse(node_removal.start('one', '192.0.2.1', forget=True)[0])
         def remove(pool, ip, callback):
             callback('Tearing down tunnel from Iran server...')
             self.assertEqual(self.data['pools']['one']['node_removals'][ip]['status'], 'running')
@@ -44,3 +45,43 @@ class NodeRemovalTests(unittest.TestCase):
         node_removal.recover()
         self.assertEqual(job['status'], 'failed')
         self.assertEqual(len(self.data['pools']['one']['nodes']), 1)
+
+    def test_failed_cleanup_can_be_followed_by_explicit_inventory_removal(self):
+        self.data['pools']['one']['nodes'][0]['password'] = 'fixture-private'
+        self.data['pools']['one']['engine'] = 'wireguard'
+        self.data['pools']['one']['kharej_server'] = {'ip': '198.51.100.1'}
+        self.data['resource_reservations'] = {'keep-unverified': {'port': 443}}
+        self.data['node_telemetry'] = {'one:192.0.2.1': {'status': 'DOWN'}}
+        _, failed = node_removal.start('one', '192.0.2.1')
+        with patch.object(node_removal.LoadBalancerManager, 'remove_node', return_value=(False, 'SSH unavailable')):
+            node_removal.run('one', '192.0.2.1')
+        self.assertEqual(failed['status'], 'failed')
+        self.assertEqual(len(self.data['pools']['one']['nodes']), 1)
+        ok, job = node_removal.start('one', '192.0.2.1', forget=True)
+        self.assertTrue(ok)
+        with patch('core.load_balancer.atomic_update', side_effect=lambda fn: fn(self.data)), \
+             patch('core.load_balancer.SSHManager') as ssh, \
+             patch('core.load_balancer.stop_and_remove_tunnel') as cleanup:
+            node_removal.run('one', '192.0.2.1', forget=True)
+        ssh.assert_not_called()
+        cleanup.assert_not_called()
+        self.assertEqual(self.data['pools']['one']['nodes'], [])
+        self.assertEqual(job['status'], 'succeeded')
+        self.assertTrue(job['cleanup_pending'])
+        self.assertIn('تأیید نشده', job['message'])
+        self.assertNotIn('fixture-private', str(job))
+        pending = next(iter(self.data['pending_node_cleanup'].values()))
+        self.assertEqual(pending['node']['password'], 'fixture-private')
+        self.assertEqual(pending['engine'], 'wireguard')
+        self.assertEqual(self.data['resource_reservations']['keep-unverified']['port'], 443)
+        self.assertNotIn('one:192.0.2.1', self.data['node_telemetry'])
+
+    def test_forget_preserves_other_members_and_rejects_missing_node(self):
+        from core.load_balancer import LoadBalancerManager
+        other = {'ip': '192.0.2.2'}
+        self.data['pools']['one']['nodes'].append(other)
+        with patch('core.load_balancer.atomic_update', side_effect=lambda fn: fn(self.data)):
+            self.assertTrue(LoadBalancerManager.forget_node('one', '192.0.2.1')[0])
+            self.assertEqual(self.data['pools']['one']['nodes'], [other])
+            self.assertFalse(LoadBalancerManager.forget_node('one', '192.0.2.1')[0])
+        self.assertEqual(len(self.data['pending_node_cleanup']), 1)

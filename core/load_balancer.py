@@ -1,4 +1,6 @@
 import time
+import copy
+import uuid
 from typing import Dict, List, Tuple, Callable, Optional
 from core.ssh_client import SSHManager
 from core.tunnel import (
@@ -502,6 +504,39 @@ class LoadBalancerManager:
             data['pools'][pool_name]['nodes'].append(new_node)
         atomic_update(append_node)
         return True, f"Server {new_iran_server['name']} ({new_iran_server['ip']}) added successfully to load balancer!"
+
+    @staticmethod
+    def forget_node(pool_name: str, iran_ip: str) -> Tuple[bool, str]:
+        """Remove only inventory membership, retaining unverified cleanup details.
+
+        This explicit action makes no SSH or DNS calls and works for every engine.
+        Resource reservations are retained because remote resources may still exist.
+        """
+        removed = [False]
+        def forget(data):
+            pool = data.get('pools', {}).get(pool_name)
+            if not pool:
+                return
+            node = next((n for n in pool.get('nodes', []) if n.get('ip') == iran_ip), None)
+            if node is None:
+                return
+            data.setdefault('pending_node_cleanup', {})[uuid.uuid4().hex] = {
+                'pool': pool_name, 'ip': iran_ip, 'status': 'unverified',
+                'recorded_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'node': copy.deepcopy(node),
+                'kharej_server': copy.deepcopy(pool.get('kharej_server', {})),
+                'engine': pool.get('engine', 'backpack'),
+                'transport': pool.get('transport'),
+                'client_ports': copy.deepcopy(pool.get('client_ports', [])),
+            }
+            pool['nodes'] = [n for n in pool['nodes'] if n.get('ip') != iran_ip]
+            data.get('node_telemetry', {}).pop(f'{pool_name}:{iran_ip}', None)
+            data.get('watchdog_status', {}).get('pool_reports', {}).pop(pool_name, None)
+            removed[0] = True
+        atomic_update(forget)
+        if not removed[0]:
+            return False, 'نود در این استخر یافت نشد'
+        return True, 'نود از پنل حذف شد؛ پاک‌سازی سرویس‌ها و DNS تأیید نشده است. اطلاعات لازم برای پیگیری روی سرور نگه داشته شد.'
 
     @staticmethod
     def remove_node(pool_name: str, iran_ip: str, callback: Optional[Callable[[str], None]] = None, force: bool = False) -> Tuple[bool, str]:
