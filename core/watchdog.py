@@ -192,7 +192,13 @@ class TelemetryWatchdog:
         # push successful sessions out of an arbitrary tail-of-lines sample.
         reader = """import time, os
 now=time.time()
-for path in ['/var/log/vxlb-user-connections.log.1','/var/log/vxlb-user-connections.log']:
+paths=['/var/log/vxlb-user-connections.log.1','/var/log/vxlb-user-connections.log']
+# Existing LD-BP monitors retain their old filenames after a manager upgrade.
+# Select one log family so the same connection is never counted twice.
+if not os.path.exists(paths[-1]):
+    legacy=['/var/log/bp-user-connections.log.1','/var/log/bp-user-connections.log']
+    if any(os.path.exists(path) for path in legacy): paths=legacy
+for path in paths:
     if not os.path.exists(path): continue
     with open(path, errors='replace') as source:
         for line in source:
