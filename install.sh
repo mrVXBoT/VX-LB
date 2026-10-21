@@ -107,7 +107,7 @@ if [ -z "$DETECTED_DIR" ]; then
     fi
     echo "[+] Downloading application and offline payload to $INSTALL_DIR..."
     if [ -d "$INSTALL_DIR/.git" ]; then
-        as_root git -C "$INSTALL_DIR" fetch --ff-only origin main && as_root git -C "$INSTALL_DIR" reset --hard origin/main
+        as_root git -C "$INSTALL_DIR" fetch origin main && as_root git -C "$INSTALL_DIR" reset --hard origin/main
     else
         as_root git clone https://github.com/mrVXBoT/VX-LB.git "$INSTALL_DIR"
     fi
