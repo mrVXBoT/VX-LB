@@ -830,7 +830,12 @@ _register_spoof_capabilities()
 
 def get_capability(engine_id: str) -> Optional[EngineCapabilities]:
     """Retrieve capability definition for a specific engine."""
-    return CAPABILITIES_CATALOG.get(engine_id.lower().strip())
+    eid = engine_id.lower().strip()
+    if eid == "gre":
+        eid = "gre_ipv4"
+    elif eid == "xray":
+        eid = "xhttp"
+    return CAPABILITIES_CATALOG.get(eid)
 
 def list_all_capabilities() -> Dict[str, dict]:
     """Retrieve all engine capabilities in dictionary form for UI/CLI consumption."""

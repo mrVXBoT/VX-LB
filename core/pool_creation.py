@@ -22,6 +22,17 @@ def update(name, **fields):
 
 def start(arguments):
     name = arguments['pool_name']
+    transport = arguments.get('transport', 'pck')
+    from core.capabilities import validate_production_readiness
+    from core.transport_change import get_engine_for_transport
+    engine = arguments.get('engine') or get_engine_for_transport(transport)
+    import os
+    is_prod = bool(arguments.get('is_production', False) or os.environ.get("VX_LB_PRODUCTION", "").lower() in ("1", "true", "yes"))
+    allow_exp = bool(arguments.get('allow_experimental', False))
+    ok_gate, gate_msg = validate_production_readiness(engine, is_production=is_prod, allow_experimental=allow_exp)
+    if not ok_gate:
+        return False, gate_msg
+
     with mutation_lock():
         data = load_data()
         if busy(data):

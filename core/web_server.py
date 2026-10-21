@@ -319,6 +319,12 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "nodes": nodes_list
                 })
 
+            cf_raw = data.get("cloudflare", {})
+            global_cf_masked = dict(cf_raw)
+            if "api_token" in global_cf_masked and global_cf_masked["api_token"]:
+                tok = str(global_cf_masked["api_token"])
+                global_cf_masked["api_token"] = ("…" + tok[-4:]) if tok else ""
+
             resp = {
                 "daemon_running": watchdog.is_daemon_running(),
                 "daemon_pid": watchdog.get_daemon_pid(),
@@ -327,7 +333,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 "filtered_ips": data.get("watchdog_status", {}).get("filtered_ips", []),
                 "iran_count": len(get_servers("iran")),
                 "kharej_count": len(get_servers("kharej")),
-                "global_cloudflare": data.get("cloudflare", {}),
+                "global_cloudflare": global_cf_masked,
                 "rotation_global": data.get("dns_scheduler", {}),
                 "dashboard_domain": get_dashboard_domain_config(),
                 "pools": pools_resp,
@@ -703,8 +709,18 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         
-        # Read body
-        content_length = int(self.headers.get("Content-Length", 0))
+        # Read body with size limits to prevent Content-Length DoS
+        MAX_BODY_SIZE = int(os.environ.get("VX_LB_MAX_BODY_SIZE", 2 * 1024 * 1024))
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+        except (ValueError, TypeError):
+            return self._send_json({"error": "Invalid Content-Length"}, 400)
+
+        if content_length < 0:
+            return self._send_json({"error": "Invalid Content-Length"}, 400)
+        if content_length > MAX_BODY_SIZE:
+            return self._send_json({"error": f"Payload too large. Maximum allowed size is {MAX_BODY_SIZE} bytes"}, 413)
+
         body = {}
         if content_length > 0:
             try:
@@ -741,7 +757,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
 
             if _verify_password(password_input, stored_pass):
                 token = secrets.token_hex(24)
-                AUTH_TOKENS[token] = time.time() + (86400 * 7)  # 7 days
+                AUTH_TOKENS[token] = time.time() + 86400  # 24 hours
                 return self._send_json({"success": True, "token": token})
             else:
                 _record_failed_login(client_ip)
@@ -971,6 +987,11 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     if body.get(k):
                         extra_args[k] = body.get(k)
 
+            if "is_production" in body:
+                extra_args["is_production"] = bool(body["is_production"])
+            if "allow_experimental" in body:
+                extra_args["allow_experimental"] = bool(body["allow_experimental"])
+
             from core.pool_creation import start as start_creation
             ok, result = start_creation(dict(
                 pool_name=pool_name,
@@ -1011,10 +1032,11 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/pools/remove_node":
             pool_name = body.get("pool", "").strip()
             iran_ip = body.get("iran_ip", "").strip()
+            force = bool(body.get("force", False))
             if not pool_name or not iran_ip:
                 return self._send_json({"error": "نام استخر و آی‌پی سرور ایران الزامی است"}, 400)
 
-            ok, msg = start_node_removal(pool_name, iran_ip)
+            ok, msg = start_node_removal(pool_name, iran_ip, force=force)
             if ok:
                 return self._send_json({"success": True, "job": msg}, 202)
             else:
@@ -1227,6 +1249,11 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             for k in ("spoof_ips", "peer_spoof_ip", "dns_resolvers", "send_domains", "fake_send_ip", "fake_send_port", "info_encryption_pass", "knock_key", "mode", "carrier", "carrier_type", "dc6_mtu"):
                 if body.get(k):
                     extra_args[k] = body.get(k)
+
+            if "is_production" in body:
+                extra_args["is_production"] = bool(body["is_production"])
+            if "allow_experimental" in body:
+                extra_args["allow_experimental"] = bool(body["allow_experimental"])
 
             ok, message = start_change(pool_name, transport, **extra_args)
             return self._send_json({"success": ok, "message": message}, 202 if ok else 409)
@@ -1596,6 +1623,10 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             def _change_p(d: dict):
                 d["web_password"] = _hash_password(new_pass)
             atomic_update(_change_p)
+            current_tok = self._get_auth_token()
+            AUTH_TOKENS.clear()
+            if current_tok:
+                AUTH_TOKENS[current_tok] = time.time() + 86400
             return self._send_json({"success": True, "message": "رمز عبور داشبورد با موفقیت به‌روزرسانی شد"})
 
         elif path == "/api/dashboard-domain":
@@ -1754,7 +1785,7 @@ def run_web_server(host: str = None, port: int = 8088):
     # for the whole fleet -- it must not be on 0.0.0.0 unless the operator
     # explicitly opts in via VX_LB_WEB_HOST (prefer an SSH tunnel instead).
     if host is None:
-        host = os.environ.get("VX_LB_WEB_HOST", "0.0.0.0")
+        host = os.environ.get("VX_LB_WEB_HOST", "127.0.0.1")
     if host == "0.0.0.0":
         print("[!] WARNING: web dashboard bound to 0.0.0.0 -- ensure the dashboard password is set and the port is firewalled.")
     

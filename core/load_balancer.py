@@ -86,6 +86,16 @@ class LoadBalancerManager:
         """
         Creates a new multi-Iran to 1-Kharej load balancing pool.
         """
+        from core.capabilities import validate_production_readiness
+        from core.transport_change import get_engine_for_transport
+        engine = kwargs.get('engine') or get_engine_for_transport(transport)
+        import os
+        is_prod = bool(kwargs.get('is_production', False) or os.environ.get("VX_LB_PRODUCTION", "").lower() in ("1", "true", "yes"))
+        allow_exp = bool(kwargs.get('allow_experimental', False))
+        ok_gate, gate_msg = validate_production_readiness(engine, is_production=is_prod, allow_experimental=allow_exp)
+        if not ok_gate:
+            return False, gate_msg, {}
+
         if transport in {'http', 'https'}:
             from core.http_transport import create
             return create(pool_name, kharej_server, iran_servers, client_ports, transport=transport, callback=callback)
@@ -494,7 +504,7 @@ class LoadBalancerManager:
         return True, f"Server {new_iran_server['name']} ({new_iran_server['ip']}) added successfully to load balancer!"
 
     @staticmethod
-    def remove_node(pool_name: str, iran_ip: str, callback: Optional[Callable[[str], None]] = None) -> Tuple[bool, str]:
+    def remove_node(pool_name: str, iran_ip: str, callback: Optional[Callable[[str], None]] = None, force: bool = False) -> Tuple[bool, str]:
         """Removes a single Iran server from a pool."""
         def log(msg: str):
             if callback:
@@ -571,9 +581,12 @@ class LoadBalancerManager:
             key_path=kh_srv.get("key_path"),
             private_key=kh_srv.get("private_key")
         )
-        if kh_ssh.connect()[0]:
+        kh_ok, kh_err = kh_ssh.connect()
+        if kh_ok:
             stop_and_remove_tunnel(kh_ssh, node_name)
             kh_ssh.close()
+        elif not force:
+            return False, f"Failed to connect to Kharej server ({kh_err}); cleanup aborted to avoid orphaned tunnel. Use force=True to remove anyway."
 
         log("Tearing down tunnel from Iran server...")
         ir_ssh = SSHManager(
@@ -584,9 +597,12 @@ class LoadBalancerManager:
             key_path=target_node.get("key_path"),
             private_key=target_node.get("private_key")
         )
-        if ir_ssh.connect()[0]:
+        ir_ok, ir_err = ir_ssh.connect()
+        if ir_ok:
             stop_and_remove_tunnel(ir_ssh, node_name)
             ir_ssh.close()
+        elif not force:
+            return False, f"Failed to connect to Iran server ({ir_err}); cleanup aborted to avoid orphaned tunnel. Use force=True to remove anyway."
 
         def remove_member(data):
             current = data['pools'][pool_name]

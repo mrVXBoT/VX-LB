@@ -1109,7 +1109,11 @@ def cloudflare_watchdog_menu():
                 console.print("\n")
                 console.print(table)
                 console.print(f"  • [bold green]Active DNS IPs for {p_name}:[/bold green] [bold yellow]{', '.join(p_rep.get('healthy_ips', [])) or 'None'}[/bold yellow]")
-                console.print(f"  • [bold red]Filtered IPs for {p_name}:[/bold red] [bold red]{', '.join(p_rep.get('filtered_ips', [])) or 'None'}[/bold red]\n")
+                console.print(f"  • [bold red]Filtered IPs for {p_name}:[/bold red] [bold red]{', '.join(p_rep.get('filtered_ips', [])) or 'None'}[/bold red]")
+                if p_rep.get("backend_state") == "NO_VERIFIED_BACKEND":
+                    console.print(f"  🚨 [bold red]CRITICAL ALERT: NO_VERIFIED_BACKEND for pool '{p_name}'![/bold red] No verified healthy path available.\n")
+                else:
+                    console.print("\n")
             Prompt.ask("Press Enter to return")
         elif choice == "2":
             if watchdog.is_daemon_running() or watchdog._running:
@@ -1185,7 +1189,7 @@ def manage_web_menu():
         web_pass = load_data().get("web_password")
         pass_status = "[bold green]Configured[/bold green]" if web_pass else "[yellow]Not set — use option [5] below[/yellow]"
         status_text = f"[bold green]RUNNING (PID: {w_pid})[/bold green]" if is_running else "[bold red]STOPPED[/bold red]"
-        bind_host = os.environ.get("VX_LB_WEB_HOST", "0.0.0.0")
+        bind_host = os.environ.get("VX_LB_WEB_HOST", "127.0.0.1")
 
         console.print("[bold cyan]=== Mobile Web Dashboard (Phone Control Panel) ===[/bold cyan]\n")
         console.print(f"  [white]Status:[/white] {status_text}")

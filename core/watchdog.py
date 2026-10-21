@@ -487,17 +487,23 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
             # Configurable via pool's 'dns_policy': 'strict' (strictly requires verified full path HEALTHY)
             # or explicitly configured 'permissive' for legacy trial routing.
             dns_policy = pool.get("dns_policy", "strict")
+            standby_ip = pool.get("standby_ip")
+            backend_state = "HEALTHY" if healthy_ips else "NO_VERIFIED_BACKEND"
             if dns_policy == "strict":
                 active_dns_ips = sorted(list(set(healthy_ips)))
                 if not active_dns_ips:
-                    log(f"  ⚠️ [Strict 6.10 Policy] No node in pool '{pool_name}' has confirmed complete path health; DNS failover suspended to prevent unverified routing.")
+                    if standby_ip:
+                        active_dns_ips = [standby_ip]
+                        log(f"  ⚠️ [Strict Policy] No healthy node in '{pool_name}'; routing to configured standby_ip {standby_ip}.")
+                    else:
+                        log(f"  ⚠️ [Strict 6.10 Policy] No node in pool '{pool_name}' has confirmed complete path health; DNS failover suspended to prevent unverified routing.")
             else:
                 if healthy_ips:
                     active_dns_ips = sorted(list(set(healthy_ips + canary_ips + degraded_ips)))
                 elif idle_ips or degraded_ips or canary_ips:
                     active_dns_ips = sorted(list(set(idle_ips + degraded_ips + canary_ips)))
                 else:
-                    fallback_ip = nodes[0]["ip"] if nodes else ""
+                    fallback_ip = standby_ip or (nodes[0]["ip"] if nodes else "")
                     if not fallback_ip:
                         continue
                     active_dns_ips = [fallback_ip]
@@ -540,6 +546,7 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
                             "healthy_ips": [],
                             "filtered_ips": filtered_ips,
                             "dns_policy": dns_policy,
+                            "backend_state": "NO_VERIFIED_BACKEND",
                             "cloudflare_sync": {"status": "SUSPENDED_NO_HEALTHY_NODES", "warning": "هیچ نود سالمی با تأیید مسیر کامل موجود نیست"}
                         }
                         continue
@@ -572,6 +579,7 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
                 "nodes": node_results,
                 "healthy_ips": active_dns_ips,
                 "filtered_ips": filtered_ips,
+                "backend_state": backend_state,
                 "cloudflare_sync": sync_report
             }
 

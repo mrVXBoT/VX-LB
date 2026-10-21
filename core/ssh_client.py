@@ -219,13 +219,18 @@ for p in ports:
             return int(out.strip())
 
         # Fallback to random guessing using ss/netstat
-        for _ in range(20):
+        for _ in range(30):
             cand = secrets.randbelow(end_range - start_range) + start_range
             c, o, _ = self.execute(f"ss -tuln | grep -q ':{cand} ' || echo 'free'")
             if "free" in o:
                 return cand
 
-        return 34567
+        # Final verification fallback: try 34567 only if verified free
+        c, o, _ = self.execute("ss -tuln | grep -q ':34567 ' || echo 'free'")
+        if "free" in o:
+            return 34567
+
+        raise RuntimeError(f"Unable to allocate a verified free port on {self.ip} in range {start_range}-{end_range}")
 
     def upload_binary(self, local_path: str, remote_path: str, mode: int = 0o755) -> bool:
         """Publish a complete binary atomically, keeping partial uploads unusable."""

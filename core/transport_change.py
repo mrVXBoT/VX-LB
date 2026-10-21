@@ -737,6 +737,13 @@ def start_change(name, target, background=True, repair=False, **kwargs):
             return False, 'نوع تونل جدید نامعتبر است'
 
         target_engine = kwargs.get('engine') or get_engine_for_transport(target)
+        from core.capabilities import validate_production_readiness
+        import os
+        is_prod = bool(kwargs.get('is_production', False) or os.environ.get("VX_LB_PRODUCTION", "").lower() in ("1", "true", "yes"))
+        allow_exp = bool(kwargs.get('allow_experimental', False))
+        ok_gate, gate_msg = validate_production_readiness(target_engine, is_production=is_prod, allow_experimental=allow_exp)
+        if not ok_gate:
+            return False, gate_msg
         curr_engine = pool.get('engine') or get_engine_for_transport(pool.get('transport'))
         if target == pool.get('transport') and target_engine == curr_engine:
             return False, 'نوع تونل جدید برابر نوع فعلی است'
