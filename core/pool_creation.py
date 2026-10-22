@@ -24,8 +24,8 @@ def start(arguments):
     name = arguments['pool_name']
     transport = arguments.get('transport', 'pck')
     from core.capabilities import validate_production_readiness
-    from core.transport_change import get_engine_for_transport
-    engine = arguments.get('engine') or get_engine_for_transport(transport)
+    from core.transport_change import _coerce_engine
+    engine = _coerce_engine(arguments.get('engine'), transport)
     import os
     is_prod = bool(arguments.get('is_production', False) or os.environ.get("VX_LB_PRODUCTION", "").lower() in ("1", "true", "yes"))
     allow_exp = bool(arguments.get('allow_experimental', False))

@@ -213,3 +213,87 @@ class UniversalTransportChangeTests(unittest.TestCase):
             self.assertEqual(p1['transport_change']['status'], 'rolled_back')
             self.assertIn('remote config failed', p1['transport_change']['error'])
 
+    def test_start_change_resolves_kernel_group_label(self):
+        with patch.object(change, 'load_data', side_effect=lambda: copy.deepcopy(self.data)), \
+             patch.object(change, 'atomic_update', side_effect=lambda cb: cb(self.data)), \
+             patch.object(change, 'routing_lock', side_effect=nullcontext), \
+             patch.object(change, 'busy', return_value=False):
+            ok, msg = change.start_change('P1', 'gre', background=False, engine='kernel')
+            self.assertTrue(ok, msg)
+            job = self.data['pools']['P1']['transport_change']
+            self.assertEqual(job['to_engine'], 'gre')
+            self.assertEqual(job['status'], 'queued')
+
+
+class KernelRollingChangeTests(unittest.TestCase):
+    def setUp(self):
+        self.pool = {
+            'name': 'P1',
+            'transport': 'tun',
+            'engine': 'tun',
+            'client_ports': ['443'],
+            'subdomain': 'lb.example.com',
+            'dns_routing': {'mode': 'round_robin'},
+            'nodes': [
+                {'node_name': 'p1_ir1', 'ip': '192.0.2.1', 'engine': 'tun'},
+                {'node_name': 'p1_ir2', 'ip': '192.0.2.2', 'engine': 'tun'},
+            ],
+            'kharej_server': {'ip': '198.51.100.1'},
+            'transport_change': {'id': 'k1', 'status': 'queued', 'from': 'tun', 'to': 'gre',
+                                 'from_engine': 'tun', 'to_engine': 'gre', 'arguments': {},
+                                 'changed': [], 'completed': 0, 'total': 2},
+        }
+        self.data = {'pools': {'P1': copy.deepcopy(self.pool)}}
+        self.stack = ExitStack()
+        self.addCleanup(self.stack.close)
+        self.stack.enter_context(patch.object(change, 'load_data', side_effect=lambda: copy.deepcopy(self.data)))
+        self.stack.enter_context(patch.object(change, 'atomic_update', side_effect=lambda cb: cb(self.data)))
+        self.stack.enter_context(patch.object(change, 'mutation_lock', side_effect=nullcontext))
+        self.stack.enter_context(patch.object(change, 'connect', return_value=FakeSSH()))
+
+    def _remove(self, name, node, engine, pool):
+        ip = node.get('ip')
+        def rm(data):
+            data['pools'][name]['nodes'] = [n for n in data['pools'][name]['nodes'] if n.get('ip') != ip]
+        rm(self.data)
+        return True, ''
+
+    def _deploy(self, name, server, callback=None):
+        eng = self.data['pools'][name].get('engine', 'backpack')
+        node = {'node_name': 'mig-' + str(server['ip']).replace('.', ''), 'ip': server['ip'],
+                'engine': eng, 'transport': eng, 'provisioning': False, 'status': 'active'}
+        self.data['pools'][name]['nodes'].append(node)
+        return True, ''
+
+    def test_kernel_success_preserves_ports_members_dns(self):
+        with patch.object(change, '_remove_node_engine', side_effect=self._remove), \
+             patch.object(change, '_deploy_node', side_effect=self._deploy):
+            change.run_change('P1')
+        p = self.data['pools']['P1']
+        self.assertEqual(p['transport'], 'gre')
+        self.assertEqual(p['engine'], 'gre')
+        self.assertEqual(p['transport_change']['status'], 'succeeded')
+        self.assertEqual(p['client_ports'], ['443'])
+        self.assertEqual(p['kharej_server'], {'ip': '198.51.100.1'})
+        self.assertEqual(p['subdomain'], 'lb.example.com')
+        self.assertEqual(p['dns_routing'], {'mode': 'round_robin'})
+        self.assertEqual(len(p['nodes']), 2)
+        self.assertTrue(all(n['engine'] == 'gre' for n in p['nodes']))
+
+    def test_kernel_failure_rolls_back_all_changed_nodes(self):
+        deploy_calls = {'n': 0}
+        def failing_deploy(name, server, callback=None):
+            deploy_calls['n'] += 1
+            if deploy_calls['n'] == 2:
+                return False, 'boom'
+            return self._deploy(name, server, callback)
+        with patch.object(change, '_remove_node_engine', side_effect=self._remove), \
+             patch.object(change, '_deploy_node', side_effect=failing_deploy):
+            change.run_change('P1')
+        p = self.data['pools']['P1']
+        self.assertEqual(p['transport'], 'tun')
+        self.assertEqual(p['engine'], 'tun')
+        self.assertEqual(p['transport_change']['status'], 'rolled_back')
+        self.assertEqual(len(p['nodes']), 2)
+        self.assertTrue(all(n['engine'] == 'tun' for n in p['nodes']))
+

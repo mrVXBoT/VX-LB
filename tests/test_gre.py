@@ -145,8 +145,9 @@ class GreTests(unittest.TestCase):
         with patch('core.transport_change.load_data',return_value=self.data),patch('core.transport_change.atomic_update') as update:
             self.assertFalse(start_change('one','tcp',background=False)[0]);update.assert_not_called()
         self.data['pools']['one']['transport']='tcp'
-        with patch('core.transport_change.load_data',return_value=self.data):
-            self.assertFalse(start_change('one','gre',background=False)[0])
+        self.data['pools']['one']['engine']='backpack'
+        with patch('core.transport_change.load_data',return_value=self.data),patch('core.transport_change.atomic_update') as update:
+            self.assertTrue(start_change('one','gre',background=False)[0]);update.assert_called_once()
 
     def test_web_create_accepts_gre_options_without_exposing_credentials(self):
         import io

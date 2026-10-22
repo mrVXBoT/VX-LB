@@ -1,6 +1,7 @@
 """Rolling transport changes with durable remote backups and conservative flow checks."""
 import copy
 import fcntl
+import importlib
 import os
 import re
 import shlex
@@ -260,6 +261,8 @@ def get_engine_for_transport(transport: str) -> str:
         return 'geneve'
     if t == 'vxlan':
         return 'vxlan'
+    if t == 'vxlan_ipsec':
+        return 'vxlan_ipsec'
     if t == 'gre6':
         return 'gre6'
     if t == 'ip6ip6':
@@ -276,6 +279,88 @@ def get_engine_for_transport(transport: str) -> str:
     if t in _SPOOF_TRANSPORTS:
         return 'spoof'
     return 'backpack'
+
+# Kernel / network-layer engines that support per-node phased migration. The web
+# UI also exposes "kernel" as a *group* label (ENGINE_TRANSPORTS.kernel) that is
+# not itself a registered engine; it must be resolved to the concrete engine of
+# the chosen transport before production-readiness validation.
+KERNEL_ENGINES = {
+    'tun', 'dc6', 'wireguard', 'gre', 'gre6', 'ip6ip6',
+    'vxlan', 'vxlan_ipsec', 'geneve_ipsec',
+}
+
+def _coerce_engine(engine_id, transport):
+    """Resolve an engine id that may be a UI group label to a registered engine.
+
+    Group labels like "kernel" / "other" are not real engines; fall back to the
+    concrete engine implied by the transport whenever the provided id is not
+    itself registered.
+    """
+    eid = (engine_id or '').lower().strip()
+    if eid and eid not in ('kernel', 'other'):
+        from core.capabilities import get_capability
+        if get_capability(eid) is not None:
+            return eid
+    return get_engine_for_transport(transport)
+
+def _engine_module(engine):
+    table = {
+        'tun': 'core.tun_runtime',
+        'dc6': 'core.dc6_runtime',
+        'wireguard': 'core.wireguard_adapter',
+        'gre': 'core.gre',
+        'gre6': 'core.gre6',
+        'ip6ip6': 'core.ip6ip6',
+        'vxlan': 'core.vxlan_adapter',
+        'vxlan_ipsec': 'core.vxlan_ipsec',
+        'geneve': 'core.geneve',
+        'geneve_ipsec': 'core.geneve',
+        'waterwall': 'core.waterwall',
+        'paqet': 'core.paqet_adapter',
+        'xray': 'core.https_tunnel',
+        'slipstream': 'core.slipstream_adapter',
+        'spoof': 'core.spoof_adapter',
+        'http': 'core.http_transport',
+        'https': 'core.http_transport',
+    }
+    name = table.get((engine or '').lower().strip())
+    if not name:
+        return None
+    return importlib.import_module(name)
+
+def _remove_node_engine(name, node, engine, pool):
+    """Tear down a single node's link for the given engine and drop it from the pool."""
+    engine = (engine or '').lower().strip()
+    if engine in ('', 'backpack'):
+        from core.load_balancer import stop_and_remove_tunnel
+        sessions = []
+        try:
+            node_name = node.get('node_name')
+            if node_name:
+                kh = connect(pool['kharej_server'])
+                sessions.append(kh)
+                stop_and_remove_tunnel(kh, node_name)
+                ir = connect(node)
+                sessions.append(ir)
+                stop_and_remove_tunnel(ir, node_name)
+        finally:
+            for s in sessions:
+                s.close()
+        def discard(data):
+            data['pools'][name]['nodes'] = [
+                n for n in data['pools'][name]['nodes'] if n.get('ip') != node.get('ip')
+            ]
+        atomic_update(discard)
+        return True, ''
+    mod = _engine_module(engine)
+    if mod is None or not hasattr(mod, 'remove'):
+        return False, 'موتور منبع برای حذف مرحله‌ای پشتیبانی نمی‌شود: ' + str(engine)
+    return mod.remove(name, node.get('ip'))
+
+def _deploy_node(name, server, callback=None):
+    """Deploy a single node onto the pool using the pool's current engine."""
+    from core.load_balancer import LoadBalancerManager
+    return LoadBalancerManager.add_node(name, server, callback)
 
 def _resolve_server(server_dict, server_type):
     from core.storage import get_servers
@@ -695,6 +780,144 @@ def _run_universal_engine_change(name, pool, job, recovering=False):
                 }
             atomic_update(_mark_failed)
 
+def _kernel_rollback(name, backup_pool, to_engine, from_engine, target):
+    """Restore a failed kernel migration.
+
+    Removes any target-engine links that were deployed, flips the pool metadata
+    back to the source engine, and re-deploys the source links for every node
+    that was torn down. Untouched source nodes keep their live links.
+    """
+    failures = []
+    try:
+        data = load_data()
+        job = data['pools'][name].get('transport_change', {})
+        changed = list(job.get('changed', []))
+
+        for rec in reversed(changed):
+            try:
+                ok, msg = _remove_node_engine(name, rec, to_engine, backup_pool)
+                if not ok:
+                    failures.append(str(msg))
+            except Exception as exc:
+                failures.append(str(exc))
+
+        def _restore_meta(data):
+            p = data['pools'][name]
+            p['transport'] = backup_pool.get('transport')
+            p['engine'] = backup_pool.get('engine')
+            for k in ('gre_mtu', 'tun_mtu', 'dc6_mtu', 'geneve_mtu',
+                      'vxlan_mtu', 'vxsec_mtu', 'gre6_mtu', 'ip6ip6_mtu'):
+                if k in backup_pool:
+                    p[k] = backup_pool[k]
+        atomic_update(_restore_meta)
+
+        for rec in reversed(changed):
+            backup = rec.get('backup') or {}
+            server = dict(backup)
+            server.setdefault('ip', rec.get('ip'))
+            server.setdefault('name', rec.get('node_name') or backup.get('server_name') or backup.get('name'))
+            server.setdefault('server_name', server['name'])
+            try:
+                ok, msg = _deploy_node(name, server)
+                if not ok:
+                    failures.append(str(msg))
+            except Exception as exc:
+                failures.append(str(exc))
+
+        if failures:
+            update_job(name, status='rollback_failed', message='بازگردانی کامل نشد؛ وضعیت منابع را بررسی کنید',
+                       failed_nodes=[r.get('ip') for r in changed])
+            return False
+        update_job(name, status='rolled_back', message='تنظیمات قبلی بازگردانده و عبور آزمایشی ترافیک تأیید شد',
+                   failed_nodes=[])
+        return True
+    except Exception as exc:
+        update_job(name, status='rollback_failed', message='بازگردانی با خطا مواجه شد: ' + str(exc))
+        return False
+
+def _run_kernel_rolling_change(name, pool, job, recovering=False):
+    """Per-node phased migration for kernel-layer tunnel engines.
+
+    One node (and both of its sides) is changed at a time while the rest of the
+    pool keeps serving traffic. Pool-level members, client ports, subdomain and
+    DNS routing are preserved; on failure every changed node reverts to its
+    previous engine.
+    """
+    args = job.get('arguments', {}) or {}
+    target = job['to']
+    to_engine = job.get('to_engine') or get_engine_for_transport(target)
+    from_engine = job.get('from_engine') or pool.get('engine') or get_engine_for_transport(job.get('from'))
+
+    if recovering:
+        update_job(name, status='rollback_failed',
+                   message='بازگردانی مرحله‌ای هسته پس از قطع شدن نیاز به رسیدگی دستی دارد')
+        return
+
+    update_job(name, status='preflight', message='آماده‌سازی تغییر مرحله‌ای تونل و دسترسی به سرورها')
+
+    kharej_srv = _resolve_server(pool['kharej_server'], 'kharej')
+    iran_srvs = [_resolve_server(n, 'iran') for n in pool['nodes']]
+
+    backup_pool = copy.deepcopy(pool)
+
+    sessions = []
+    try:
+        sessions.append(connect(kharej_srv))
+        for srv in iran_srvs:
+            sessions.append(connect(srv))
+    except Exception as exc:
+        update_job(name, status='failed', message=f'بررسی پیش‌پرواز ناموفق: {exc}')
+        return
+    finally:
+        for s in sessions:
+            s.close()
+
+    def _set_target(data):
+        p = data['pools'][name]
+        p['transport'] = target
+        p['engine'] = to_engine
+        if target == 'gre' and args.get('mtu'):
+            p['gre_mtu'] = int(args['mtu'])
+        if target == 'tun' and args.get('mtu'):
+            p['tun_mtu'] = int(args['mtu'])
+    atomic_update(_set_target)
+
+    changed = []
+    try:
+        total = len(iran_srvs)
+        for index, srv in enumerate(iran_srvs):
+            data = load_data()
+            cur = None
+            for n in data['pools'][name]['nodes']:
+                if n.get('ip') == srv.get('ip'):
+                    cur = n
+                    break
+            label = srv.get('server_name') or srv.get('name') or srv.get('ip')
+            if cur is None:
+                raise RuntimeError('نود در استخر یافت نشد: ' + str(label))
+            update_job(name, status='changing', changed=list(changed), completed=index, total=total,
+                       message='تغییر دو سمت نود: ' + str(label))
+            ok_src, msg_src = _remove_node_engine(name, cur, from_engine, pool)
+            if not ok_src:
+                raise RuntimeError('پاک‌سازی لینک قبلی نود ناموفق بود: ' + str(msg_src))
+            changed.append({'node_name': cur.get('node_name'), 'ip': cur.get('ip'),
+                           'backup': cur, 'from_engine': from_engine})
+            ok_dst, msg_dst = _deploy_node(name, srv)
+            if not ok_dst:
+                raise RuntimeError('راه‌اندازی تونل جدید نود ناموفق بود: ' + str(msg_dst))
+
+        def commit(data):
+            p = data['pools'][name]
+            p['transport'] = target
+            p['engine'] = to_engine
+            p['transport_change'].update(status='succeeded',
+                message='نوع تونل همهٔ نودها تغییر کرد و عبور ترافیک تأیید شد',
+                changed=list(changed), completed=total, total=total)
+        atomic_update(commit)
+    except Exception as error:
+        update_job(name, error=str(error), changed=list(changed))
+        _kernel_rollback(name, backup_pool, to_engine, from_engine, target)
+
 def run_change(name, recovering=False):
     with mutation_lock():
         pool_data = load_data().get('pools', {}).get(name)
@@ -721,6 +944,12 @@ def run_change(name, recovering=False):
             _run_backpack_rolling_change(name, pool, job, recovering)
             return
 
+        kernel_target = to_engine in KERNEL_ENGINES
+        kernel_source = from_engine in (None, 'backpack') or from_engine in KERNEL_ENGINES
+        if kernel_target and kernel_source:
+            _run_kernel_rolling_change(name, pool, job, recovering)
+            return
+
         _run_universal_engine_change(name, pool, job, recovering)
 
 def start_change(name, target, background=True, repair=False, **kwargs):
@@ -736,7 +965,7 @@ def start_change(name, target, background=True, repair=False, **kwargs):
         if target not in all_transports:
             return False, 'نوع تونل جدید نامعتبر است'
 
-        target_engine = kwargs.get('engine') or get_engine_for_transport(target)
+        target_engine = _coerce_engine(kwargs.get('engine'), target)
         from core.capabilities import validate_production_readiness
         import os
         is_prod = bool(kwargs.get('is_production', False) or os.environ.get("VX_LB_PRODUCTION", "").lower() in ("1", "true", "yes"))
@@ -744,12 +973,12 @@ def start_change(name, target, background=True, repair=False, **kwargs):
         ok_gate, gate_msg = validate_production_readiness(target_engine, is_production=is_prod, allow_experimental=allow_exp)
         if not ok_gate:
             return False, gate_msg
-        curr_engine = pool.get('engine') or get_engine_for_transport(pool.get('transport'))
+        curr_engine = _coerce_engine(pool.get('engine'), pool.get('transport'))
         if target == pool.get('transport') and target_engine == curr_engine:
             return False, 'نوع تونل جدید برابر نوع فعلی است'
 
-        if not kwargs.get('engine') and (target == 'gre' or pool.get('transport') == 'gre'):
-            return False, 'GRE موتور مستقلی است؛ برای آن استخر جدید بسازید. تبدیل مرحله‌ای BackPack به GRE هنوز پشتیبانی نمی‌شود'
+        if target != 'gre' and pool.get('transport') == 'gre':
+            return False, 'GRE موتور مستقلی است؛ مهاجرت از آن پشتیبانی نمی‌شود؛ برای نوع دیگر استخر جدید بسازید'
 
         if target_engine == 'xray' or target in {'xhttp', 'xhttps', 'nova', 'gre_xhttp'}:
             cam = kwargs.get('camouflage') or pool.get('camouflage') or {}

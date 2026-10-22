@@ -89,8 +89,8 @@ class LoadBalancerManager:
         Creates a new multi-Iran to 1-Kharej load balancing pool.
         """
         from core.capabilities import validate_production_readiness
-        from core.transport_change import get_engine_for_transport
-        engine = kwargs.get('engine') or get_engine_for_transport(transport)
+        from core.transport_change import _coerce_engine
+        engine = _coerce_engine(kwargs.get('engine'), transport)
         import os
         is_prod = bool(kwargs.get('is_production', False) or os.environ.get("VX_LB_PRODUCTION", "").lower() in ("1", "true", "yes"))
         allow_exp = bool(kwargs.get('allow_experimental', False))
