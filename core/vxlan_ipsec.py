@@ -305,21 +305,42 @@ def verify(iran, kharej, node) -> bool:
         run_agent(ssh, node, "secure-check")
 
     for source, target in ((iran, kharej), (kharej, iran)):
-        channel = None
+        port_file = "/tmp/vxsec-echo-" + secrets.token_hex(6) + ".port"
+        pid = None
         try:
-            stdin, stdout, stderr = target.client.exec_command(
-                "python3 " + shlex.quote(AGENT) + " echo " + shlex.quote(path(node)),
+            # Launch the echo responder detached from the SSH channel so it
+            # survives long enough for the probe to connect.
+            code, out, _ = target.execute(
+                "nohup python3 " + shlex.quote(AGENT) + " echo "
+                + shlex.quote(path(node)) + " " + shlex.quote(port_file)
+                + " >/tmp/vxsec-echo.log 2>&1 & echo $!",
                 timeout=10,
             )
-            channel = stdout.channel
-            line = stdout.readline().strip()
-            if not line.isdigit():
+            pid = out.strip().splitlines()[-1].strip() if out else ""
+            if not pid.isdigit():
                 raise RuntimeError("VXLAN echo endpoint failed to start")
-            run_agent(source, node, "probe", int(line), secrets.token_hex(24))
+            port = wait_for_echo_port(target, port_file, pid)
+            run_agent(source, node, "probe", port, secrets.token_hex(24))
         finally:
-            if channel:
-                channel.close()
+            if pid and pid.isdigit():
+                target.execute("kill -TERM " + shlex.quote(pid) + " 2>/dev/null", timeout=5)
+            target.execute("rm -f " + shlex.quote(port_file), timeout=5)
     return True
+
+
+def wait_for_echo_port(target, port_file, pid, attempts=40):
+    """Wait until the echo responder writes its bound port to disk."""
+    for _ in range(attempts):
+        code, alive, _ = target.execute("kill -0 " + shlex.quote(pid) + " 2>/dev/null", timeout=10)
+        if code != 0:
+            code, log, _ = target.execute("tail -20 /tmp/vxsec-echo.log 2>/dev/null", timeout=10)
+            raise RuntimeError("VXLAN echo endpoint exited: " + (log or "no log"))
+        code, port, _ = target.execute("cat " + shlex.quote(port_file) + " 2>/dev/null", timeout=10)
+        port = port.strip() if port else ""
+        if port.isdigit() and int(port) > 0:
+            return int(port)
+        time.sleep(0.5)
+    raise RuntimeError("VXLAN echo endpoint did not write a port file in time")
 
 
 def cleanup_endpoint(ssh, node, iran: bool):

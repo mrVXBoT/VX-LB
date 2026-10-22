@@ -396,7 +396,7 @@ def probe(c, port, nonce):
             raise
 
 
-def echo(c):
+def echo(c, port_file=None):
     c = validate(c)
     tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -407,6 +407,10 @@ def echo(c):
     udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     udp.bind((c["private"], port))
+
+    if port_file:
+        with open(port_file, "w") as f:
+            f.write(str(port) + "\n")
 
     def udp_loop():
         while True:
@@ -566,7 +570,7 @@ def main():
     elif action == "probe":
         probe(c, int(sys.argv[3]), sys.argv[4])
     elif action == "echo":
-        echo(c)
+        echo(c, sys.argv[3] if len(sys.argv) > 3 else None)
     elif action == "relay":
         relay(c)
     elif action == "status":
