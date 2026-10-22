@@ -353,27 +353,47 @@ def probe(c, port, nonce):
     seed = f"VXLAN-PROBE-{nonce}\n".encode("utf-8")
     payload = (seed * ((65536 + len(seed) - 1) // len(seed)))[:65536]
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(4)
-        s.connect((c["peer"], port))
-        s.sendall(payload)
-        received = b""
-        while len(received) < len(payload):
-            chunk = s.recv(len(payload) - len(received))
-            if not chunk:
-                break
-            received += chunk
-        if received != payload:
-            raise RuntimeError("VXLAN TCP 64KiB probe did not return the complete nonce payload")
+    # The first overlay packet must learn the peer MAC through ARP; until the
+    # neighbour resolves, `connect` can return EHOSTUNREACH before the kernel
+    # even emits the encapsulated ARP request. Give ARP a few seconds.
+    deadline = time.time() + 12
+    while True:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(3)
+                s.connect((c["peer"], port))
+                s.sendall(payload)
+                received = b""
+                while len(received) < len(payload):
+                    chunk = s.recv(len(payload) - len(received))
+                    if not chunk:
+                        break
+                if received != payload:
+                    raise RuntimeError("VXLAN TCP 64KiB probe did not return the complete nonce payload")
+            break
+        except OSError as error:
+            if error.errno in (113, 101, 111) and time.time() < deadline:
+                time.sleep(0.5)
+                continue
+            raise
 
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.settimeout(4)
-        s.connect((c["peer"], port))
-        udp_payload = f"VXLAN-UDP-{nonce}\n".encode("utf-8")
-        s.send(udp_payload)
-        resp = s.recv(4096)
-        if resp != udp_payload:
-            raise RuntimeError(f"UDP probe nonce mismatch: {resp!r} != {udp_payload!r}")
+    deadline = time.time() + 12
+    while True:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.settimeout(4)
+                s.connect((c["peer"], port))
+                udp_payload = f"VXLAN-UDP-{nonce}\n".encode("utf-8")
+                s.send(udp_payload)
+                resp = s.recv(4096)
+                if resp != udp_payload:
+                    raise RuntimeError(f"UDP probe nonce mismatch: {resp!r} != {udp_payload!r}")
+            break
+        except OSError as error:
+            if error.errno in (113, 101, 111) and time.time() < deadline:
+                time.sleep(0.5)
+                continue
+            raise
 
 
 def echo(c):
