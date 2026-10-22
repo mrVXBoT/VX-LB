@@ -78,7 +78,7 @@ def install_strongswan(ssh) -> Optional[str]:
             ssh,
             "export DEBIAN_FRONTEND=noninteractive; "
             "apt-get update -y >/dev/null 2>&1 || true; "
-            "apt-get install -y --no-install-recommends charon-systemd >/dev/null",
+            "apt-get install -y --no-install-recommends charon-systemd libstrongswan >/dev/null",
             timeout=180,
         )
     elif "dnf" in manager or "yum" in manager:

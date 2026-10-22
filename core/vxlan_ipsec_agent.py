@@ -113,7 +113,9 @@ def ipsec_connection(c):
         "local_addrs": [c["local"]],
         "remote_addrs": [c["remote"]],
         "proposals": ["aes256gcm16-prfsha256-ecp256",
-                       "aes256gcm16-prfsha256-modp2048"],
+                       "aes256gcm16-prfsha256-modp2048",
+                       "aes256-sha256-ecp256",
+                       "aes256-sha256-modp2048"],
         "dpd_delay": "20s",
         "mobike": "no",
         "local": {"auth": "psk", "id": c["local"]},
@@ -124,7 +126,8 @@ def ipsec_connection(c):
                 "remote_ts": [c["remote"] + "/32[17/" + dst_port + "]"],
                 "mode": "transport",
                 "reqid": str(sec["reqid"]),
-                "esp_proposals": ["aes256gcm16-ecp256", "aes256gcm16-modp2048"],
+                "esp_proposals": ["aes256gcm16-ecp256", "aes256gcm16-modp2048",
+                                 "aes256-sha256-ecp256", "aes256-sha256-modp2048"],
                 "rekey_time": "30m",
                 "life_time": "40m",
                 "start_action": "trap",
@@ -135,11 +138,14 @@ def ipsec_connection(c):
     }
 
 
+ALLOWED_ENCR_ALGS = {b"AES_GCM_16", b"AES_GCM_12", b"AES_GCM_8", b"AES_CBC"}
+
+
 def installed_sa(session, name, reqid):
     return any(
         sa.get("state") == b"ESTABLISHED"
         and child.get("state") == b"INSTALLED"
-        and child.get("encr-alg") == b"AES_GCM_16"
+        and child.get("encr-alg") in ALLOWED_ENCR_ALGS
         and child.get("reqid") == str(reqid).encode()
         for row in session.list_sas({"ike": name})
         for sa in row.values()
