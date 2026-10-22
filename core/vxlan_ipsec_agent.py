@@ -301,17 +301,10 @@ def up(c):
                 "id", str(c["vni"]),
                 "remote", c["remote"],
                 "dstport", str(c["dst_port"]),
-                "nolearning",
             )
         command("ip", "link", "set", c["interface"], "mtu", str(c["mtu"]))
         command("ip", "addr", "replace", c["private"] + "/30", "dev", c["interface"])
         command("ip", "link", "set", c["interface"], "up")
-        # Point-to-point VXLAN with `nolearning` never learns the peer MAC, so
-        # a static FDB/neighbour entry is required before the kernel will
-        # encapsulate traffic towards `remote`. Without it TCP/UDP probes fail
-        # with EHOSTUNREACH.
-        command("ip", "neigh", "replace", c["peer"], "lladdr", "00:00:00:00:00:00",
-                "dev", c["interface"], "nud", "permanent", check=False)
         command("ip", "route", "replace", c["peer"] + "/32", "dev", c["interface"])
         firewall(c)
     except Exception:
