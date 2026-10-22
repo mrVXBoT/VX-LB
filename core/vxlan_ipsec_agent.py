@@ -397,6 +397,14 @@ def echo(c):
 
     threading.Thread(target=tcp_loop, daemon=True).start()
     print(port, flush=True)
+    # Exit when stdin closes (parent SSH channel closed) so we do not leak.
+    def stdin_watchdog():
+        try:
+            sys.stdin.read()
+        except Exception:
+            pass
+        os._exit(0)
+    threading.Thread(target=stdin_watchdog, daemon=True).start()
     try:
         while True:
             time.sleep(1)

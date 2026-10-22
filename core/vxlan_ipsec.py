@@ -65,7 +65,49 @@ def detect_ipsec_unit(ssh):
     return None
 
 
-def install_agent(ssh, node=None):
+def install_strongswan(ssh) -> Optional[str]:
+    code, out, _ = ssh.execute(
+        "command -v apt-get || command -v dnf || command -v yum || command -v zypper",
+        timeout=15,
+    )
+    if code != 0 or not out.strip():
+        return None
+    manager = out.strip().splitlines()[0]
+    if "apt-get" in manager:
+        execute(
+            ssh,
+            "export DEBIAN_FRONTEND=noninteractive; "
+            "apt-get update -y >/dev/null 2>&1 || true; "
+            "apt-get install -y --no-install-recommends charon-systemd >/dev/null",
+            timeout=180,
+        )
+    elif "dnf" in manager or "yum" in manager:
+        execute(
+            ssh,
+            "command -v dnf >/dev/null && dnf install -y strongswan >/dev/null "
+            "|| yum install -y strongswan >/dev/null",
+            timeout=180,
+        )
+    elif "zypper" in manager:
+        execute(ssh, "zypper --non-interactive install strongswan >/dev/null", timeout=180)
+    for _ in range(6):
+        execute(
+            ssh,
+            "systemctl daemon-reload; "
+            "systemctl enable --now strongswan.service 2>/dev/null "
+            "|| systemctl enable --now strongswan-starter.service 2>/dev/null "
+            "|| systemctl enable --now strongswan-swanctl.service 2>/dev/null "
+            "|| systemctl enable --now ipsec.service 2>/dev/null || true",
+            timeout=30,
+        )
+        unit_name = detect_ipsec_unit(ssh)
+        if unit_name:
+            return unit_name
+        time.sleep(1)
+    return None
+
+
+def install_agent(ssh, node=None, config_index=0):
     try:
         execute(
             ssh,
@@ -78,15 +120,15 @@ def install_agent(ssh, node=None):
             "kernel module; raw/plain mode is not allowed. " + str(error)
         ) from error
 
-    unit_name = detect_ipsec_unit(ssh)
+    unit_name = detect_ipsec_unit(ssh) or install_strongswan(ssh)
     if not unit_name:
         raise RuntimeError(
             "VXLAN + IPsec needs an active strongSwan daemon exposing a VICI socket "
-            "(/run/charon.vici); raw mode is not allowed. On Debian/Ubuntu install "
+            "(/run/charon.vici); automatic installation failed. On Debian/Ubuntu install "
             "'charon-systemd' (provides strongswan.service), then enable and start it."
         )
-    if node is not None:
-        node.setdefault("vxsec", {})["ipsec_unit"] = unit_name
+    if node is not None and 0 <= config_index < len(node.get("vxsec", {}).get("configs", [])):
+        node["vxsec"]["configs"][config_index]["ipsec_unit"] = unit_name
 
     vici_dir = Path(__file__).resolve().parent / "vendor" / "vici"
     if vici_dir.exists():
@@ -138,11 +180,12 @@ def run_agent(ssh, node, action, *args) -> str:
     )
 
 
-def service(node, relay=False) -> str:
+def service(node, relay=False, config_index=0) -> str:
     config_path = path(node)
     helper = "python3 " + AGENT
     link_unit = unit(node)
-    ipsec_unit = node.get("vxsec", {}).get("ipsec_unit") or "strongswan.service"
+    config = node["vxsec"]["configs"][config_index] if node.get("vxsec", {}).get("configs") else {}
+    ipsec_unit = config.get("ipsec_unit") or node.get("vxsec", {}).get("ipsec_unit") or "strongswan.service"
     return f"""[Unit]
 Description=VX-LB VXLAN+IPsec {'TCP/UDP relay' if relay else 'private link'}
 After=network-online.target {ipsec_unit} {link_unit if relay else ''}
@@ -309,18 +352,37 @@ def update_job(pool: str, target_ip: str, **fields):
     atomic_update(write_job)
 
 
+def secure_start_with_retry(iran, node, attempts=12, delay=1.5):
+    last = None
+    for _ in range(attempts):
+        try:
+            return run_agent(iran, node, "secure-start")
+        except RuntimeError as error:
+            last = error
+            time.sleep(delay)
+    raise last
+
+
 def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
     pool = get_pools().get(pool_name)
     if not pool:
         return False, "VXLAN+IPsec pool not found"
     if any(n["ip"] == server["ip"] for n in pool["nodes"]):
         return False, "Server already belongs to this pool"
+
+    update_job(
+        pool_name, server["ip"], status="queued",
+        ip=server["ip"], name=server.get("name", server["ip"]),
+        message="در صف افزودن نود VXLAN+IPsec",
+    )
+
     from core.load_balancer import LoadBalancerManager
 
     ok, message = LoadBalancerManager.check_port_conflicts(
         pool["client_ports"], [server["ip"]], exclude_pool_name=pool_name
     )
     if not ok:
+        update_job(pool_name, server["ip"], status="failed", message="راه‌اندازی VXLAN+IPsec کامل نشد", error=message)
         return False, message
 
     try:
@@ -333,6 +395,7 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
             dst_port=pool.get("vxsec_dst_port", DEFAULT_DST_PORT),
         )
     except ValueError as error:
+        update_job(pool_name, server["ip"], status="failed", message="راه‌اندازی VXLAN+IPsec کامل نشد", error=str(error))
         return False, str(error)
 
     sessions = []
@@ -352,8 +415,8 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
         kharej = connect(pool["kharej_server"])
         sessions.append(kharej)
 
-        for ssh, c in zip(sessions, node["vxsec"]["configs"]):
-            install_agent(ssh, node)
+        for index, (ssh, c) in enumerate(zip(sessions, node["vxsec"]["configs"])):
+            install_agent(ssh, node, config_index=index)
             execute(
                 ssh,
                 "test ! -e "
@@ -373,12 +436,12 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
         installed = list(sessions)
 
         progress("ساخت لینک VXLAN و بارگذاری سیاست‌های IPsec با دیوار آتش محافظ")
-        for ssh in sessions:
-            write(ssh, "/etc/systemd/system/" + unit(node), service(node))
+        for index, ssh in enumerate(sessions):
+            write(ssh, "/etc/systemd/system/" + unit(node), service(node, config_index=index))
             execute(ssh, "systemctl daemon-reload")
             execute(ssh, "systemctl enable --now " + shlex.quote(unit(node)), timeout=90)
 
-        run_agent(iran, node, "secure-start")
+        secure_start_with_retry(iran, node)
 
         progress("آزمون رمزنگاری و عبور ترافیک TCP و UDP")
         verify(iran, kharej, node)
@@ -423,7 +486,11 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
             atomic_update(discard)
 
         message = str(error) + (("; پاک‌سازی کامل نشد: " + "; ".join(failures)) if failures else "")
-        update_job(pool_name, server["ip"], status="failed", message="راه‌اندازی VXLAN+IPsec کامل نشد", error=message)
+        update_job(
+            pool_name, server["ip"], status="failed",
+            message="راه‌اندازی VXLAN+IPsec کامل نشد", error=message,
+            ip=server["ip"], name=server.get("name", server["ip"]),
+        )
         return False, message
     finally:
         for ssh in sessions:
