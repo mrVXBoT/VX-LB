@@ -295,13 +295,26 @@ def up(c):
             if info.get("linkinfo", {}).get("info_kind") != "vxlan":
                 raise RuntimeError("Interface name already in use by a non-VXLAN link")
         else:
-            command(
+            # Pin the underlay egress device — VXLAN resolves `remote` itself
+            # and without an explicit `dev` it can pick the wrong interface or
+            # fail to transmit ARP/encapsulated frames entirely (EHOSTUNREACH).
+            underlay_dev = command(
+                "ip", "-j", "route", "get", c["remote"], check=True,
+            ).stdout
+            try:
+                underlay_dev = json.loads(underlay_dev)[0].get("dev", "")
+            except (ValueError, IndexError, AttributeError):
+                underlay_dev = ""
+            args = [
                 "ip", "link", "add", c["interface"],
                 "type", "vxlan",
                 "id", str(c["vni"]),
                 "remote", c["remote"],
                 "dstport", str(c["dst_port"]),
-            )
+            ]
+            if underlay_dev:
+                args += ["dev", underlay_dev]
+            command(*args)
         command("ip", "link", "set", c["interface"], "mtu", str(c["mtu"]))
         command("ip", "addr", "replace", c["private"] + "/30", "dev", c["interface"])
         command("ip", "link", "set", c["interface"], "up")
