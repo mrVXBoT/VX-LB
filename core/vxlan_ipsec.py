@@ -10,6 +10,7 @@ Manages two-server and multi-node VXLAN + IPsec links:
 import copy
 import ipaddress
 import json
+import re
 import secrets
 import shlex
 import time
@@ -211,7 +212,7 @@ WantedBy=multi-user.target
 """
 
 
-def allocate(server: dict, kharej: dict, ports: list, mtu: int = 1280, vni: Optional[int] = None, dst_port: int = DEFAULT_DST_PORT) -> dict:
+def allocate(server: dict, kharej: dict, ports: list, mtu: int = 1280, vni: Optional[int] = None, dst_port: int = DEFAULT_DST_PORT, node_name: Optional[str] = None) -> dict:
     local = str(ipaddress.IPv4Address(server["ip"]))
     remote = str(ipaddress.IPv4Address(kharej["ip"]))
     if local == remote:
@@ -256,7 +257,9 @@ def allocate(server: dict, kharej: dict, ports: list, mtu: int = 1280, vni: Opti
                 if {c["local"], c["remote"]} == {local, remote}:
                     raise ValueError("Only one managed IPsec VXLAN link per endpoint pair is currently supported")
 
-    interface = "vx" + secrets.token_hex(5)
+    interface = node_name or ("vx" + secrets.token_hex(5))
+    if not re.fullmatch(r"vx[0-9a-f]{4,10}", interface):
+        raise ValueError("Invalid VXLAN+IPsec interface name")
     security = {
         "mode": "ipsec",
         "psk": secrets.token_hex(32),
@@ -416,6 +419,7 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
             pool.get("vxsec_mtu", 1280),
             vni=pool.get("vni"),
             dst_port=pool.get("vxsec_dst_port", DEFAULT_DST_PORT),
+            node_name=server.get("node_name"),
         )
     except ValueError as error:
         update_job(pool_name, server["ip"], status="failed", message="راه‌اندازی VXLAN+IPsec کامل نشد", error=str(error))

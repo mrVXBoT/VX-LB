@@ -795,9 +795,15 @@ def _kernel_rollback(name, backup_pool, to_engine, from_engine, target):
 
         for rec in reversed(changed):
             try:
-                ok, msg = _remove_node_engine(name, rec, to_engine, backup_pool)
-                if not ok:
-                    failures.append(str(msg))
+                target_node = rec.get('target_node')
+                if target_node:
+                    ok, msg = _remove_node_engine(name, target_node, to_engine, backup_pool)
+                    if not ok:
+                        failures.append(str(msg))
+                else:
+                    ok, msg = _remove_node_engine(name, rec, to_engine, backup_pool)
+                    if not ok:
+                        failures.append(str(msg))
             except Exception as exc:
                 failures.append(str(exc))
 
@@ -921,6 +927,12 @@ def _run_kernel_rolling_change(name, pool, job, recovering=False):
             ok_dst, msg_dst = _deploy_node(name, srv)
             if not ok_dst:
                 raise RuntimeError('راه‌اندازی تونل جدید نود ناموفق بود: ' + str(msg_dst))
+            deployed_pool = load_data().get('pools', {}).get(name, {})
+            deployed_node = next(
+                (n for n in deployed_pool.get('nodes', []) if n.get('ip') == srv.get('ip')),
+                None,
+            )
+            changed[-1]['target_node'] = copy.deepcopy(deployed_node) if deployed_node else None
 
         def commit(data):
             p = data['pools'][name]
