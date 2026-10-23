@@ -19,7 +19,7 @@ class RetryWarmup(Exception): pass
 def retriable(error):
     if isinstance(error,socket.timeout):
         return True
-    return getattr(error,'errno',None) in (113,101,111)
+    return getattr(error,'errno',None) in (113,101,111,114)
 def dial(kind):
     sock=socket.socket(socket.AF_INET,kind);sock.settimeout(15)
     while True:
