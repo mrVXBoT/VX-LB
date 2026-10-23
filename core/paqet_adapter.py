@@ -231,7 +231,6 @@ class PaqetAdapter:
         port_str = validate_port(listen_port)
         iface = validate_interface(interface)
         mac = validate_mac(router_mac)
-        ciph = validate_cipher(cipher)
         mode = validate_kcp_mode(kcp_mode)
         flags = validate_tcp_flags(local_flags or ["PA"])
 
@@ -254,15 +253,15 @@ class PaqetAdapter:
                 },
                 "tcp": {
                     "local_flag": flags,
+                    "remote_flag": validate_tcp_flags(local_flags or ["PA"]),
                 },
             },
             "transport": {
                 "protocol": "kcp",
-                "conn": max(1, min(int(conn), 256)),
                 "kcp": {
                     "mode": mode,
-                    "block": ciph,
                     "key": secret_key.strip(),
+                    "conn": max(1, min(int(conn), 256)),
                 },
             },
         }
@@ -335,11 +334,10 @@ class PaqetAdapter:
             },
             "transport": {
                 "protocol": "kcp",
-                "conn": max(1, min(int(conn), 256)),
                 "kcp": {
                     "mode": mode,
-                    "block": ciph,
                     "key": secret_key.strip(),
+                    "conn": max(1, min(int(conn), 256)),
                 },
             },
         }

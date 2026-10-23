@@ -151,9 +151,10 @@ def test_paqet_server_config():
     assert cfg_dict["network"]["ipv4"]["addr"] == "45.38.41.122:9999"
     assert cfg_dict["network"]["ipv4"]["router_mac"] == "aa:bb:cc:dd:ee:ff"
     assert cfg_dict["transport"]["protocol"] == "kcp"
-    assert cfg_dict["transport"]["kcp"]["block"] == "aes-128-gcm"
     assert cfg_dict["transport"]["kcp"]["key"] == secret
     assert cfg_dict["transport"]["kcp"]["mode"] == "fast"
+    assert cfg_dict["transport"]["kcp"]["conn"] == 1
+    assert cfg_dict["network"]["tcp"]["remote_flag"] == ["PA"]
 
     # Validate YAML output can be parsed back identically
     parsed = yaml.safe_load(yaml_str)
@@ -189,6 +190,7 @@ def test_paqet_client_config():
     assert cfg_dict["server"]["addr"] == "45.38.41.122:9999"
     assert cfg_dict["transport"]["protocol"] == "kcp"
     assert cfg_dict["transport"]["kcp"]["key"] == secret
+    assert cfg_dict["transport"]["kcp"]["conn"] == 1
 
     # Check TCP and UDP forward rules
     assert len(cfg_dict["forward"]) == 2
