@@ -880,6 +880,22 @@ def _run_kernel_rolling_change(name, pool, job, recovering=False):
             p['gre_mtu'] = int(args['mtu'])
         if target == 'tun' and args.get('mtu'):
             p['tun_mtu'] = int(args['mtu'])
+        if target == 'vxlan':
+            vni = args.get('vni') or p.get('vni') or 1000
+            dst_port = args.get('dst_port') or p.get('dst_port') or p.get('vxsec_dst_port') or 4789
+            mtu = args.get('mtu') or p.get('vxlan_mtu') or p.get('vxsec_mtu') or 1400
+            p['vni'] = int(vni)
+            p['dst_port'] = int(dst_port)
+            p['vxlan_mtu'] = int(mtu)
+            p['vxlan_method'] = args.get('vxlan_method') or p.get('vxlan_method') or 'p2p'
+        if target == 'vxlan_ipsec':
+            vni = args.get('vni') or p.get('vni')
+            dst_port = args.get('dst_port') or p.get('vxsec_dst_port') or 4789
+            mtu = args.get('mtu') or p.get('vxsec_mtu') or 1280
+            if vni is not None:
+                p['vni'] = int(vni)
+            p['vxsec_dst_port'] = int(dst_port)
+            p['vxsec_mtu'] = int(mtu)
     atomic_update(_set_target)
 
     changed = []
