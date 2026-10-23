@@ -313,7 +313,8 @@ def verify(iran, kharej, node) -> bool:
             code, out, _ = target.execute(
                 "nohup python3 " + shlex.quote(AGENT) + " echo "
                 + shlex.quote(path(node)) + " " + shlex.quote(port_file)
-                + " >/tmp/vxsec-echo.log 2>&1 & echo $!",
+                + " >/tmp/vxsec-echo.log 2>&1 & "
+                + "echo $!",
                 timeout=10,
             )
             pid = out.strip().splitlines()[-1].strip() if out else ""

@@ -440,14 +440,20 @@ def echo(c, port_file=None):
 
     threading.Thread(target=tcp_loop, daemon=True).start()
     print(port, flush=True)
-    # Exit when stdin closes (parent SSH channel closed) so we do not leak.
-    def stdin_watchdog():
-        try:
-            sys.stdin.read()
-        except Exception:
-            pass
-        os._exit(0)
-    threading.Thread(target=stdin_watchdog, daemon=True).start()
+    # Exit when the SSH channel's stdin pipe closes so we do not leak the
+    # responder process. Only install the watchdog when stdin is actually a
+    # pipe — under `nohup`/detached launch stdin is /dev/null and read()
+    # returns EOF instantly, which would kill the responder on startup.
+    import stat
+    if stat.S_ISFIFO(os.fstat(0).st_mode):
+        def stdin_watchdog():
+            try:
+                while sys.stdin.read(1):
+                    pass
+            except Exception:
+                pass
+            os._exit(0)
+        threading.Thread(target=stdin_watchdog, daemon=True).start()
     try:
         while True:
             time.sleep(1)
