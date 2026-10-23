@@ -341,6 +341,22 @@ def down(c):
     except Exception:
         pass
     security_firewall(c, remove=True)
+    # Failed migrations can leave older-generation rules from previous reqids
+    # behind; exact-config removal cannot match those. Sweep everything tagged
+    # for this interface so the endpoint never keeps stale guards.
+    purge_rules = [
+        line.strip()
+        for chain in ("INPUT", "OUTPUT", "FORWARD")
+        for line in command(
+            "iptables", "-w", "-S", chain, check=False
+        ).stdout.splitlines()
+        if line.strip().startswith("-A " + chain + " ")
+        and ("vxlb-sec-" + c["interface"] in line or "vxlb-vx-" + c["interface"] in line)
+    ]
+    for line in purge_rules:
+        chain = line.split()[1]
+        spec = line[len("-A " + chain + " "):]
+        command("iptables", "-w", "-D", chain, *spec, check=False)
 
 
 def mtu(c):

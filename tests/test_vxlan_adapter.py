@@ -531,6 +531,14 @@ class VxlanAdapterTests(unittest.TestCase):
                     written_paths,
                     f"relay unit must be published under the stored iface for {node_name}",
                 )
+                executed = [c.args[0] for c in mock_ssh.execute.call_args_list]
+                self.assertTrue(
+                    any(
+                        "vxlb-sec-" in command and node_name in command and stored in command
+                        for command in executed
+                    ),
+                    f"stale VX-LB firewall tags must be purged on the endpoints for {node_name}",
+                )
                 from core.vxlan_adapter import remove_pool
                 remove_pool(pool_name)
 

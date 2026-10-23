@@ -40,23 +40,34 @@ import socket,sys,json,time,secrets
 host=sys.argv[1];port=int(sys.argv[2]);nonce=sys.argv[3].encode();iface=sys.argv[4]
 af=socket.AF_INET6 if ':' in host else socket.AF_INET
 start=time.monotonic()
+deadline=time.monotonic()+15
 for kind in (socket.SOCK_STREAM,socket.SOCK_DGRAM):
- with socket.socket(af,kind) as sock:
-  # A fresh WireGuard endpoint may need the 5-second handshake retry.
-  sock.settimeout(8)
-  if iface:sock.setsockopt(socket.SOL_SOCKET,socket.SO_BINDTODEVICE,iface.encode()+b'\0')
-  sock.connect((host,port))
-  for i in range(4):
-   size=65536 if kind==socket.SOCK_STREAM and i==0 else 1024
-   data=nonce+str(i).encode()+secrets.token_bytes(size)
-   sock.sendall(data)
-   result=b''
-   while len(result)<len(data):
-    part=sock.recv(65536)
-    if not part:raise RuntimeError('Echo closed before completion')
-    result+=part
-    if kind==socket.SOCK_DGRAM:break
-   if result!=data:raise RuntimeError('Echo challenge mismatch')
+ while True:
+  try:
+   with socket.socket(af,kind) as sock:
+    # A fresh kernel tunnel endpoint must first learn the peer MAC through
+    # ARP/flooding across the tunnel; until resolution completes `connect`
+    # can report EHOSTUNREACH/ENETUNREACH even when the tunnel is healthy.
+    sock.settimeout(8)
+    if iface:sock.setsockopt(socket.SOL_SOCKET,socket.SO_BINDTODEVICE,iface.encode()+b'\0')
+    sock.connect((host,port))
+    for i in range(4):
+     size=65536 if kind==socket.SOCK_STREAM and i==0 else 1024
+     data=nonce+str(i).encode()+secrets.token_bytes(size)
+     sock.sendall(data)
+     result=b''
+     while len(result)<len(data):
+      part=sock.recv(65536)
+      if not part:raise RuntimeError('Echo closed before completion')
+      result+=part
+      if kind==socket.SOCK_DGRAM:break
+     if result!=data:raise RuntimeError('Echo challenge mismatch')
+   break
+  except OSError as error:
+   if error.errno in (113,101,111) and time.monotonic()<deadline:
+    time.sleep(0.4)
+    continue
+   raise
 print(json.dumps({'passed':True,'latency_ms':(time.monotonic()-start)*1000,'protocols':['tcp','udp']}))
 '''
 

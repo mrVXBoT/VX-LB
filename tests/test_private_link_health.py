@@ -20,6 +20,36 @@ def test_tcp_udp_probe_scripts_echo_real_bytes_on_localhost():
         responder.stdin.close()
         responder.wait(timeout=3)
 
+def test_probe_retries_transient_bringup_errors_until_ready():
+    """First connects to a fresh kernel tunnel can hit transient OSErrors while
+    ARP/peers resolve; the probe must retry instead of failing immediately."""
+    import socket as _socket
+    # Reserve a port that is guaranteed to refuse connections until the
+    # (delayed) responder finally binds to it.
+    with _socket.socket() as shoe:
+        shoe.bind(('127.0.0.1', 0))
+        shoe.listen(1)
+        port = shoe.getsockname()[1]
+    delayed_responder = subprocess.Popen(
+        ['sh', '-c', 'sleep 2; exec "$1" -u -c "$2" "$3" "$4"', 'sh',
+         sys.executable, health.ECHO, '127.0.0.1', str(port)],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    try:
+        # No responder yet: the old probe code died instantly with OSError
+        # ECONNREFUSED; the retry-capable probe waits for the responder.
+        result = subprocess.run(
+            [sys.executable, '-c', health.PROBE, '127.0.0.1', str(port), 'nonce-test', ''],
+            capture_output=True, text=True, timeout=20,
+        )
+        assert result.returncode == 0, result.stderr
+        assert json.loads(result.stdout)['protocols'] == ['tcp', 'udp']
+    finally:
+        delayed_responder.stdin.close()
+        delayed_responder.wait(timeout=3)
+        delayed_responder.kill()
+
+
 @pytest.mark.parametrize('path_pass,relay_pass,destination_pass,expected',[(False,True,True,'DOWN'),(True,True,False,'DOWN'),(True,False,True,'DOWN'),(True,True,True,'HEALTHY')])
 def test_listener_alone_can_never_make_node_healthy(path_pass,relay_pass,destination_pass,expected):
     node={'ip':'192.0.2.1','engine':'wireguard','wireguard':{'interface':'wg-test','local_private':'10.1.0.1','remote_private':'10.1.0.2'}}

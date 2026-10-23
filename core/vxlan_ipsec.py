@@ -442,7 +442,10 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
         kharej = connect(pool["kharej_server"])
         sessions.append(kharej)
 
+        progress("در حال اتصال و پاک‌سازی بقایای فایروال تلاش‌های قبلی")
+        from core.firewall_purge import purge_kernel_engine_rules
         for index, (ssh, c) in enumerate(zip(sessions, node["vxsec"]["configs"])):
+            purge_kernel_engine_rules(ssh, c["interface"], node.get("node_name"))
             install_agent(ssh, node, config_index=index)
             execute(
                 ssh,
