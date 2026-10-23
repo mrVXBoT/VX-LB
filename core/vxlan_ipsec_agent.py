@@ -122,8 +122,8 @@ def ipsec_connection(c):
         "remote": {"auth": "psk", "id": c["remote"]},
         "children": {
             c["interface"]: {
-                "local_ts": [c["local"] + "/32[17/" + dst_port + "]"],
-                "remote_ts": [c["remote"] + "/32[17/" + dst_port + "]"],
+                "local_ts": [c["local"] + "/32[17]"],
+                "remote_ts": [c["remote"] + "/32[17]"],
                 "mode": "transport",
                 "reqid": str(sec["reqid"]),
                 "esp_proposals": ["aes256gcm16-ecp256", "aes256gcm16-modp2048",
@@ -311,6 +311,7 @@ def up(c):
                 "id", str(c["vni"]),
                 "remote", c["remote"],
                 "dstport", str(c["dst_port"]),
+                "srcport", str(c["dst_port"]), str(c["dst_port"]),
             ]
             if underlay_dev:
                 args += ["dev", underlay_dev]
