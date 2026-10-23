@@ -902,6 +902,20 @@ def _run_kernel_rolling_change(name, pool, job, recovering=False):
                 p['vni'] = int(vni)
             p['vxsec_dst_port'] = int(dst_port)
             p['vxsec_mtu'] = int(mtu)
+        if target == 'dc6':
+            carrier = (
+                args.get('carrier_type')
+                or args.get('carrier')
+                or p.get('carrier_type')
+                or p.get('carrier')
+                or 'sit'
+            )
+            p['carrier_type'] = carrier
+            p['carrier'] = carrier
+            if args.get('mtu') or args.get('dc6_mtu'):
+                p['dc6_mtu'] = int(args.get('mtu') or args.get('dc6_mtu'))
+            if args.get('mss_clamp'):
+                p['dc6_mss_clamp'] = int(args['mss_clamp'])
     atomic_update(_set_target)
 
     changed = []
