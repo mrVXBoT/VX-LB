@@ -1315,7 +1315,7 @@ async function submitCreatePool(e) {
              wireguard_mtu: document.getElementById("new-pool-wireguard-mtu")?.value || '1280',
              enable_psk: document.getElementById("new-pool-wireguard-psk")?.checked || false,
            } :
-           ['paqet', 'quantum', 'quantum+', 'quantum-gaming'].includes(transport) ? {camouflage:{tunnel_port:document.getElementById('paqet-tunnel-port')?.value || '9999',binary:document.getElementById('paqet-binary')?.value || '/usr/local/bin/paqet'}} :
+           transport === 'paqet' ? {camouflage:{tunnel_port:document.getElementById('paqet-tunnel-port')?.value || '9999',binary:document.getElementById('paqet-binary')?.value || '/usr/local/bin/paqet'}} :
            transport === "slipstream" ? {
              domain: document.getElementById("slipstream-domain")?.value || "",
              resolvers: (document.getElementById("slipstream-resolvers")?.value || "").split(",").map(r => r.trim()).filter(Boolean),
@@ -2085,12 +2085,9 @@ const ENGINE_TRANSPORTS = {
     ]
   },
   paqet: {
-    label: "اسکریپت Paqet (موتور پکت خام و حالت‌های کوانتوم L3)",
+    label: "اسکریپت Paqet (حامل KCP خام)",
     transports: [
-      { value: "quantum", label: "06. Quantum (KCP Fast-ARQ تهاجمی - رفع گلوگاه پکت‌لاس)", hint: "الگوریتم پرسرعت تهاجمی جهت حذف کامل افت سرعت ناشی از پکت‌لاس" },
-      { value: "quantum+", label: "07. Quantum+ (KCP + Reed-Solomon FEC)", hint: "تحمل قطعی بسته‌ها با کدگذاری ماتریسی رید-سولومون بدون نیاز به بازفرست" },
-      { value: "quantum-gaming", label: "12. Quantum Gaming (KCP با تایمر 10ms برای بازی و مکالمه)", hint: "تایمر 10ms و ارسال ACK فوری؛ تأخیر به شبکه وابسته است" },
-      { value: "paqet", label: "Paqet Raw Carrier (حامل باینری مستقیم پکت روی سوکت خام)", hint: "استفاده مستقیم از باینری رسمی Paqet در لایه 3" }
+      { value: "paqet", label: "Paqet Raw KCP", hint: "حامل رسمی Paqet با KCP خام و forward TCP" }
     ]
   },
   waterwall: {
@@ -2509,7 +2506,7 @@ function updateGreCreateFields() {
     });
   }
 
-  const paqet = ['paqet', 'quantum', 'quantum+', 'quantum-gaming'].includes(mode);
+  const paqet = mode === 'paqet';
   const paqetDiv = document.getElementById('paqet-create-fields');
   if (paqetDiv) {
     paqetDiv.classList.toggle('hidden', !paqet);
