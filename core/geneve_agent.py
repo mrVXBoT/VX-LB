@@ -172,6 +172,21 @@ def ipsec(c, action):
     elif action == "start":
         if installed_sa(session, name, sec["reqid"]):
             return
+        # Ensure the connection (and its CHILD_SA) is actually loaded. After a
+        # strongSwan restart or an incomplete prior teardown the config may be
+        # gone, which makes initiate() fail with "CHILD_SA config not found".
+        known = session.get_conns().get("conns", [])
+        if name.encode() not in known:
+            session.load_shared(
+                {
+                    "id": name,
+                    "type": "IKE",
+                    "data": bytes.fromhex(sec["psk"]),
+                    "owners": [c["local"], c["remote"]],
+                }
+            )
+            session.load_conn({name: ipsec_connection(c)})
+            session.install({"child": c["interface"], "ike": name})
         messages = []
         try:
             for event in session.initiate(
