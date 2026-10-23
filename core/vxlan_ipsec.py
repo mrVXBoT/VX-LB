@@ -527,11 +527,23 @@ def add(pool_name: str, server: dict, callback=None) -> Tuple[bool, str]:
 def verify_relay(ssh, node, ports):
     script = """import json,subprocess,sys
 unit=sys.argv[1];ports=set(map(int,json.loads(sys.argv[2])))
-pid=subprocess.check_output(['systemctl','show',unit,'--property=MainPID','--value'],text=True).strip()
-if not pid.isdigit() or int(pid)==0:sys.exit(1)
+pids=set()
+main=subprocess.check_output(['systemctl','show',unit,'--property=MainPID','--value'],text=True).strip()
+if main.isdigit() and int(main):pids.add(main)
+try:
+ cgroup=subprocess.check_output(['systemctl','show',unit,'--property=ControlGroup','--value'],text=True).strip()
+ if cgroup:
+  for line in open('/sys/fs/cgroup'+cgroup+'/cgroup.procs'):
+   if line.strip().isdigit():pids.add(line.strip())
+except (OSError,subprocess.CalledProcessError):pass
+if not pids:sys.exit(1)
 for kind in ['-ltnp','-lunp']:
  text=subprocess.check_output(['ss',kind],text=True)
- found={int(line.split()[3].rsplit(':',1)[-1]) for line in text.splitlines()[1:] if 'pid='+pid+',' in line}
+ found=set()
+ for line in text.splitlines()[1:]:
+  if any('pid='+pid+',' in line for pid in pids):
+   try:found.add(int(line.split()[3].rsplit(':',1)[-1]))
+   except (IndexError,ValueError):pass
  if not ports.issubset(found):sys.exit(1)
 """
     command = "python3 -c " + shlex.quote(script) + " " + shlex.quote(unit(node, True)) + " " + shlex.quote(json.dumps(ports))

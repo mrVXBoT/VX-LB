@@ -745,8 +745,11 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
             callback(msg)
 
     ir_cidr, kh_cidr = allocate_vxlan_private_ips()
-    node_id = f"vx_{secrets.token_hex(4)}"
-    iface = make_vxlan_iface(node_id)
+    node_id = str(server.get("node_name") or f"vx_{secrets.token_hex(4)}")
+    if re.fullmatch(r"vx[0-9a-f]{4,10}", node_id):
+        iface = node_id
+    else:
+        iface = make_vxlan_iface(node_id.removeprefix("vx_"))
     method = pool.get("vxlan_method", VXLAN_METHOD_P2P)
     vni_val = pool.get("vni", DEFAULT_VXLAN_VNI)
     dst_port_val = pool.get("dst_port", DEFAULT_VXLAN_PORT)
