@@ -1062,8 +1062,8 @@ def start_change(name, target, background=True, repair=False, **kwargs):
         if target == pool.get('transport') and target_engine == curr_engine:
             return False, 'نوع تونل جدید برابر نوع فعلی است'
 
-        if target != 'gre' and pool.get('transport') == 'gre':
-            return False, 'GRE موتور مستقلی است؛ مهاجرت از آن پشتیبانی نمی‌شود؛ برای نوع دیگر استخر جدید بسازید'
+        if pool.get('transport') == 'gre' and target_engine not in KERNEL_ENGINES:
+            return False, 'GRE موتور مستقلی است؛ این تغییر تنها به موتورهای هسته (kernel) پشتیبانی می‌شود؛ برای بقیه استخر جدید بسازید'
 
         if target_engine == 'xray' or target in {'xhttp', 'xhttps', 'nova', 'gre_xhttp'}:
             cam = kwargs.get('camouflage') or pool.get('camouflage') or {}
