@@ -5,13 +5,11 @@ from core import paqet_probe as probe
 
 NODE={'node_name':'node','paqet':{'probe_port':43000,'probe_backend_port':44000}}
 
-def test_forwarding_includes_tcp_udp_and_loopback_only_probe():
+def test_forwarding_includes_tcp_and_optional_loopback_probe():
     rules=probe.forward_rules(NODE,'192.0.2.2',['443'])
-    assert [r['protocol'] for r in rules]==['tcp','udp','tcp','udp']
-    # The probe ingress listens on loopback locally, but the Paqet raw-packet
-    # server cannot deliver to loopback; it must target the real server IP so
-    # the ECHO responder bound to that address receives the tunnelled data.
-    assert all(r['listen']=='127.0.0.1:43000' and r['target']=='192.0.2.2:44000' for r in rules[2:])
+    assert [r['protocol'] for r in rules]==['tcp','tcp','udp']
+    assert rules[0] == {'listen':'0.0.0.0:443','target':'192.0.2.2:443','protocol':'tcp'}
+    assert all(r['listen']=='127.0.0.1:43000' and r['target']=='192.0.2.2:44000' for r in rules[1:])
     with pytest.raises(ValueError):probe.forward_rules(NODE,'192.0.2.2',['43000'])
 
 @pytest.mark.parametrize('code,protocols,passed',[(0,['tcp','udp'],True),(1,['tcp','udp'],False),(0,['tcp'],False)])

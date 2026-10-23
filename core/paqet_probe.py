@@ -92,8 +92,7 @@ def forward_rules(node,server_ip,ports):
     rules=[]
     validated=validate_ports(ports)
     for port in validated:
-        for protocol in ('tcp','udp'):
-            rules.append({'listen':f'0.0.0.0:{port}','target':f'{server_ip}:{port}','protocol':protocol})
+        rules.append({'listen':f'0.0.0.0:{port}','target':f'{server_ip}:{port}','protocol':'tcp'})
     meta=node.get('paqet',{})
     ingress=meta.get('probe_port');backend=meta.get('probe_backend_port')
     if str(meta.get('tunnel_port')) in validated:

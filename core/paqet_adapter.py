@@ -179,6 +179,8 @@ def build_forward_rule(listen: str, target: str, protocol: str = "tcp") -> Dict[
 # path is unusable on lossy links with the stock defaults; these buffer/window
 # settings are what keeps the tunnel alive under heavy packet loss (e.g. the
 # IR <-> EU route commonly used by operators).
+# mode: fast — paqctl's proven mode; fast3 did not establish the raw
+# tunnel on v1.0.0-alpha.21 in production.
 HIGHLOSS_KCP_PROFILE = {
     "conn": 2,
     "mtu": 1350,
@@ -193,6 +195,7 @@ HIGHLOSS_KCP_PROFILE = {
     "dshard": 10,
     "pshard": 3,
 }
+DEFAULT_KCP_MODE = "fast"
 
 
 class PaqetAdapter:
@@ -394,12 +397,16 @@ class PaqetAdapter:
             "mkdir -p /etc/sysctl.d && "
             "echo 'net.ipv4.tcp_rfc1337=1' > /etc/sysctl.d/99-vxlb-paqet.conf",
         ]
+        tunnel_p = int(validate_port(tunnel_port))
+        # INPUT DROP must only apply to forwarded listen ports, not the raw
+        # tunnel port — dropping the tunnel port kills the KCP handshake.
         for p in ports:
+            if p != tunnel_p:
+                cmds.append(
+                    f"iptables -C INPUT -p tcp --dport {p} -j DROP 2>/dev/null || "
+                    f"iptables -I INPUT 1 -p tcp --dport {p} -j DROP"
+                )
             cmds.extend([
-                # Block kernel from seeing inbound on this port at all — without it
-                # the kernel emits RSTs which kill raw-packet TCP sessions.
-                f"iptables -C INPUT -p tcp --dport {p} -j DROP 2>/dev/null || "
-                f"iptables -I INPUT 1 -p tcp --dport {p} -j DROP",
                 f"iptables -t raw -C PREROUTING -p tcp --dport {p} -j NOTRACK 2>/dev/null || "
                 f"iptables -t raw -A PREROUTING -p tcp --dport {p} -j NOTRACK",
                 f"iptables -t raw -C OUTPUT -p tcp --sport {p} -j NOTRACK 2>/dev/null || "
@@ -426,9 +433,11 @@ class PaqetAdapter:
             except Exception:
                 continue
         cmds = []
+        tunnel_p = int(validate_port(tunnel_port))
         for p in ports:
+            if p != tunnel_p:
+                cmds.append(f"iptables -D INPUT -p tcp --dport {p} -j DROP 2>/dev/null || true")
             cmds.extend([
-                f"iptables -D INPUT -p tcp --dport {p} -j DROP 2>/dev/null || true",
                 f"iptables -t raw -D PREROUTING -p tcp --dport {p} -j NOTRACK 2>/dev/null || true",
                 f"iptables -t raw -D OUTPUT -p tcp --sport {p} -j NOTRACK 2>/dev/null || true",
                 f"iptables -t mangle -D OUTPUT -p tcp --sport {p} --tcp-flags RST RST -j DROP 2>/dev/null || true",
@@ -925,7 +934,7 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
         tunnel_port = reserve_probe_port(kharej, used_ports, preferred=preferred_port, bind_host='0.0.0.0')
         secret_key = (pool.get("camouflage") or {}).get("secret_key") or generate_paqet_secret()
         cipher = (pool.get("camouflage") or {}).get("cipher", "aes-128-gcm")
-        kcp_mode = (pool.get("camouflage") or {}).get("kcp_mode", "fast")
+        kcp_mode = (pool.get("camouflage") or {}).get("kcp_mode") or DEFAULT_KCP_MODE
 
         # Start from the proven high-loss KCP profile (same as paqctl's
         # "High-Loss" profile) so the raw tunnel survives lossy links, then

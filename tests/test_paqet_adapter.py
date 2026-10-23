@@ -205,23 +205,21 @@ def test_iptables_commands():
     adapter = PaqetAdapter()
     setup_cmds = adapter.build_iptables_setup_commands(9999)
     # 2 sysctl lines + 4 iptables per port
-    assert len(setup_cmds) == 6
-    assert any("INPUT -p tcp --dport 9999 -j DROP" in cmd for cmd in setup_cmds)
+    assert len(setup_cmds) == 5
     assert any("PREROUTING -p tcp --dport 9999 -j NOTRACK" in cmd for cmd in setup_cmds)
     assert any("OUTPUT -p tcp --sport 9999 -j NOTRACK" in cmd for cmd in setup_cmds)
     assert any("OUTPUT -p tcp --sport 9999 --tcp-flags RST RST -j DROP" in cmd for cmd in setup_cmds)
     assert any("tcp_rfc1337" in cmd for cmd in setup_cmds)
 
     teardown_cmds = adapter.build_iptables_teardown_commands(9999)
-    assert len(teardown_cmds) == 4
-    assert any("-D INPUT -p tcp --dport 9999 -j DROP" in cmd for cmd in teardown_cmds)
+    assert len(teardown_cmds) == 3
     assert any("-D PREROUTING -p tcp --dport 9999 -j NOTRACK" in cmd for cmd in teardown_cmds)
     assert any("-D OUTPUT -p tcp --sport 9999 -j NOTRACK" in cmd for cmd in teardown_cmds)
     assert any("-D OUTPUT -p tcp --sport 9999 --tcp-flags RST RST -j DROP" in cmd for cmd in teardown_cmds)
 
     setup_with_extra = adapter.build_iptables_setup_commands(9999, extra_ports=[30068, 30068])
     # dedupe + 2 sysctl + 4*2 iptables
-    assert len(setup_with_extra) == 10
+    assert len(setup_with_extra) == 9
     assert sum("dport 30068" in c or "sport 30068" in c for c in setup_with_extra) == 4
 
 
