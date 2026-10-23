@@ -202,16 +202,23 @@ def test_paqet_client_config():
 def test_iptables_commands():
     adapter = PaqetAdapter()
     setup_cmds = adapter.build_iptables_setup_commands(9999)
-    assert len(setup_cmds) == 3
+    # 2 sysctl lines + 3 iptables per port
+    assert len(setup_cmds) == 5
     assert any("PREROUTING -p tcp --dport 9999 -j NOTRACK" in cmd for cmd in setup_cmds)
     assert any("OUTPUT -p tcp --sport 9999 -j NOTRACK" in cmd for cmd in setup_cmds)
     assert any("OUTPUT -p tcp --sport 9999 --tcp-flags RST RST -j DROP" in cmd for cmd in setup_cmds)
+    assert any("tcp_rfc1337" in cmd for cmd in setup_cmds)
 
     teardown_cmds = adapter.build_iptables_teardown_commands(9999)
     assert len(teardown_cmds) == 3
     assert any("-D PREROUTING -p tcp --dport 9999 -j NOTRACK" in cmd for cmd in teardown_cmds)
     assert any("-D OUTPUT -p tcp --sport 9999 -j NOTRACK" in cmd for cmd in teardown_cmds)
     assert any("-D OUTPUT -p tcp --sport 9999 --tcp-flags RST RST -j DROP" in cmd for cmd in teardown_cmds)
+
+    setup_with_extra = adapter.build_iptables_setup_commands(9999, extra_ports=[30068, 30068])
+    # dedupe + 2 sysctl + 3*2 iptables
+    assert len(setup_with_extra) == 8
+    assert sum("dport 30068" in c or "sport 30068" in c for c in setup_with_extra) == 3
 
 
 def test_systemd_unit():
@@ -329,16 +336,22 @@ def test_deployment_shell_writes_clean_yaml_and_runs_service(tmp_path, role):
     commands = tmp_path / 'commands'
     commands.mkdir()
     calls = tmp_path / 'calls'
-    for name in ('systemctl', 'iptables'):
+    for name in ('systemctl', 'iptables', 'sysctl'):
         stub = commands / name
         stub.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "' + str(calls) + '"\n')
         stub.chmod(0o755)
     units = tmp_path / 'units'
     units.mkdir()
+    vxlb = tmp_path / 'vxlb'
+    vxlb.mkdir()
+    sysctl_d = tmp_path / 'sysctl.d'
+    sysctl_d.mkdir()
 
     class ShellSSH:
         def execute(self, cmd, timeout=30):
             cmd = cmd.replace('/etc/systemd/system/', str(units) + '/')
+            cmd = cmd.replace('/etc/vxlb/', str(vxlb) + '/')
+            cmd = cmd.replace('/etc/sysctl.d/', str(sysctl_d) + '/')
             result = subprocess.run(['bash', '-c', cmd], capture_output=True, text=True,
                                     env={**os.environ, 'PATH': str(commands) + ':' + os.environ['PATH']})
             return result.returncode, result.stdout, result.stderr

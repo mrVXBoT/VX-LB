@@ -370,34 +370,105 @@ class PaqetAdapter:
         yaml_content = yaml.dump(config, sort_keys=False, default_flow_style=False)
         return config, yaml_content
 
-    def build_iptables_setup_commands(self, tunnel_port: int) -> List[str]:
+    def build_iptables_setup_commands(
+        self,
+        tunnel_port: int,
+        extra_ports: Optional[List[int]] = None,
+    ) -> List[str]:
         """
         Generates mandatory iptables commands to prevent kernel RST injection
-        and conntrack interference on the raw Paqet port.
+        and conntrack interference on the raw Paqet port (and any extra ports
+        the node is listening on for forwarding).
         """
-        p = validate_port(tunnel_port)
-        return [
-            # 1. NOTRACK PREROUTING
-            f"iptables -t raw -C PREROUTING -p tcp --dport {p} -j NOTRACK 2>/dev/null || "
-            f"iptables -t raw -A PREROUTING -p tcp --dport {p} -j NOTRACK",
-            # 2. NOTRACK OUTPUT
-            f"iptables -t raw -C OUTPUT -p tcp --sport {p} -j NOTRACK 2>/dev/null || "
-            f"iptables -t raw -A OUTPUT -p tcp --sport {p} -j NOTRACK",
-            # 3. Suppress kernel TCP RST in mangle OUTPUT
-            f"iptables -t mangle -C OUTPUT -p tcp --sport {p} --tcp-flags RST RST -j DROP 2>/dev/null || "
-            f"iptables -t mangle -A OUTPUT -p tcp --sport {p} --tcp-flags RST RST -j DROP",
+        ports = [int(validate_port(tunnel_port))]
+        for ep in extra_ports or []:
+            try:
+                ep_i = int(validate_port(ep))
+                if ep_i not in ports:
+                    ports.append(ep_i)
+            except Exception:
+                continue
+        cmds = [
+            # RFC 1337 drops RST on sockets in TIME-WAIT instead of aborting them;
+            # without it the kernel nukes paqet's half-lived raw TCP flows on
+            # every unrelated inbound packet.
+            "sysctl -w net.ipv4.tcp_rfc1337=1 >/dev/null 2>&1 || true",
+            "mkdir -p /etc/sysctl.d && "
+            "echo 'net.ipv4.tcp_rfc1337=1' > /etc/sysctl.d/99-vxlb-paqet.conf",
         ]
+        for p in ports:
+            cmds.extend([
+                f"iptables -t raw -C PREROUTING -p tcp --dport {p} -j NOTRACK 2>/dev/null || "
+                f"iptables -t raw -A PREROUTING -p tcp --dport {p} -j NOTRACK",
+                f"iptables -t raw -C OUTPUT -p tcp --sport {p} -j NOTRACK 2>/dev/null || "
+                f"iptables -t raw -A OUTPUT -p tcp --sport {p} -j NOTRACK",
+                f"iptables -t mangle -C OUTPUT -p tcp --sport {p} --tcp-flags RST RST -j DROP 2>/dev/null || "
+                f"iptables -t mangle -A OUTPUT -p tcp --sport {p} --tcp-flags RST RST -j DROP",
+            ])
+        return cmds
 
-    def build_iptables_teardown_commands(self, tunnel_port: int) -> List[str]:
+    def build_iptables_teardown_commands(
+        self,
+        tunnel_port: int,
+        extra_ports: Optional[List[int]] = None,
+    ) -> List[str]:
         """
         Generates teardown commands to cleanly remove Paqet iptables rules upon teardown.
         """
-        p = validate_port(tunnel_port)
-        return [
-            f"iptables -t raw -D PREROUTING -p tcp --dport {p} -j NOTRACK 2>/dev/null || true",
-            f"iptables -t raw -D OUTPUT -p tcp --sport {p} -j NOTRACK 2>/dev/null || true",
-            f"iptables -t mangle -D OUTPUT -p tcp --sport {p} --tcp-flags RST RST -j DROP 2>/dev/null || true",
-        ]
+        ports = [int(validate_port(tunnel_port))]
+        for ep in extra_ports or []:
+            try:
+                ep_i = int(validate_port(ep))
+                if ep_i not in ports:
+                    ports.append(ep_i)
+            except Exception:
+                continue
+        cmds = []
+        for p in ports:
+            cmds.extend([
+                f"iptables -t raw -D PREROUTING -p tcp --dport {p} -j NOTRACK 2>/dev/null || true",
+                f"iptables -t raw -D OUTPUT -p tcp --sport {p} -j NOTRACK 2>/dev/null || true",
+                f"iptables -t mangle -D OUTPUT -p tcp --sport {p} --tcp-flags RST RST -j DROP 2>/dev/null || true",
+            ])
+        return cmds
+
+    @staticmethod
+    def _forward_listen_ports(forward_rules: Optional[List[Dict[str, str]]]) -> List[int]:
+        """Extract the local listen ports from paqet forward rules."""
+        ports: List[int] = []
+        for rule in forward_rules or []:
+            listen = str(rule.get("listen", ""))
+            if ":" in listen:
+                try:
+                    ports.append(int(listen.rsplit(":", 1)[1]))
+                except (ValueError, IndexError):
+                    continue
+        return ports
+
+    def build_persistence_unit(self, tunnel_name: str, commands: List[str]) -> Tuple[str, str, str]:
+        """Builds an oneshot systemd unit that re-applies firewall/sysctl rules at boot.
+
+        Returns (unit_name, script_path, unit_content).
+        """
+        t_name = validate_tunnel_name(tunnel_name)
+        script_path = f"/etc/vxlb/paqet-{t_name}-fw.sh"
+        unit_name = f"vxlb-paqet-{t_name}-fw.service"
+        script = "#!/bin/bash\nset +e\n" + "\n".join(commands) + "\n"
+        unit = f"""[Unit]
+Description=VX-LB Paqet Firewall Rules ({t_name})
+After=network.target network-online.target
+Wants=network-online.target
+Before=paqet-{t_name}.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash {script_path}
+
+[Install]
+WantedBy=multi-user.target
+"""
+        return unit_name, script_path, unit, script
 
     def build_systemd_unit(self, tunnel_name: str) -> str:
         """
@@ -505,18 +576,26 @@ WantedBy=multi-user.target
         )
         unit = self.build_systemd_unit(t_name)
         iptables_cmds = self.build_iptables_setup_commands(p)
+        fw_unit_name, fw_script_path, fw_unit, fw_script = self.build_persistence_unit(
+            t_name, iptables_cmds
+        )
 
         # Execute remote setup commands
         cfg_path = f"{self.config_dir}/{t_name}.yaml"
         unit_path = f"/etc/systemd/system/paqet-{t_name}.service"
+        fw_unit_path = f"/etc/systemd/system/{fw_unit_name}"
 
         commands = [
-            f"mkdir -p {self.config_dir}",
+            f"mkdir -p {self.config_dir} /etc/vxlb/",
             f"cat << 'EOF' > {cfg_path}\n{yaml_cfg}\nEOF",
             f"chmod 600 {cfg_path}",
             f"cat << 'EOF' > {unit_path}\n{unit}\nEOF",
+            f"cat << 'EOF' > {fw_script_path}\n{fw_script}\nEOF",
+            f"chmod +x {fw_script_path}",
+            f"cat << 'EOF' > {fw_unit_path}\n{fw_unit}\nEOF",
             *iptables_cmds,
             "systemctl daemon-reload",
+            f"systemctl enable {fw_unit_name} 2>/dev/null || true",
             f"systemctl enable --now paqet-{t_name}.service",
             f"systemctl restart paqet-{t_name}.service",
         ]
@@ -572,16 +651,27 @@ WantedBy=multi-user.target
             conn=conn,
         )
         unit = self.build_systemd_unit(t_name)
+        listen_ports = self._forward_listen_ports(forward_rules)
+        iptables_cmds = self.build_iptables_setup_commands(p, extra_ports=listen_ports)
+        fw_unit_name, fw_script_path, fw_unit, fw_script = self.build_persistence_unit(
+            t_name, iptables_cmds
+        )
 
         cfg_path = f"{self.config_dir}/{t_name}.yaml"
         unit_path = f"/etc/systemd/system/paqet-{t_name}.service"
+        fw_unit_path = f"/etc/systemd/system/{fw_unit_name}"
 
         commands = [
-            f"mkdir -p {self.config_dir}",
+            f"mkdir -p {self.config_dir} /etc/vxlb/",
             f"cat << 'EOF' > {cfg_path}\n{yaml_cfg}\nEOF",
             f"chmod 600 {cfg_path}",
             f"cat << 'EOF' > {unit_path}\n{unit}\nEOF",
+            f"cat << 'EOF' > {fw_script_path}\n{fw_script}\nEOF",
+            f"chmod +x {fw_script_path}",
+            f"cat << 'EOF' > {fw_unit_path}\n{fw_unit}\nEOF",
+            *iptables_cmds,
             "systemctl daemon-reload",
+            f"systemctl enable {fw_unit_name} 2>/dev/null || true",
             f"systemctl enable --now paqet-{t_name}.service",
             f"systemctl restart paqet-{t_name}.service",
         ]
@@ -606,11 +696,16 @@ WantedBy=multi-user.target
         cfg_path = f"{self.config_dir}/{t_name}.yaml"
         unit_name = f"paqet-{t_name}.service"
         unit_path = f"/etc/systemd/system/{unit_name}"
+        fw_unit_name = f"vxlb-paqet-{t_name}-fw.service"
+        fw_unit_path = f"/etc/systemd/system/{fw_unit_name}"
+        fw_script_path = f"/etc/vxlb/paqet-{t_name}-fw.sh"
 
         cleanup_cmds = [
             f"systemctl stop {unit_name} 2>/dev/null || true",
             f"systemctl disable {unit_name} 2>/dev/null || true",
-            f"rm -f {unit_path} {cfg_path}",
+            f"systemctl stop {fw_unit_name} 2>/dev/null || true",
+            f"systemctl disable {fw_unit_name} 2>/dev/null || true",
+            f"rm -f {unit_path} {cfg_path} {fw_unit_path} {fw_script_path}",
             "systemctl daemon-reload",
         ]
 
