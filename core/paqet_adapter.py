@@ -175,6 +175,26 @@ def build_forward_rule(listen: str, target: str, protocol: str = "tcp") -> Dict[
     }
 
 
+# Mirrors paqctl's "High-Loss / Restricted Uplink" KCP profile. The raw KCP
+# path is unusable on lossy links with the stock defaults; these buffer/window
+# settings are what keeps the tunnel alive under heavy packet loss (e.g. the
+# IR <-> EU route commonly used by operators).
+HIGHLOSS_KCP_PROFILE = {
+    "conn": 2,
+    "mtu": 1350,
+    "sndwnd": 1024,
+    "rcvwnd": 1024,
+    "nodelay": 0,
+    "interval": 20,
+    "resend": 2,
+    "nocongestion": 0,
+    "sockbuf": 4194304,
+    "smuxbuf": 4194304,
+    "dshard": 10,
+    "pshard": 3,
+}
+
+
 class PaqetAdapter:
     """
     Adapter for configuring, deploying, and managing Paqet tunnels.
@@ -254,7 +274,8 @@ class PaqetAdapter:
             }
 
         if kcp_tuning:
-            allowed = {'dshard', 'pshard', 'nodelay', 'interval', 'resend', 'nocongestion', 'wdelay', 'acknodelay'}
+            allowed = {'dshard', 'pshard', 'nodelay', 'interval', 'resend', 'nocongestion',
+                       'wdelay', 'acknodelay', 'mtu', 'sndwnd', 'rcvwnd', 'sockbuf', 'smuxbuf'}
             if set(kcp_tuning) - allowed:
                 raise ValueError('Unsupported KCP tuning option')
             config['transport']['kcp'].update(kcp_tuning)
@@ -341,7 +362,8 @@ class PaqetAdapter:
             config["socks5"] = socks5_rules
 
         if kcp_tuning:
-            allowed = {'dshard', 'pshard', 'nodelay', 'interval', 'resend', 'nocongestion', 'wdelay', 'acknodelay'}
+            allowed = {'dshard', 'pshard', 'nodelay', 'interval', 'resend', 'nocongestion',
+                       'wdelay', 'acknodelay', 'mtu', 'sndwnd', 'rcvwnd', 'sockbuf', 'smuxbuf'}
             if set(kcp_tuning) - allowed:
                 raise ValueError('Unsupported KCP tuning option')
             config['transport']['kcp'].update(kcp_tuning)
@@ -455,6 +477,7 @@ WantedBy=multi-user.target
         router_mac: Optional[str] = None,
         server_ip: Optional[str] = None,
         kcp_tuning: Optional[dict] = None,
+        conn: int = 2,
     ) -> Tuple[bool, str]:
         """
         Provisions and starts Paqet server on a remote server node.
@@ -478,6 +501,7 @@ WantedBy=multi-user.target
             cipher=cipher,
             kcp_mode=kcp_mode,
             kcp_tuning=kcp_tuning,
+            conn=conn,
         )
         unit = self.build_systemd_unit(t_name)
         iptables_cmds = self.build_iptables_setup_commands(p)
@@ -520,6 +544,7 @@ WantedBy=multi-user.target
         router_mac: Optional[str] = None,
         client_ip: Optional[str] = None,
         kcp_tuning: Optional[dict] = None,
+        conn: int = 2,
     ) -> Tuple[bool, str]:
         """
         Provisions and starts Paqet client on a remote client node.
@@ -544,6 +569,7 @@ WantedBy=multi-user.target
             cipher=cipher,
             kcp_mode=kcp_mode,
             kcp_tuning=kcp_tuning,
+            conn=conn,
         )
         unit = self.build_systemd_unit(t_name)
 
@@ -778,7 +804,12 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
         cipher = (pool.get("camouflage") or {}).get("cipher", "aes-128-gcm")
         kcp_mode = (pool.get("camouflage") or {}).get("kcp_mode", "fast")
 
-        kcp_tuning = {}
+        # Start from the proven high-loss KCP profile (same as paqctl's
+        # "High-Loss" profile) so the raw tunnel survives lossy links, then
+        # apply transport-specific overrides on top.
+        kcp_tuning = dict(HIGHLOSS_KCP_PROFILE)
+        kcp_tuning.pop('conn', None)
+        conn = int(HIGHLOSS_KCP_PROFILE.get('conn', 2))
         if pool.get('transport') == 'quantum+':
             profile = pool.get('camouflage') or {}
             data, parity = int(profile.get('fec_datashard', 10)), int(profile.get('fec_parityshard', 3))
@@ -818,6 +849,7 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
             cipher=cipher,
             kcp_mode=kcp_mode,
             kcp_tuning=kcp_tuning,
+            conn=conn,
         )
         if not ok_kh:
             raise RuntimeError(msg_kh)
@@ -836,6 +868,7 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
             cipher=cipher,
             kcp_mode=kcp_mode,
             kcp_tuning=kcp_tuning,
+            conn=conn,
         )
         if not ok_ir:
             raise RuntimeError(msg_ir)
