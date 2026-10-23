@@ -35,7 +35,7 @@ def once():
     for kind,proto in ((socket.SOCK_STREAM,'tcp'),(socket.SOCK_DGRAM,'udp')):
         sock=dial(kind)
         try:
-            data=nonce+b'/'+proto.encode()+secrets.token_bytes(4096)
+            data=nonce+b'/'+proto.encode()+secrets.token_bytes(256)
             sock.sendall(data)
             got=b''
             while len(got)<len(data):
