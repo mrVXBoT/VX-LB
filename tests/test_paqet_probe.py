@@ -16,14 +16,15 @@ def test_forwarding_includes_tcp_udp_and_loopback_only_probe():
 
 @pytest.mark.parametrize('code,protocols,passed',[(0,['tcp','udp'],True),(1,['tcp','udp'],False),(0,['tcp'],False)])
 def test_probe_uses_forwarded_ingress_and_closes_responder(code,protocols,passed):
-    ir=MagicMock();kh=MagicMock();kh.ip='192.0.2.2';stdout=MagicMock();stdout.readline.return_value='44000\n';kh.client.exec_command.return_value=(None,stdout,None)
+    ir=MagicMock();kh=MagicMock();kh.ip='192.0.2.2';stdout=MagicMock();stdout.readline.side_effect=['44000\n','44000\n','44000\n','44000\n'];kh.client.exec_command.return_value=(None,stdout,None)
     ir.execute.return_value=(code,json.dumps({'passed':True,'latency_ms':3,'protocols':protocols}),'')
     if passed:assert probe.verify_data(ir,kh,NODE)['latency_ms']==3
     else:
         with pytest.raises(RuntimeError):probe.verify_data(ir,kh,NODE)
     assert '127.0.0.1 43000' in ir.execute.call_args.args[0]
-    # ECHO must bind to the real server IP, not loopback, so Paqet can deliver.
-    assert '192.0.2.2' in kh.client.exec_command.call_args.args[0]
+    # ECHO must bind to all interfaces (0.0.0.0) so the Paqet raw-packet
+    # server can deliver to the real server IP, not loopback only.
+    assert '0.0.0.0' in kh.client.exec_command.call_args.args[0]
     stdout.channel.close.assert_called_once()
 
 

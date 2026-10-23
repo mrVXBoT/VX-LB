@@ -2,6 +2,7 @@
 import json
 import secrets
 import shlex
+import time
 from core.validation import validate_ports,validate_port
 from core.private_link_health import ECHO,PROBE
 
@@ -51,10 +52,20 @@ def verify_data(iran,kharej,node):
     backend=validate_port(meta.get('probe_backend_port',''))
     channel=None
     try:
-        bind_ip = getattr(kharej, "ip", None) or "0.0.0.0"
+        # Bind on all interfaces so the Paqet raw-packet server can deliver to
+        # the real server IP. 0.0.0.0 covers both loopback and the public IP.
+        bind_ip = "0.0.0.0"
         stdin,stdout,stderr=kharej.client.exec_command('python3 -u -c '+shlex.quote(ECHO)+' '+shlex.quote(bind_ip)+' '+backend,timeout=10)
-        channel=stdout.channel;channel.settimeout(10)
-        if stdout.readline().strip()!=backend:
+        channel=stdout.channel;channel.settimeout(15)
+        bound = None
+        for _ in range(20):
+            line = stdout.readline()
+            if not line:
+                time.sleep(0.3)
+                continue
+            bound = line.strip()
+            break
+        if bound != backend:
             raise RuntimeError('Paqet probe backend could not bind its reserved port')
         code,out,_=iran.execute('python3 -c '+shlex.quote(PROBE)+' 127.0.0.1 '+ingress+' '+secrets.token_hex(24)+" ''",timeout=30)
         if code:raise RuntimeError('TCP/UDP data did not traverse Paqet')
