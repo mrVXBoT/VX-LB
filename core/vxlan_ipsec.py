@@ -765,11 +765,20 @@ def health(pool_name: str, node: dict, ports: list):
     if node.get("provisioning"):
         return "DOWN", "VXLAN+IPsec provisioning interrupted or cleanup required", {}
     pool = get_pools().get(pool_name, {})
+    if not pool:
+        return "DOWN", f"VXLAN+IPsec pool '{pool_name}' not found", {}
+    kharej_server = pool.get("kharej_server") or pool.get("kharej")
+    if not kharej_server:
+        return (
+            "DOWN",
+            "VXLAN+IPsec verification failed: رکورد استخر فاقد سرور خارج (kharej_server) است؛ وضعیت منابع را بررسی کنید",
+            {},
+        )
     sessions = []
     try:
         iran = connect(node)
         sessions.append(iran)
-        kharej = connect(pool["kharej_server"])
+        kharej = connect(kharej_server)
         sessions.append(kharej)
         verify(iran, kharej, node)
         verify_relay(iran, node, ports)
