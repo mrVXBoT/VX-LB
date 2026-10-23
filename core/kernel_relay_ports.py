@@ -50,18 +50,26 @@ def checked(ssh, command):
         raise RuntimeError(f'Relay operation failed on {ssh.ip} (rc={code}): {detail}')
 
 
-def verify_listeners(ssh, service, ports):
-    # Verify BOTH TCP and UDP sockets belong to this service, not another process.
+def verify_listeners(ssh, service, ports, attempts=20):
+    # Verify BOTH TCP and UDP sockets belong to this service, not another
+    # process. Retries tolerate slow starts and crash-restart windows; when the
+    # check still fails, the service state and its journal are returned so the
+    # real cause is visible instead of a bare assertion error.
     program = '''import subprocess,sys,time
-pid=subprocess.check_output(['systemctl','show','--property=MainPID','--value',sys.argv[1]],text=True).strip()
-assert pid.isdecimal() and int(pid)>0
-for attempt in range(20):
- rows=subprocess.check_output(['ss','-H','-lntup'],text=True).splitlines()
- if all(any(r.split()[0]==proto and r.split()[4].endswith(':'+port) and ('pid='+pid+',') in r for r in rows) for port in sys.argv[2:] for proto in ('tcp','udp')):break
+pid=''
+for attempt in range(int(sys.argv[1])):
+ r=subprocess.run(['systemctl','show','--property=MainPID','--value',sys.argv[2]],capture_output=True,text=True)
+ pid=r.stdout.strip()
+ if pid.isdecimal() and int(pid)>0:
+  rows=subprocess.check_output(['ss','-H','-lntup'],text=True).splitlines()
+  if all(any(row.split()[0]==proto and row.split()[4].endswith(':'+port) and ('pid='+pid+',') in row for row in rows) for port in sys.argv[3:] for proto in ('tcp','udp')):sys.exit(0)
  time.sleep(0.2)
-else:raise RuntimeError('Relay listener verification failed')
+state=subprocess.run(['systemctl','show','--property=LoadState,ActiveState,SubState,MainPID,Result,ExecMainStatus','--value',sys.argv[2]],capture_output=True,text=True).stdout.strip()
+print('relay '+sys.argv[2]+' is not listening; MainPID='+repr(pid)+'; '+state)
+subprocess.run(['journalctl','-u',sys.argv[2],'-n','12','--no-pager','-o','cat'],stderr=subprocess.DEVNULL)
+sys.exit(1)
 '''
-    checked(ssh, 'python3 -c ' + shlex.quote(program) + ' ' + shlex.quote(service) + ' ' + ' '.join(map(str, ports)))
+    checked(ssh, 'python3 -c ' + shlex.quote(program) + ' ' + str(attempts) + ' ' + shlex.quote(service) + ' ' + ' '.join(map(str, ports)))
 
 
 def check_ports_free(ssh, ports):

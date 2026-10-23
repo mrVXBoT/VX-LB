@@ -483,11 +483,13 @@ class VxlanDedicatedAdapter(BaseTunnelAdapter):
             f"ip link set dev {shlex.quote(iface)} down 2>/dev/null || true; "
             f"ip link del {shlex.quote(iface)} 2>/dev/null || true; "
             f"{bridge_cleanup_cmd}"
-            f"rm -f /etc/systemd/system/{svc} "
-            f"/etc/systemd/system/vxlb-vxlan-{iface}-relay.service "
-            f"/usr/local/bin/vxlb-{iface}-relay.py "
-            f"/usr/local/bin/vxlb-{shlex.quote(iface)}-start.sh "
-            f"/usr/local/bin/vxlb-{shlex.quote(iface)}-stop.sh; "
+            + "rm -f " + " ".join(shlex.quote(p) for p in (
+                "/etc/systemd/system/" + svc,
+                f"/etc/systemd/system/vxlb-vxlan-{iface}-relay.service",
+                f"/usr/local/bin/vxlb-{iface}-relay.py",
+                f"/usr/local/bin/vxlb-{iface}-start.sh",
+                f"/usr/local/bin/vxlb-{iface}-stop.sh",
+            )) + "; "
             f"systemctl daemon-reload"
         )
         ok, out, err = ssh.execute(cmd)
@@ -732,6 +734,18 @@ def create(
     return any_success, msg, updated_pool
 
 
+def relay_journal(ssh, unit, lines=12):
+    """Best-effort journal tail for a relay unit; '' when nothing is available."""
+    try:
+        _, out, _ = ssh.execute(
+            "journalctl -u " + shlex.quote(unit) + " -n " + str(lines) + " --no-pager -o cat 2>/dev/null",
+            timeout=10,
+        )
+        return (out or "").strip()
+    except Exception:
+        return ""
+
+
 def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = None) -> Tuple[bool, str]:
     """Add an Iran server node to an existing VXLAN pool."""
     pool = get_pools().get(name)
@@ -820,11 +834,19 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
             "peers": [kharej["ip"]],
         }
         config_payload = adapter.configure(server, kharej, pool_cfg)
+        # The adapter is the single source of truth for the deployed interface
+        # name: relay, systemd units and stored metadata must never diverge,
+        # otherwise the relay unit points Requires= at a nonexistent service.
+        iface = config_payload["interface"]
+        node["vxlan"]["iface"] = iface
         node["vxlan"]["bridge_name"] = config_payload["bridge_name"]
         def record_bridge(data):
             for entry in data["pools"][name]["nodes"]:
                 if entry["node_name"] == node_id:
-                    entry["vxlan"]["bridge_name"] = config_payload["bridge_name"]
+                    entry["vxlan"].update(
+                        iface=iface,
+                        bridge_name=config_payload["bridge_name"],
+                    )
         atomic_update(record_bridge)
         def publish(ssh, path, content):
             if not ssh.write_file(path, content):
@@ -860,15 +882,30 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
             check_ports_free(ir_ssh, client_ports)
             progress("استقرار سرویس فوروارد پورت‌های کلاینت...")
             relay_py, relay_unit = generate_relay_script_and_unit(iface, kh_cidr.split("/")[0], client_ports)
-            publish(ir_ssh, f"/usr/local/bin/vxlb-{iface}-relay.py", relay_py)
-            publish(ir_ssh, f"/etc/systemd/system/vxlb-vxlan-{iface}-relay.service", relay_unit)
+            relay_unit_name = "vxlb-vxlan-" + iface + "-relay.service"
+            relay_script = "/usr/local/bin/vxlb-" + iface + "-relay.py"
+            relay_service = "/etc/systemd/system/" + relay_unit_name
+            # Purge stale runtime artifacts from earlier attempts so the fresh
+            # unit always replaces them instead of inheriting broken state.
+            ir_ssh.execute(
+                "systemctl stop " + shlex.quote(relay_unit_name) + " 2>/dev/null; "
+                "systemctl disable " + shlex.quote(relay_unit_name) + " 2>/dev/null; "
+                "rm -f " + shlex.quote(relay_script) + " " + shlex.quote(relay_service) + "; "
+                "systemctl daemon-reload"
+            )
+            publish(ir_ssh, relay_script, relay_py)
+            publish(ir_ssh, relay_service, relay_unit)
             code, _, error = ir_ssh.execute(
-                f"chmod 755 /usr/local/bin/vxlb-{iface}-relay.py && "
-                f"systemctl daemon-reload && "
-                f"systemctl enable --now vxlb-vxlan-{iface}-relay.service"
+                "chmod 755 " + shlex.quote(relay_script) + " && "
+                "systemctl daemon-reload && "
+                "systemctl enable --now " + shlex.quote(relay_unit_name)
             )
             if code:
-                raise RuntimeError("VXLAN relay startup failed: " + error)
+                journal = relay_journal(ir_ssh, relay_unit_name)
+                raise RuntimeError(
+                    "VXLAN relay startup failed: " + (error or "exit code " + str(code))
+                    + (("\n" + journal) if journal else "")
+                )
 
         if client_ports:
             from core.kernel_relay_ports import verify_listeners

@@ -471,6 +471,103 @@ class VxlanAdapterTests(unittest.TestCase):
         self.assertIn("vxlb-vx-test1-relay.py", unit)
         self.assertIn("vxlb-vxlan-vx-test1.service", unit)
 
+    def test_stored_interface_matches_adapter_configuration(self):
+        """add() stores the adapter-configured interface so relay unit names match deployed units.
+
+        Regression: when a node migrating from vxlan_ipsec to vxlan kept the old
+        vx<hex> node name, add() used that raw id for the relay unit while the
+        adapter deployed the link under make_vxlan_iface(node_name) -- the relay
+        then required a nonexistent service and never started.
+        """
+        from unittest.mock import Mock, patch
+        from core.vxlan_adapter import VxlanDedicatedAdapter, create
+        from core.storage import get_pools
+        from core.vxlan_tools import make_vxlan_iface
+
+        adapter = VxlanDedicatedAdapter()
+        mock_ssh = Mock()
+        mock_ssh.connect.return_value = (True, "Connected")
+
+        def expected_iface(node_name):
+            from core.validation import validate_tunnel_name
+            candidate = re.sub(r"^[^a-z0-9]+", "", str(node_name).lower())
+            return make_vxlan_iface(validate_tunnel_name(candidate[:12]))
+
+        for node_name in ("vx0f9e2d3c1b", "node_ir_migration", "vx_node01"):
+            pool_name = "iface_sync_pool_" + re.sub(r"[^a-z0-9]", "", node_name)
+            kharej = {"name": "Kharej", "ip": "203.0.113.10", "port": 22, "password": "pass"}
+            irans = [{"name": "Iran1", "ip": "198.51.100.10", "port": 22, "password": "pass", "node_name": node_name}]
+            mock_ssh.reset_mock()
+            mock_ssh.execute.side_effect = lambda command, **kw: (1, "", "") if command.startswith("ip link show dev ") else (0, "", "")
+            mock_ssh.write_file.return_value = True
+            with patch("core.private_link_health.probe_pair", return_value={"passed": True, "latency_ms": 1}), patch(
+                "core.vxlan_adapter.connect", return_value=mock_ssh
+            ), patch(
+                "core.vxlan_adapter.load_data",
+                return_value={"iran_servers": [{"ip": "198.51.100.10", "password": "pass"}]},
+            ):
+                ok, msg, pool = create(
+                    name=pool_name,
+                    kharej=kharej,
+                    servers=irans,
+                    ports=["8080"],
+                    vxlan_method="p2p",
+                    vni=2000,
+                    dst_port=4789,
+                    mtu=1400,
+                )
+                self.assertTrue(ok, msg)
+                node = get_pools()[pool_name]["nodes"][0]
+                stored = node["vxlan"]["iface"]
+                self.assertEqual(
+                    stored,
+                    expected_iface(node_name),
+                    f"stored iface must equal adapter-derived iface for {node_name}",
+                )
+                relay_service = f"/etc/systemd/system/vxlb-vxlan-{stored}-relay.service"
+                written_paths = [c.args[0] for c in mock_ssh.write_file.call_args_list]
+                self.assertIn(
+                    relay_service,
+                    written_paths,
+                    f"relay unit must be published under the stored iface for {node_name}",
+                )
+                from core.vxlan_adapter import remove_pool
+                remove_pool(pool_name)
+
+    def test_verify_listeners_reports_service_state_and_journal(self):
+        """verify_listeners surfaces MainPID/service state instead of an AssertionError."""
+        from core.kernel_relay_ports import verify_listeners
+
+        class FakeSSH:
+            ip = "203.0.113.9"
+            calls = []
+
+            def execute(self, command, timeout=30):
+                FakeSSH.calls.append(command)
+                return (1, "relay vx.service is not listening; MainPID='0'; loaded\ninactive dead\nbind: Address already in use", "")
+
+        fake = FakeSSH()
+        with self.assertRaises(RuntimeError) as ctx:
+            verify_listeners(fake, "vx.service", [30068])
+        message = str(ctx.exception)
+        self.assertIn("not listening", message)
+        self.assertIn("Address already in use", message)
+        self.assertIn("30068", FakeSSH.calls[0])
+
+    def test_verify_listeners_success_path(self):
+        """verify_listeners accepts a healthy relay service without retries."""
+        from core.kernel_relay_ports import verify_listeners
+
+        class FakeSSH:
+            ip = "203.0.113.9"
+
+            def execute(self, command, timeout=30):
+                return (0, "", "")
+
+        verified = verify_listeners(FakeSSH(), "vx.service", [30068])
+        self.assertIsNone(verified)
+
+
     def test_pool_lifecycle_orchestration(self):
         """create, add, change_mtu, and remove_pool work together seamlessly."""
         from unittest.mock import patch
