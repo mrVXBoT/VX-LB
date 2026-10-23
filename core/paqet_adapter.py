@@ -700,6 +700,27 @@ WantedBy=multi-user.target
         fw_unit_path = f"/etc/systemd/system/{fw_unit_name}"
         fw_script_path = f"/etc/vxlb/paqet-{t_name}-fw.sh"
 
+        # Pull listen ports from the existing paqet config before deleting it so
+        # teardown removes the firewall rules for forwarded ports too — otherwise
+        # rules from the previous deploy linger and break the next pool's traffic.
+        code_cfg, cfg_out, _ = ssh.execute(f"cat {cfg_path} 2>/dev/null || true")
+        forward_listen_ports: List[int] = []
+        if cfg_out.strip():
+            try:
+                existing = yaml.safe_load(cfg_out) or {}
+                forward_listen_ports = self._forward_listen_ports(existing.get("forward") or [])
+            except Exception:
+                forward_listen_ports = []
+
+        extra_ports = list(forward_listen_ports)
+        if tunnel_port:
+            try:
+                tp = int(validate_port(tunnel_port))
+                if tp not in extra_ports:
+                    extra_ports.append(tp)
+            except Exception:
+                pass
+
         cleanup_cmds = [
             f"systemctl stop {unit_name} 2>/dev/null || true",
             f"systemctl disable {unit_name} 2>/dev/null || true",
@@ -709,8 +730,12 @@ WantedBy=multi-user.target
             "systemctl daemon-reload",
         ]
 
-        if tunnel_port:
-            cleanup_cmds.extend(self.build_iptables_teardown_commands(tunnel_port))
+        if extra_ports:
+            # Reuse the first port as the "tunnel" placeholder — the builder only
+            # needs a list of ports to delete.
+            cleanup_cmds.extend(
+                self.build_iptables_teardown_commands(extra_ports[0], extra_ports=extra_ports[1:])
+            )
 
         batch_cmd = " && ".join(cleanup_cmds)
         code, out, err = ssh.execute(batch_cmd, timeout=60)
