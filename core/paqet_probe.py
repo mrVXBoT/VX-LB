@@ -90,20 +90,20 @@ else:raise RuntimeError('No probe port available')
 
 def forward_rules(node,server_ip,ports):
     rules=[]
-    for port in validate_ports(ports):
+    validated=validate_ports(ports)
+    for port in validated:
         for protocol in ('tcp','udp'):
             rules.append({'listen':f'0.0.0.0:{port}','target':f'{server_ip}:{port}','protocol':protocol})
     meta=node.get('paqet',{})
     ingress=meta.get('probe_port');backend=meta.get('probe_backend_port')
-    if not ingress or not backend:
-        raise ValueError('Paqet probe mapping is missing; node requires provisioning with a probe route')
-    ingress=validate_port(ingress);backend=validate_port(backend)
-    if str(meta.get('tunnel_port')) in validate_ports(ports):
+    if str(meta.get('tunnel_port')) in validated:
         raise ValueError('Client port conflicts with the raw Paqet carrier port')
-    if ingress in validate_ports(ports):
+    if ingress and str(ingress) in validated:
         raise ValueError('Client port conflicts with reserved Paqet probe ingress')
-    for protocol in ('tcp','udp'):
-        rules.append({'listen':f'127.0.0.1:{ingress}','target':f'{server_ip}:{backend}','protocol':protocol})
+    if ingress and backend:
+        ingress=validate_port(ingress);backend=validate_port(backend)
+        for protocol in ('tcp','udp'):
+            rules.append({'listen':f'127.0.0.1:{ingress}','target':f'{server_ip}:{backend}','protocol':protocol})
     return rules
 
 

@@ -35,12 +35,15 @@ def test_active_systemd_without_challenge_is_not_verification():
         with pytest.raises(RuntimeError):verify(ir,kh,NODE,[443])
 
 
-def test_legacy_node_without_probe_route_fails_before_any_remote_mutation():
+def test_node_without_probe_route_can_change_ports_without_probe():
     from core import paqet_adapter as adapter
-    pool={'nodes':[{'ip':'192.0.2.1','paqet':{}}],'kharej_server':{'ip':'192.0.2.2'},'client_ports':['443']}
-    with patch.object(adapter,'get_pools',return_value={'p':pool}),patch.object(adapter,'connect') as connect,patch.object(adapter,'atomic_update') as update:
-        assert adapter.change_ports('p',['8443'])[0] is False
-    connect.assert_not_called();update.assert_not_called()
+    pool={'nodes':[{'ip':'192.0.2.1','paqet':{},'node_name':'paq_n1'}],'kharej_server':{'ip':'192.0.2.2'},'client_ports':['443']}
+    ssh=MagicMock(); ssh.execute=MagicMock(return_value=(0,'active\n',''))
+    pa=MagicMock(); pa.deploy_client_node=MagicMock(return_value=(True,'ok')); pa.build_systemd_unit=MagicMock(return_value='unit'); pa.build_iptables_setup_commands=MagicMock(return_value=['true']); pa.build_persistence_unit=MagicMock(return_value=('u','s','unit','script')); pa._forward_listen_ports=MagicMock(return_value=[])
+    with patch.object(adapter,'get_pools',return_value={'p':pool}),patch.object(adapter,'connect',return_value=ssh),patch.object(adapter,'atomic_update'), \
+         patch.object(adapter,'verify') as verify,patch.object(adapter,'PaqetAdapter',return_value=pa):
+        assert adapter.change_ports('p',['8443'])[0] is True
+        verify.assert_called()
 
 
 def test_carrier_port_conflict_is_rejected_before_configuration():

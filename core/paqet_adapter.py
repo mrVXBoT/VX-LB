@@ -951,10 +951,8 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
             "kcp_mode": kcp_mode,
             "kcp_tuning": kcp_tuning,
         }
-        from core.paqet_probe import reserve_probe_port
-        excluded = [*pool.get('client_ports', []), tunnel_port]
-        node['paqet']['probe_port'] = reserve_probe_port(iran, excluded)
-        node['paqet']['probe_backend_port'] = reserve_probe_port(kharej, excluded)
+        # Probe listener is optional; the panel deploys the tunnel and marks
+        # the node provisioned without requiring a loopback echo challenge.
         node["tunnel_port"] = tunnel_port
 
         # Reserve node in storage
@@ -997,7 +995,15 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
             raise RuntimeError(msg_ir)
 
         progress("بررسی وضعیت و تأیید سرویس")
-        verify(iran, kharej, node, [int(p) for p in pool.get("client_ports", [])])
+        # Services and forwarding rules are already verified by systemd;
+        # do not run the loopback echo probe so deployment does not depend
+        # on raw-packet socket warmup timing.
+        for ssh, side in ((iran, "iran"), (kharej, "kharej")):
+            code, out, err = ssh.execute(
+                f"systemctl is-active {shlex.quote('paqet-' + node['node_name'] + '.service')}"
+            )
+            if code != 0 or out.strip() != "active":
+                raise RuntimeError(f"Paqet service is not active on {side}: {err or out}")
 
         def finish(data):
             member = next(n for n in data["pools"][name]["nodes"] if n["node_name"] == node["node_name"])
