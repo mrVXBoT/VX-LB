@@ -398,6 +398,10 @@ class PaqetAdapter:
         ]
         for p in ports:
             cmds.extend([
+                # Block kernel from seeing inbound on this port at all — without it
+                # the kernel emits RSTs which kill raw-packet TCP sessions.
+                f"iptables -C INPUT -p tcp --dport {p} -j DROP 2>/dev/null || "
+                f"iptables -I INPUT 1 -p tcp --dport {p} -j DROP",
                 f"iptables -t raw -C PREROUTING -p tcp --dport {p} -j NOTRACK 2>/dev/null || "
                 f"iptables -t raw -A PREROUTING -p tcp --dport {p} -j NOTRACK",
                 f"iptables -t raw -C OUTPUT -p tcp --sport {p} -j NOTRACK 2>/dev/null || "
@@ -426,6 +430,7 @@ class PaqetAdapter:
         cmds = []
         for p in ports:
             cmds.extend([
+                f"iptables -D INPUT -p tcp --dport {p} -j DROP 2>/dev/null || true",
                 f"iptables -t raw -D PREROUTING -p tcp --dport {p} -j NOTRACK 2>/dev/null || true",
                 f"iptables -t raw -D OUTPUT -p tcp --sport {p} -j NOTRACK 2>/dev/null || true",
                 f"iptables -t mangle -D OUTPUT -p tcp --sport {p} --tcp-flags RST RST -j DROP 2>/dev/null || true",
