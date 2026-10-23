@@ -286,7 +286,7 @@ def get_engine_for_transport(transport: str) -> str:
 # the chosen transport before production-readiness validation.
 KERNEL_ENGINES = {
     'tun', 'dc6', 'wireguard', 'gre', 'gre6', 'ip6ip6',
-    'vxlan', 'vxlan_ipsec', 'geneve_ipsec',
+    'vxlan', 'vxlan_ipsec', 'geneve', 'geneve_ipsec',
 }
 
 def _coerce_engine(engine_id, transport):
