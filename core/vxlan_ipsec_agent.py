@@ -130,9 +130,9 @@ def ipsec_connection(c):
                                  "aes256-sha256-ecp256", "aes256-sha256-modp2048"],
                 "rekey_time": "30m",
                 "life_time": "40m",
-                "start_action": "trap",
-                "dpd_action": "trap",
-                "close_action": "trap",
+                "start_action": "start",
+                "dpd_action": "restart",
+                "close_action": "restart",
             }
         },
     }
