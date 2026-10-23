@@ -41,7 +41,7 @@ def forward_rules(node,server_ip,ports):
     if ingress in validate_ports(ports):
         raise ValueError('Client port conflicts with reserved Paqet probe ingress')
     for protocol in ('tcp','udp'):
-        rules.append({'listen':f'127.0.0.1:{ingress}','target':f'127.0.0.1:{backend}','protocol':protocol})
+        rules.append({'listen':f'127.0.0.1:{ingress}','target':f'{server_ip}:{backend}','protocol':protocol})
     return rules
 
 
@@ -51,7 +51,8 @@ def verify_data(iran,kharej,node):
     backend=validate_port(meta.get('probe_backend_port',''))
     channel=None
     try:
-        stdin,stdout,stderr=kharej.client.exec_command('python3 -u -c '+shlex.quote(ECHO)+' 127.0.0.1 '+backend,timeout=10)
+        bind_ip = getattr(kharej, "ip", None) or "0.0.0.0"
+        stdin,stdout,stderr=kharej.client.exec_command('python3 -u -c '+shlex.quote(ECHO)+' '+shlex.quote(bind_ip)+' '+backend,timeout=10)
         channel=stdout.channel;channel.settimeout(10)
         if stdout.readline().strip()!=backend:
             raise RuntimeError('Paqet probe backend could not bind its reserved port')

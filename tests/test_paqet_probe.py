@@ -8,17 +8,22 @@ NODE={'node_name':'node','paqet':{'probe_port':43000,'probe_backend_port':44000}
 def test_forwarding_includes_tcp_udp_and_loopback_only_probe():
     rules=probe.forward_rules(NODE,'192.0.2.2',['443'])
     assert [r['protocol'] for r in rules]==['tcp','udp','tcp','udp']
-    assert all(r['listen']=='127.0.0.1:43000' and r['target']=='127.0.0.1:44000' for r in rules[2:])
+    # The probe ingress listens on loopback locally, but the Paqet raw-packet
+    # server cannot deliver to loopback; it must target the real server IP so
+    # the ECHO responder bound to that address receives the tunnelled data.
+    assert all(r['listen']=='127.0.0.1:43000' and r['target']=='192.0.2.2:44000' for r in rules[2:])
     with pytest.raises(ValueError):probe.forward_rules(NODE,'192.0.2.2',['43000'])
 
 @pytest.mark.parametrize('code,protocols,passed',[(0,['tcp','udp'],True),(1,['tcp','udp'],False),(0,['tcp'],False)])
 def test_probe_uses_forwarded_ingress_and_closes_responder(code,protocols,passed):
-    ir=MagicMock();kh=MagicMock();stdout=MagicMock();stdout.readline.return_value='44000\n';kh.client.exec_command.return_value=(None,stdout,None)
+    ir=MagicMock();kh=MagicMock();kh.ip='192.0.2.2';stdout=MagicMock();stdout.readline.return_value='44000\n';kh.client.exec_command.return_value=(None,stdout,None)
     ir.execute.return_value=(code,json.dumps({'passed':True,'latency_ms':3,'protocols':protocols}),'')
     if passed:assert probe.verify_data(ir,kh,NODE)['latency_ms']==3
     else:
         with pytest.raises(RuntimeError):probe.verify_data(ir,kh,NODE)
     assert '127.0.0.1 43000' in ir.execute.call_args.args[0]
+    # ECHO must bind to the real server IP, not loopback, so Paqet can deliver.
+    assert '192.0.2.2' in kh.client.exec_command.call_args.args[0]
     stdout.channel.close.assert_called_once()
 
 
