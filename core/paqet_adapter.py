@@ -500,7 +500,7 @@ WantedBy=multi-user.target
         # Heredoc terminators must occupy a line by themselves. Joining them
         # with && writes the remaining deployment commands into the config.
         batch_cmd = "set -e\n" + "\n".join(commands)
-        code, out, err = ssh.execute(batch_cmd, timeout=30)
+        code, out, err = ssh.execute(batch_cmd, timeout=90)
         if code != 0:
             return False, f"Server deployment failed (exit {code}): {err or out}"
 
@@ -561,7 +561,7 @@ WantedBy=multi-user.target
         ]
 
         batch_cmd = "set -e\n" + "\n".join(commands)
-        code, out, err = ssh.execute(batch_cmd, timeout=30)
+        code, out, err = ssh.execute(batch_cmd, timeout=90)
         if code != 0:
             return False, f"Client deployment failed (exit {code}): {err or out}"
 
@@ -592,7 +592,7 @@ WantedBy=multi-user.target
             cleanup_cmds.extend(self.build_iptables_teardown_commands(tunnel_port))
 
         batch_cmd = " && ".join(cleanup_cmds)
-        code, out, err = ssh.execute(batch_cmd, timeout=20)
+        code, out, err = ssh.execute(batch_cmd, timeout=60)
         if code != 0:
             return False, f"Teardown failed (exit {code}): {err or out}"
 

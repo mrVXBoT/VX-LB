@@ -155,34 +155,42 @@ class SSHManager:
             self.client = None
 
     def execute(self, cmd: str, timeout: int = 30) -> Tuple[int, str, str]:
-        """Executes a command and returns exit_code, stdout, stderr."""
-        for attempt in range(2):
+        """Executes a command and returns exit_code, stdout, stderr.
+
+        Retries transient SSH failures (channel-open timeouts, dropped
+        transports) with backoff so flaky links do not fail a deployment.
+        """
+        last_err = "SSH transport unavailable"
+        for attempt in range(4):
             transport = self.client.get_transport() if self.client else None
             if not transport or not transport.is_active():
                 self.close()
                 ok, msg = self.connect()
                 if not ok:
-                    return -1, "", msg
+                    last_err = msg
+                    time.sleep(0.6 * (attempt + 1))
+                    continue
 
             channel = None
             try:
-                stdin, stdout, stderr = self.client.exec_command(cmd, timeout=timeout)
+                stdin, stdout, stderr = self.client.exec_command(cmd, timeout=timeout + 10)
                 channel = stdout.channel
+                channel.settimeout(timeout + 15)
                 out = stdout.read().decode("utf-8", errors="replace")
                 err = stderr.read().decode("utf-8", errors="replace")
                 code = channel.recv_exit_status()
                 return code, out, err
             except Exception as e:
+                last_err = str(e)
                 self.close()
-                if attempt == 1:
-                    return -1, "", str(e)
-                time.sleep(0.5)
+                time.sleep(0.8 * (attempt + 1))
             finally:
                 if channel:
                     try:
                         channel.close()
                     except Exception:
                         pass
+        return -1, "", last_err
 
     def is_alive(self) -> bool:
         """Quick check if SSH server is responding."""
