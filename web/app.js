@@ -1315,7 +1315,7 @@ async function submitCreatePool(e) {
              wireguard_mtu: document.getElementById("new-pool-wireguard-mtu")?.value || '1280',
              enable_psk: document.getElementById("new-pool-wireguard-psk")?.checked || false,
            } :
-           transport === "paqet" ? {camouflage:{tunnel_port:document.getElementById('paqet-tunnel-port')?.value || '9999',binary:document.getElementById('paqet-binary')?.value || '/usr/local/bin/paqet'}} :
+           ['paqet', 'quantum', 'quantum+', 'quantum-gaming'].includes(transport) ? {camouflage:{tunnel_port:document.getElementById('paqet-tunnel-port')?.value || '9999',binary:document.getElementById('paqet-binary')?.value || '/usr/local/bin/paqet'}} :
            transport === "slipstream" ? {
              domain: document.getElementById("slipstream-domain")?.value || "",
              resolvers: (document.getElementById("slipstream-resolvers")?.value || "").split(",").map(r => r.trim()).filter(Boolean),
@@ -2509,7 +2509,7 @@ function updateGreCreateFields() {
     });
   }
 
-  const paqet = mode === 'paqet';
+  const paqet = ['paqet', 'quantum', 'quantum+', 'quantum-gaming'].includes(mode);
   const paqetDiv = document.getElementById('paqet-create-fields');
   if (paqetDiv) {
     paqetDiv.classList.toggle('hidden', !paqet);

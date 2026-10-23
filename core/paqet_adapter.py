@@ -759,7 +759,11 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
             if not ok:
                 raise RuntimeError(msg)
 
-        preferred_port = int((pool.get("camouflage") or {}).get("port") or 9999)
+        preferred_port = int(
+            (pool.get("camouflage") or {}).get("tunnel_port")
+            or (pool.get("camouflage") or {}).get("port")
+            or 9999
+        )
         from core.paqet_probe import reserve_probe_port
         used_ports = list(pool.get('client_ports', []))
         for other in get_pools().values():

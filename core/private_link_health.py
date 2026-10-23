@@ -17,7 +17,7 @@ server=socket.socket(af,socket.SOCK_STREAM);server.setsockopt(socket.SOL_SOCKET,
 port=server.getsockname()[1]
 udp=socket.socket(af,socket.SOCK_DGRAM);udp.bind((host,port))
 print(port,flush=True)
-clients=[];deadline=time.monotonic()+15
+clients=[];deadline=time.monotonic()+35
 try:
  while time.monotonic()<deadline:
   ready,_,_=select.select([server,udp,sys.stdin,*clients],[],[],0.2)
@@ -40,7 +40,7 @@ import socket,sys,json,time,secrets
 host=sys.argv[1];port=int(sys.argv[2]);nonce=sys.argv[3].encode();iface=sys.argv[4]
 af=socket.AF_INET6 if ':' in host else socket.AF_INET
 start=time.monotonic()
-deadline=time.monotonic()+15
+deadline=time.monotonic()+30
 for kind in (socket.SOCK_STREAM,socket.SOCK_DGRAM):
  while True:
   try:

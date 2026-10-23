@@ -56,7 +56,7 @@ def verify_data(iran,kharej,node):
         # the real server IP. 0.0.0.0 covers both loopback and the public IP.
         bind_ip = "0.0.0.0"
         stdin,stdout,stderr=kharej.client.exec_command('python3 -u -c '+shlex.quote(ECHO)+' '+shlex.quote(bind_ip)+' '+backend,timeout=10)
-        channel=stdout.channel;channel.settimeout(15)
+        channel=stdout.channel;channel.settimeout(35)
         bound = None
         for _ in range(20):
             line = stdout.readline()
@@ -67,8 +67,11 @@ def verify_data(iran,kharej,node):
             break
         if bound != backend:
             raise RuntimeError('Paqet probe backend could not bind its reserved port')
-        code,out,_=iran.execute('python3 -c '+shlex.quote(PROBE)+' 127.0.0.1 '+ingress+' '+secrets.token_hex(24)+" ''",timeout=30)
-        if code:raise RuntimeError('TCP/UDP data did not traverse Paqet')
+        code,out,err=iran.execute('python3 -c '+shlex.quote(PROBE)+' 127.0.0.1 '+ingress+' '+secrets.token_hex(24)+" ''",timeout=35)
+        if code:
+            detail = (err.strip() or out.strip())
+            msg = f'TCP/UDP data did not traverse Paqet: {detail}' if detail else 'TCP/UDP data did not traverse Paqet'
+            raise RuntimeError(msg)
         result=json.loads(out)
         if result.get('passed') is not True or result.get('protocols')!=['tcp','udp']:
             raise RuntimeError('Invalid Paqet data challenge result')
