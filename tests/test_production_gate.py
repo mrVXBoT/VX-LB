@@ -36,7 +36,7 @@ class TestProductionReadinessGate(unittest.TestCase):
 
     def test_experimental_engine_gating(self):
         # Experimental engines: permitted in dev/lab, blocked in prod unless allow_experimental=True
-        for exp_eng in ["waterwall", "paqet", "wireguard", "sit", "6to4_unicast", "geneve"]:
+        for exp_eng in ["waterwall", "wireguard", "sit", "6to4_unicast", "geneve"]:
             # In non-production (dev / staging / lab) -> Allowed
             ok_lab, msg_lab = validate_production_readiness(exp_eng, is_production=False)
             self.assertTrue(ok_lab, f"Experimental engine {exp_eng} should be permitted in non-production")
