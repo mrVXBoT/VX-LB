@@ -369,6 +369,7 @@ def probe(c, port, nonce):
                     chunk = s.recv(len(payload) - len(received))
                     if not chunk:
                         break
+                    received += chunk
                 if received != payload:
                     raise RuntimeError("VXLAN TCP 64KiB probe did not return the complete nonce payload")
             break
