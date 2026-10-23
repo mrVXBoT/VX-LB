@@ -17,7 +17,7 @@ server=socket.socket(af,socket.SOCK_STREAM);server.setsockopt(socket.SOL_SOCKET,
 port=server.getsockname()[1]
 udp=socket.socket(af,socket.SOCK_DGRAM);udp.bind((host,port))
 print(port,flush=True)
-clients=[];deadline=time.monotonic()+35
+clients=[];deadline=time.monotonic()+120
 try:
  while time.monotonic()<deadline:
   ready,_,_=select.select([server,udp,sys.stdin,*clients],[],[],0.2)
@@ -29,7 +29,10 @@ try:
    elif item is udp:
     data,addr=udp.recvfrom(1500);udp.sendto(data,addr)
    else:
-    data=item.recv(65536)
+    try:
+     data=item.recv(65536)
+    except socket.timeout:
+     continue
     if data:item.sendall(data)
     else:clients.remove(item);item.close()
 finally:
