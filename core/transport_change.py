@@ -841,6 +841,39 @@ def _kernel_rollback(name, backup_pool, to_engine, from_engine, target):
         update_job(name, status='rollback_failed', message='بازگردانی با خطا مواجه شد: ' + str(exc))
         return False
 
+def _validate_target_prerequisites(
+    to_engine, target, kharej_srv, iran_srvs, sessions, args
+):
+    """Return an error string if the target engine cannot be deployed.
+
+    Runs BEFORE tearing down the healthy source tunnel so an infeasible target
+    (e.g. gre6/ip6ip6 requiring native IPv6 on both endpoints) leaves the
+    current state untouched instead of destroying it and failing rollback.
+    """
+    try:
+        if to_engine in ("gre6", "ip6ip6"):
+            endpoints = [kharej_srv] + list(iran_srvs)
+            for sess, endpoint in zip(sessions, endpoints):
+                host = str(endpoint.get("ip") or "")
+                has_v6 = bool(host and ":" in host)
+                if not has_v6:
+                    _, out, _ = sess.execute(
+                        "ip -6 addr show scope global 2>/dev/null | grep -c 'inet6 ' || true"
+                    )
+                    if (out or "").strip().lstrip("0").isdigit() and int((out or "0").strip() or 0) > 0:
+                        has_v6 = True
+                if not has_v6:
+                    label = endpoint.get("name") or endpoint.get("server_name") or host
+                    return (
+                        f"پیش‌شرط تونل {to_engine} برآورده نشد: سرور {label} "
+                        f"({host}) IPv6 عمومی بومی ندارد؛ تغییر انجام نشد و تونل قبلی دستنخورده ماند. "
+                        "یا روی هر دو سرور IPv6 عمومی فعال کنید یا موتور دیگری (مثلاً dc6/sit یا tun) انتخاب کنید."
+                    )
+        return None
+    except Exception as exc:
+        return f"بررسی پیش‌شرط تونل مقصد ناموفق بود: {exc}"
+
+
 def _run_kernel_rolling_change(name, pool, job, recovering=False):
     """Per-node phased migration for kernel-layer tunnel engines.
 
@@ -871,6 +904,16 @@ def _run_kernel_rolling_change(name, pool, job, recovering=False):
         sessions.append(connect(kharej_srv))
         for srv in iran_srvs:
             sessions.append(connect(srv))
+        # Validate target feasibility BEFORE tearing down the healthy source
+        # tunnel. If the target cannot be brought up (e.g. gre6/ip6ip6 need
+        # native IPv6 on both endpoints), abort cleanly and leave the current
+        # healthy state untouched instead of destroying it and failing rollback.
+        preflight_err = _validate_target_prerequisites(
+            to_engine, target, kharej_srv, iran_srvs, sessions, args
+        )
+        if preflight_err:
+            update_job(name, status='failed', message=preflight_err)
+            return
     except Exception as exc:
         update_job(name, status='failed', message=f'بررسی پیش‌پرواز ناموفق: {exc}')
         return
