@@ -9,17 +9,17 @@ from core.private_link_health import ECHO
 # The shared 64KiB probe burst is fragile through a raw KCP tunnel (it can
 # stall on segmentation/MTU and surface as a bare TimeoutError). Paqet uses a
 # dedicated probe with bounded payloads, retries for tunnel/ARP/client-listener
-# warm-up (including socket.timeout), and explicit echo verification.
+# warm-up (including socket.timeout and an early EOF while the forward path is
+# still settling), and explicit echo verification.
 PAQET_PROBE = r'''
 import socket,sys,json,time,secrets
 host=sys.argv[1];port=int(sys.argv[2]);nonce=sys.argv[3].encode()
 start=time.monotonic();deadline=time.monotonic()+60
+class RetryWarmup(Exception): pass
 def retriable(error):
-    if not isinstance(error,OSError):
-        return False
     if isinstance(error,socket.timeout):
         return True
-    return error.errno in (113,101,111)
+    return getattr(error,'errno',None) in (113,101,111)
 def dial(kind):
     sock=socket.socket(socket.AF_INET,kind);sock.settimeout(15)
     while True:
@@ -41,7 +41,7 @@ def once():
             while len(got)<len(data):
                 part=sock.recv(65536)
                 if not part:
-                    raise RuntimeError('Echo closed before completion')
+                    raise RetryWarmup()
                 got+=part
                 if kind==socket.SOCK_DGRAM:
                     break
@@ -55,6 +55,10 @@ while True:
     try:
         protocols=once()
         break
+    except RetryWarmup:
+        if time.monotonic()>=deadline:
+            raise RuntimeError('Echo closed before completion (tunnel/forward did not settle)')
+        time.sleep(0.5)
     except OSError as error:
         if retriable(error) and time.monotonic()<deadline:
             time.sleep(0.5)
@@ -124,6 +128,9 @@ def verify_data(iran,kharej,node):
             break
         if bound != backend:
             raise RuntimeError('Paqet probe backend could not bind its reserved port')
+        # Let the freshly started Paqet client register and raise its forward
+        # listeners before the first probe attempt; the probe also retries.
+        time.sleep(3)
         code,out,err=iran.execute('python3 -c '+shlex.quote(PAQET_PROBE)+' 127.0.0.1 '+ingress+' '+secrets.token_hex(24),timeout=60)
         if code:
             detail = (err.strip() or out.strip())
