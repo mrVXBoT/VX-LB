@@ -853,9 +853,11 @@ def add(name: str, server: dict, callback: Optional[Callable[[str], None]] = Non
         # this node's identifiers behind (older generation, rotated reqid),
         # which silently drops plain VXLAN traffic between the endpoints. Only
         # VX-LB-tagged rules are removed, never foreign or admin rules.
-        from core.firewall_purge import purge_kernel_engine_rules
+        from core.firewall_purge import purge_kernel_engine_rules, purge_xfrm_between
         purge_kernel_engine_rules(ir_ssh, node_id, iface)
         purge_kernel_engine_rules(kh_ssh, node_id, iface)
+        purge_xfrm_between(ir_ssh, server["ip"], kharej["ip"])
+        purge_xfrm_between(kh_ssh, kharej["ip"], server["ip"])
         def publish(ssh, path, content):
             if not ssh.write_file(path, content):
                 raise RuntimeError("Writing VXLAN runtime artifact failed: " + path)

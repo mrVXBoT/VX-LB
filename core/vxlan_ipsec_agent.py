@@ -341,6 +341,17 @@ def down(c):
     except Exception:
         pass
     security_firewall(c, remove=True)
+    # Stale IPsec XFRM policies/states can survive a strongSwan unload and then
+    # force plain VXLAN UDP into ESP -> EHOSTUNREACH. Clear anything remaining
+    # between these two public endpoints.
+    try:
+        for msg in (
+            ["ip", "xfrm", "policy", "flush"],
+            ["ip", "xfrm", "state", "flush"],
+        ):
+            subprocess.run(msg, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+    except Exception:
+        pass
     # Failed migrations can leave older-generation rules from previous reqids
     # behind; exact-config removal cannot match those. Sweep everything tagged
     # for this interface so the endpoint never keeps stale guards.
