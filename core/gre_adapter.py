@@ -81,10 +81,5 @@ class GreIpv4Adapter(BaseTunnelAdapter):
         # Call cleanup ensuring fail-closed removal
         return cleanup_gre_node(ssh, identifier)
 
-class GreXhttpAdapter(GreIpv4Adapter):
-    def __init__(self):
-        BaseTunnelAdapter.__init__(self, "gre_xhttp")
-
 register_adapter(GreIpv4Adapter())
-register_adapter(GreXhttpAdapter())
 

@@ -58,22 +58,22 @@ CAPABILITIES_CATALOG: Dict[str, EngineCapabilities] = {
     "waterwall": EngineCapabilities(
         engine_id="waterwall",
         display_name="WaterWall",
-        description="Node-based VLESS/TLS/Mux tunnel engine with protocol-level routing",
+        description="Node-based WaterWall engine with real protocol modes (Trojan, Reality, Reverse, HalfDuplex, Bgp4)",
         supported_protocols=["tcp", "udp"],
         address_families=["ipv4"],
-        layer="L7",
+        layer="L4",
         directionality="bidirectional",
         supported_topologies=["1:1", "N:1"],
         requires_encryption=True,
-        encryption_type="tls",
+        encryption_type="noise",
         kernel_requirements=[],
         support_status="experimental",
-        status_reason="Direct VLESS/TLS/Mux chain tested locally; advanced chain editor & reverse in development",
+        status_reason="Trojan/Reality/Reverse/HalfDuplex/Bgp4 chains generated from WaterWall protocol nodes; TCP verified, UDP on Trojan",
         default_mtu=1350,
         overhead_bytes=100,
         supports_port_forwarding=True,
         supports_raw_link=False,
-        requires_external_domain=True,
+        requires_external_domain=False,
     ),
     # TrustTunnel
     "trusttunnel": EngineCapabilities(
@@ -236,46 +236,6 @@ CAPABILITIES_CATALOG: Dict[str, EngineCapabilities] = {
         overhead_bytes=100,
         supports_port_forwarding=True,
         supports_raw_link=True,
-    ),
-    "gre_xhttp": EngineCapabilities(
-        engine_id="gre_xhttp",
-        display_name="GRE inside XHTTP/TLS",
-        description="Real GRE packets encapsulated inside authenticated XHTTP TLS carrier",
-        supported_protocols=["tcp", "udp"],
-        address_families=["ipv4"],
-        layer="L3",
-        directionality="bidirectional",
-        supported_topologies=["1:1", "N:1"],
-        requires_encryption=True,
-        encryption_type="tls",
-        kernel_requirements=["gre"],
-        support_status="verified",
-        status_reason="Encapsulated GRE inside TLS loopback tested with bidirectional traffic",
-        default_mtu=1280,
-        overhead_bytes=140,
-        supports_port_forwarding=True,
-        supports_raw_link=True,
-        requires_external_domain=True,
-    ),
-    "xhttp": EngineCapabilities(
-        engine_id="xhttp",
-        display_name="Xray XHTTP Camouflage",
-        description="Authenticated XHTTP/TLS HTTPS camouflage proxy engine",
-        supported_protocols=["tcp", "udp"],
-        address_families=["ipv4"],
-        layer="L7",
-        directionality="bidirectional",
-        supported_topologies=["1:1", "N:1"],
-        requires_encryption=True,
-        encryption_type="tls",
-        kernel_requirements=[],
-        support_status="verified",
-        status_reason="Verified official binary test with self-signed & valid TLS 1.3 certificates",
-        default_mtu=1350,
-        overhead_bytes=100,
-        supports_port_forwarding=True,
-        supports_raw_link=False,
-        requires_external_domain=True,
     ),
     "ip6ip6": EngineCapabilities(
         engine_id="ip6ip6",
@@ -813,8 +773,6 @@ def get_capability(engine_id: str) -> Optional[EngineCapabilities]:
     eid = engine_id.lower().strip()
     if eid == "gre":
         eid = "gre_ipv4"
-    elif eid == "xray":
-        eid = "xhttp"
     return CAPABILITIES_CATALOG.get(eid)
 
 def list_all_capabilities() -> Dict[str, dict]:

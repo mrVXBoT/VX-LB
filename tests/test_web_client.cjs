@@ -229,20 +229,17 @@ const originalApiFetch = context.apiFetch;
   assert.doesNotMatch(element('pools-container').innerHTML,/retryTransportRollback/);
   assert.match(element('pools-container').innerHTML,/openAddNodeModal[^>]*disabled/);
   console.log('PASS: GRE private endpoints, MTU settings and dedicated recovery actions');
-  run(`renderPools([{name:'https-one',engine:'xray',transport:'xhttp',camouflage:{server_name:'tunnel.example.com'},nodes:[{name:'iran',ip:'192.0.2.1',engine:'xray',transport:'xhttp',https:{server_name:'tunnel.example.com',outer_port:8443}}]}])`);
-  assert.match(element('pools-container').innerHTML,/Xray · xhttp/);
-  assert.match(element('pools-container').innerHTML,/tunnel.example.com:8443/);
+  run(`renderPools([{name:'ww-one',engine:'waterwall',transport:'waterwall',waterwall_mode:'trojan',camouflage:{mode:'trojan',port:443},nodes:[{name:'iran',ip:'192.0.2.1',engine:'waterwall',transport:'waterwall',outer_port:443,waterwall:{profile:{mode:'trojan'},outer_port:443}}]}])`);
+  assert.match(element('pools-container').innerHTML,/سد کرج/);
   assert.match(element('pools-container').innerHTML,/openTransportModal/);
-  const httpsInputs=['https-server-name','https-outer-port','https-certificate','https-key','https-binary'].map(element);
-  element('https-create-fields').querySelectorAll=()=>httpsInputs;
-  element('new-pool-proto').value='xhttp';run(`updateGreCreateFields()`);
-  assert.equal(element('https-create-fields').classList.contains('hidden'),false);
-  assert.equal(element('https-server-name').disabled,false);
+  element('new-pool-proto').value='waterwall';run(`updateGreCreateFields()`);
+  assert.equal(element('waterwall-create-fields').classList.contains('hidden'),false);
+  assert.equal(element('waterwall-outer-port').disabled,false);
   assert.equal(element('new-pool-gre-mtu').disabled,true);
   element('new-pool-proto').value='pck';run(`updateGreCreateFields()`);
-  assert.equal(element('https-create-fields').classList.contains('hidden'),true);
-  assert.ok(httpsInputs.every(input=>input.disabled));
-  console.log('PASS: HTTPS profile rendering and hidden field constraints');
+  assert.equal(element('waterwall-create-fields').classList.contains('hidden'),true);
+  assert.equal(element('waterwall-outer-port').disabled,true);
+  console.log('PASS: WaterWall profile rendering and hidden field constraints');
 
   // Verify cascading engine to transport population
   element('new-pool-engine').value = 'backpack';
@@ -271,7 +268,7 @@ const originalApiFetch = context.apiFetch;
     assert.equal(element('spoof-ttl-delta').disabled,mode!=='hop-ttl-injection');
   }
   run("populatePoolTransports('spoof')");
-  assert.match(element('new-pool-proto').innerHTML,/value="l3-ip-spoof" disabled/);
+  assert.match(element('new-pool-proto').innerHTML,/value="l3-ip-spoof"[^>]*disabled/);
   assert.doesNotMatch(element('new-pool-proto').innerHTML,/value="fake-sni" disabled/);
   console.log('PASS: packet profiles expose only implemented options and relevant inputs');
 
@@ -290,12 +287,12 @@ const originalApiFetch = context.apiFetch;
   assert.match(element('transport-target').innerHTML, /value="waterwall"/);
   assert.doesNotMatch(element('transport-target').innerHTML, /value="stealth"/);
 
-  // Switch target engine to xray and verify TLS fields unhide
-  element('transport-change-engine').value = 'xray';
+  // Switch target engine to kernel and verify MTU fields unhide
+  element('transport-change-engine').value = 'kernel';
   run('onTransportChangeEngineChanged()');
-  element('transport-target').value = 'xhttp';
+  element('transport-target').value = 'gre';
   run('onTransportChangeTransportChanged()');
-  assert.equal(element('transport-change-tls-fields').classList.contains('hidden'), false);
+  assert.equal(element('transport-change-mtu-fields').classList.contains('hidden'), false);
   console.log('PASS: Universal transport modal cascading and adaptive field triggers');
 
   // Managed HTTP modes may switch within their family only.
@@ -435,19 +432,14 @@ console.log('PASS: topology details and single zoom handler after refresh');
   run(`setPoolEngineFilter('')`);
   console.log('PASS: pool search and engine filter');
 
-  element('https-create-fields').querySelectorAll = () => [];
   element('new-pool-proto').value = 'waterwall';
-  element('https-binary').value = '/usr/local/bin/xray';
+  element('waterwall-binary').value = '';
   run('updateGreCreateFields()');
-  assert.equal(element('https-binary').value, '/usr/local/bin/waterwall');
-  assert.equal(element('query').textContent, 'مسیر WaterWall روی هر دو سرور');
-  element('new-pool-proto').value = 'xhttp';
-  run('updateGreCreateFields()');
-  assert.equal(element('https-binary').value, '/usr/local/bin/xray');
-  element('https-binary').value = '/opt/custom/engine';
+  assert.equal(element('waterwall-binary').value, '/usr/local/bin/waterwall');
+  element('waterwall-binary').value = '/opt/custom/waterwall';
   element('new-pool-proto').value = 'waterwall';
   run('updateGreCreateFields()');
-  assert.equal(element('https-binary').value, '/opt/custom/engine');
+  assert.equal(element('waterwall-binary').value, '/opt/custom/waterwall');
   console.log('PASS: WaterWall binary defaults follow the engine and preserve custom paths');
 
 

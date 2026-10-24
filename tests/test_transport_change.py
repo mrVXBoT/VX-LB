@@ -134,17 +134,13 @@ class UniversalTransportChangeTests(unittest.TestCase):
             self.assertFalse(ok)
             self.assertIn('نامعتبر', msg)
 
-            # Xray without domain rejected
-            ok, msg = change.start_change('P1', 'xhttp', background=False)
+            # Slipstream without domain rejected
+            ok, msg = change.start_change('P1', 'slipstream', background=False)
             self.assertFalse(ok)
-            self.assertIn('دامنهٔ TLS', msg)
+            self.assertIn('دامنه', msg)
 
             # Valid cross-engine transition to waterwall queued
             ok, msg = change.start_change('P1', 'waterwall', background=False)
-            self.assertTrue(ok)
-
-            # Valid cross-engine transition to xray with camouflage queued
-            ok, msg = change.start_change('P1', 'xhttp', background=False, camouflage={'server_name': 'test.com'})
             self.assertTrue(ok)
 
     def test_universal_migration_success_preserves_dns_and_ports(self):

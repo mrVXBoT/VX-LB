@@ -48,27 +48,6 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
             }
         }
     ),
-    "xray": BinaryManifest(
-        name="Xray-core",
-        engine_id="xhttp",
-        pinned_version="v26.3.27",
-        license_spdx="MPL-2.0",
-        executable_name="xray",
-        required_capabilities=[],
-        architectures={
-            "x86_64": {
-                "sha256": "8255dd939c34cf966cc91517b6324dd3c8d0bcf49ffac8beca049a38c46845ed",
-                "source_url": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-64.zip",
-                "is_verified": True
-            },
-            "aarch64": {
-                "sha256": "c2d20a7045250497083afea0d79db0672f6c89a25aaaf37c92de034d6b764b04",
-                "source_url": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-arm64-v8a.zip",
-                "archive_type": "zip", "archive_member": "xray",
-                "is_verified": True
-            }
-        }
-    ),
     "waterwall": BinaryManifest(
         name="WaterWall",
         engine_id="waterwall",

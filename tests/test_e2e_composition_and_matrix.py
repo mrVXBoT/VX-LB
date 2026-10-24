@@ -96,24 +96,6 @@ class TestCompositionAndMatrixE2E(unittest.TestCase):
         self.assertTrue(comp.encryption.has_psk)
         self.assertEqual(comp.camouflage.type, "none")
 
-    def test_tier1_composition_deconstruction_gre_xhttp(self):
-        """Verify compound gre_xhttp pool deconstructs into GRE + TLS1.3 + XHTTP."""
-        legacy_pool = {
-            "transport": "gre_xhttp",
-            "engine": "gre_xhttp",
-            "gre_mtu": 1360,
-            "domain": "grpc.cdn.example.com",
-            "resolvers": ["1.1.1.1:53", "8.8.8.8:53"],
-        }
-        comp = deconstruct_legacy_pool(legacy_pool)
-        self.assertEqual(comp.network.type, "gre_ipv4")
-        self.assertEqual(comp.network.mtu, 1360)
-        self.assertEqual(comp.encryption.type, "tls13")
-        self.assertEqual(comp.encryption.cipher, "TLS_AES_128_GCM_SHA256")
-        self.assertEqual(comp.camouflage.type, "xhttp_grpc")
-        self.assertEqual(comp.camouflage.domain, "grpc.cdn.example.com")
-        self.assertEqual(comp.camouflage.resolvers, ["1.1.1.1:53", "8.8.8.8:53"])
-
     def test_tier1_composition_deconstruction_geneve_ipsec(self):
         """Verify geneve_ipsec deconstructs into Geneve L2/L3 overlay with IPsec encryption."""
         legacy_pool = {
@@ -158,7 +140,7 @@ class TestCompositionAndMatrixE2E(unittest.TestCase):
             engine="custom",
             network=NetworkLayerSpec(type="direct", mtu=1400),
             encryption=EncryptionLayerSpec(type="tls13", cipher="TLS_AES_128_GCM_SHA256"),
-            camouflage=CamouflageLayerSpec(type="xhttp_grpc", domain="test.com"),
+            camouflage=CamouflageLayerSpec(type="waterwall", domain="test.com"),
         )
         comp_dict = comp.to_dict()
         self.assertIn("network", comp_dict)
@@ -192,10 +174,10 @@ class TestCompositionAndMatrixE2E(unittest.TestCase):
         """Verify POST /api/pools/composition/validate returns valid=True for compliant layers."""
         body = {
             "composition": {
-                "engine": "gre_xhttp",
-                "network": {"type": "gre_ipv4", "mtu": 1360},
-                "encryption": {"type": "tls13", "cipher": "TLS_AES_128_GCM_SHA256"},
-                "camouflage": {"type": "xhttp_grpc", "domain": "cdn.example.com"},
+                "engine": "wireguard",
+                "network": {"type": "wireguard", "mtu": 1280},
+                "encryption": {"type": "noise"},
+                "camouflage": {"type": "none"},
             }
         }
         raw = json.dumps(body).encode("utf-8")
@@ -249,18 +231,6 @@ class TestCompositionAndMatrixE2E(unittest.TestCase):
         valid, msg = validate_composition(comp)
         self.assertFalse(valid)
         self.assertIn("Raw unencrypted GRE on public IPv4 is forbidden", msg)
-
-    def test_tier2_invalid_layer_xhttp_without_tls_forbidden(self):
-        """Validate composition forbids XHTTP camouflage without TLS 1.3."""
-        comp = UnifiedComposition(
-            engine="gre_xhttp",
-            network=NetworkLayerSpec(type="gre_ipv4", mtu=1360),
-            encryption=EncryptionLayerSpec(type="none"),  # Missing TLS 1.3
-            camouflage=CamouflageLayerSpec(type="xhttp_grpc", domain="cdn.example.com"),
-        )
-        valid, msg = validate_composition(comp)
-        self.assertFalse(valid)
-        self.assertIn("XHTTP camouflage requires TLS 1.3", msg)
 
     def test_tier2_invalid_layer_dns_without_domain_forbidden(self):
         """Validate composition forbids DNS delegation camouflage with empty domain."""
@@ -444,7 +414,7 @@ class TestCompositionAndMatrixE2E(unittest.TestCase):
         """Verify end-to-end migration from v0 legacy state to v3 populates composition."""
         v0_data = {
             "pools": {
-                "Pool1": {"transport": "gre_xhttp", "gre_mtu": 1360, "domain": "cdn.test"},
+                "Pool1": {"transport": "gre", "gre_mtu": 1360},
                 "Pool2": {"transport": "wireguard", "mtu": 1420, "enable_psk": True},
                 "Pool3": {"transport": "slipstream", "domain": "tunnel.test"},
             }
@@ -459,8 +429,8 @@ class TestCompositionAndMatrixE2E(unittest.TestCase):
         # Pool 1 composition
         p1_comp = migrated["pools"]["Pool1"]["composition"]
         self.assertEqual(p1_comp["network"]["type"], "gre_ipv4")
-        self.assertEqual(p1_comp["encryption"]["type"], "tls13")
-        self.assertEqual(p1_comp["camouflage"]["type"], "xhttp_grpc")
+        self.assertEqual(p1_comp["encryption"]["type"], "ipsec")
+        self.assertEqual(p1_comp["camouflage"]["type"], "none")
 
         # Pool 2 composition
         p2_comp = migrated["pools"]["Pool2"]["composition"]

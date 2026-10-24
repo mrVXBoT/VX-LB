@@ -78,10 +78,10 @@ class ApiExtensionsTests(unittest.TestCase):
         self.handler.path = "/api/pools/composition/validate"
         body = {
             "composition": {
-                "engine": "gre_xhttp",
-                "network": {"type": "gre_ipv4", "mtu": 1360},
-                "encryption": {"type": "tls13", "cipher": "TLS_AES_128_GCM_SHA256"},
-                "camouflage": {"type": "xhttp_grpc", "domain": "vpn.example.com"}
+                "engine": "wireguard",
+                "network": {"type": "wireguard", "mtu": 1280},
+                "encryption": {"type": "noise"},
+                "camouflage": {"type": "none"}
             }
         }
         raw = json.dumps(body).encode("utf-8")

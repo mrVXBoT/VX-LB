@@ -103,7 +103,6 @@ class CompositionValidationTests(unittest.TestCase):
     def test_valid_compositions(self):
         valid_cases = [
             legacy_transport_to_composition("gre"),
-            legacy_transport_to_composition("gre_xhttp"),
             legacy_transport_to_composition("geneve_ipsec"),
             legacy_transport_to_composition("geneve"),
             legacy_transport_to_composition("vxlan"),
@@ -182,13 +181,6 @@ class CompositionValidationTests(unittest.TestCase):
         valid, _ = validate_composition(comp)
         self.assertTrue(valid)
 
-    def test_xhttp_camouflage_requires_tls(self):
-        comp = legacy_transport_to_composition("gre_xhttp")
-        comp.encryption.type = "none"
-        valid, msg = validate_composition(comp)
-        self.assertFalse(valid)
-        self.assertIn("TLS", msg)
-
     def test_invalid_input_types(self):
         valid, msg = validate_composition("not a dict or comp")
         self.assertFalse(valid)
@@ -202,7 +194,6 @@ class CompositionTranslationTests(unittest.TestCase):
     def test_bidirectional_roundtrip_all_monolithic_transports(self):
         transports = [
             "gre",
-            "gre_xhttp",
             "geneve_ipsec",
             "geneve",
             "vxlan",
@@ -280,7 +271,6 @@ class CompositionCatalogTests(unittest.TestCase):
             self.assertTrue(valid, f"Catalog item {item['id']} is invalid: {msg}")
 
         self.assertIn("gre", ids)
-        self.assertIn("gre_xhttp", ids)
         self.assertIn("geneve_ipsec", ids)
         self.assertIn("wireguard", ids)
         self.assertIn("slipstream", ids)

@@ -98,11 +98,6 @@ class TelemetryWatchdog:
             status, reason, details = health(pool_name, node, client_ports or [])
             self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
             return status, reason, [], details
-        if node.get('engine') == 'xray':
-            from core.https_tunnel import health
-            status, reason, details = health(pool_name,node,client_ports or [])
-            self.save_node_telemetry(pool_name,node['ip'],status,reason,[],details)
-            return status,reason,[],details
         if node.get('engine') == 'gre' or node.get('transport') == 'gre':
             from core.gre import health
             status, reason, details = health(pool_name, node, client_ports or [])

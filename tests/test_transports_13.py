@@ -5,7 +5,7 @@ Verifies:
 2. Parameter bounds and security validation.
 3. kernel-based telemetry kernel tcp_info unpacking and EWMA health scoring.
 4. HMAC canary challenge & response protocol.
-5. Adapter configuration synthesis for tun, dc6, xhttps, and nova.
+5. Adapter configuration synthesis for tun and dc6.
 """
 import copy
 import struct
@@ -30,7 +30,6 @@ from core.capabilities import get_capability, CAPABILITIES_CATALOG
 from core.tunnel import SUPPORTED_TRANSPORTS
 from core.tun_adapter import TunDedicatedAdapter
 from core.dc6_adapter import DC6Adapter
-import core.https_tunnel as https_tunnel
 from core.load_balancer import LoadBalancerManager
 
 
@@ -39,11 +38,11 @@ class Transports13CatalogTests(unittest.TestCase):
 
     EXPECTED_IDS = [
         "tcp", "ws", "wss", "http", "https",
-        "tun", "xhttp", "xhttps", "dc6", "nova"
+        "tun", "dc6"
     ]
 
     def test_all_transports_registered(self):
-        self.assertEqual(len(self.EXPECTED_IDS), 10)
+        self.assertEqual(len(self.EXPECTED_IDS), 7)
         for tid in self.EXPECTED_IDS:
             self.assertTrue(is_13_transport(tid), f"Transport '{tid}' missing from 13 catalog")
             spec = get_transport_spec(tid)
@@ -58,10 +57,9 @@ class Transports13CatalogTests(unittest.TestCase):
         cats = list_transports_by_category()
         self.assertIn(CAT_WEB_STREAM, cats)
         self.assertIn(CAT_L3_CARRIER, cats)
-        self.assertIn(CAT_ANTI_CENSORSHIP, cats)
 
         total_transports = sum(len(c["transports"]) for c in cats.values())
-        self.assertEqual(total_transports, 10)
+        self.assertEqual(total_transports, 7)
 
     def test_capabilities_integration(self):
         for tid in self.EXPECTED_IDS:
@@ -101,13 +99,6 @@ class ParameterValidationTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("حامل", msg)
 
-    def test_nova_port_hopping_validation(self):
-        ok, _, p = validate_transport_params("nova", {"port_hopping_min": 20000, "port_hopping_max": 40000})
-        self.assertTrue(ok)
-
-        # Min >= Max
-        ok, msg, _ = validate_transport_params("nova", {"port_hopping_min": 50000, "port_hopping_max": 20000})
-        self.assertFalse(ok)
 
 
 class ZeroFakeTelemetryTests(unittest.TestCase):
@@ -195,40 +186,6 @@ class DedicatedAdaptersTests(unittest.TestCase):
         self.assertIn("encaplimit none", cfg["iran_service_unit"])
         self.assertIn("TCPMSS --set-mss 1340", cfg["mss_rule"])
 
-    def test_xhttps_and_nova_configs(self):
-        # Test xhttps with xmux
-        node_xhttps = {
-            "node_name": "ldh0123456789abcdef",
-            "transport": "xhttps",
-            "https": {
-                "uuid": "00000000-0000-0000-0000-000000000001",
-                "path": "/xhttp-path",
-                "outer_port": 8443,
-                "probe_local": 11111,
-                "probe_remote": 22222,
-                "profile": {
-                    "server_name": "example.com",
-                    "certificate": "/etc/cert.pem",
-                    "key": "/etc/key.pem",
-                    "xmux_concurrency": 8,
-                    "xmux_max_conns": 4,
-                }
-            }
-        }
-        iran_cfg, kharej_cfg = https_tunnel.configs(node_xhttps, "5.6.7.8", ["443"])
-        # Verify xmux is populated
-        self.assertFalse(iran_cfg["outbounds"][0]["mux"]["enabled"])
-        self.assertEqual(iran_cfg["outbounds"][0]["streamSettings"]["xhttpSettings"]["xmux"], {"maxConcurrency": 8})
-
-        # Test nova with fragment outbound
-        node_nova = copy.deepcopy(node_xhttps)
-        node_nova["transport"] = "nova"
-        node_nova["https"]["profile"]["tls_fragment_min"] = 10
-        node_nova["https"]["profile"]["tls_fragment_max"] = 30
-        node_nova["https"]["profile"]["tls_fragment_delay"] = 10
-        iran_nova, _ = https_tunnel.configs(node_nova, "5.6.7.8", ["443"])
-        outbound_tags = [o["tag"] for o in iran_nova["outbounds"]]
-        self.assertIn("fragment-out", outbound_tags)
 
 
 if __name__ == "__main__":

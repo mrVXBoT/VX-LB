@@ -142,15 +142,11 @@ class WaterWallOpsTests(unittest.TestCase):
             'node_name': 'ldw' + secrets.token_hex(8),
             'ip': '192.0.2.10',
             'waterwall': {
-                'profile': {
-                    'server_name': 'tunnel.test',
-                    'certificate': str(self.tmp_path / 'cert.pem'),
-                    'key': str(self.tmp_path / 'key.pem'),
+                'profile': waterwall.profile('trojan', {
+                    'password': 'secret-pass-1234',
                     'port': self.outer_port,
                     'binary': '/tmp/waterwall-bin/Waterwall'
-                },
-                'uuid_tcp': str(uuid.uuid4()),
-                'uuid_udp': str(uuid.uuid4()),
+                }),
                 'outer_port': self.outer_port,
                 'backend_port': self.backend_port,
                 'probe_port': self.probe_port,
@@ -388,9 +384,8 @@ class WaterWallAdapterLifecycleTests(unittest.TestCase):
         configured_client_ports = ["2222", "8443"]
         pool_config = {
             "camouflage": {
-                "server_name": "tunnel.test",
-                "certificate": "/etc/ssl/certs/tunnel.crt",
-                "key": "/etc/ssl/private/tunnel.key",
+                "mode": "trojan",
+                "password": "secret-pass-1234",
                 "binary": "/tmp/waterwall-bin/Waterwall",
                 "port": 443
             },
@@ -410,11 +405,9 @@ class WaterWallAdapterLifecycleTests(unittest.TestCase):
         systemd_unit = cfg["systemd_unit"]
         iran_chain = cfg["iran_chain"]
 
-        # Verify loopback-only probe listener on independent port
-        probe_listener = next(n for n in iran_chain["nodes"] if n["name"] == "tcp-udp-probe-listener")
-        self.assertEqual(probe_listener["settings"]["address"], "127.0.0.1")
-        self.assertEqual(probe_listener["settings"]["port"], cfg["probe_port"])
-        self.assertNotIn(cfg["probe_port"], [int(p) for p in configured_client_ports])
+        # Verify the trojan client chain contains the expected protocol node
+        self.assertTrue(any(n["type"] == "TrojanClient" for n in iran_chain["nodes"]))
+        self.assertTrue(any(n["type"] == "TrojanServer" for n in cfg["kharej_chain"]["nodes"]))
 
         # Deploy the generated configuration and systemd unit files
         iran_ssh.write_file(config_path, json.dumps(iran_chain))
@@ -505,7 +498,7 @@ class WaterWallAdapterLifecycleTests(unittest.TestCase):
     def test_adapter_probe_failures_detected(self):
         """Verify adapter.probe detects service down, journal errors, and invalid arguments."""
         cfg = self.adapter.configure({}, {"ip": "198.51.100.22"}, {
-            "camouflage": {"binary": "/tmp/waterwall-bin/Waterwall", "server_name": "tunnel.test", "port": 443},
+            "camouflage": {"mode": "trojan", "password": "secret-pass-1234", "binary": "/tmp/waterwall-bin/Waterwall", "port": 443},
             "client_ports": ["2222"]
         })
         node = cfg["node"]

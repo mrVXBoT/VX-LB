@@ -22,7 +22,8 @@ class WaterWallAdapter(BaseTunnelAdapter):
         return install_waterwall(ssh, role, config)
 
     def configure(self, iran_node: dict, kharej_server: dict, pool_config: dict) -> dict:
-        from core.waterwall import chain_configs, core_config, service, path, unit, DIRECTORY
+        from core.waterwall import chain_configs, core_config, service, path, unit, DIRECTORY, profile as waterwall_profile
+        from core.waterwall_modes import default_settings
 
         node = copy.deepcopy(iran_node)
         node_name = node.get("node_name")
@@ -31,20 +32,14 @@ class WaterWallAdapter(BaseTunnelAdapter):
         if "ip" not in node:
             node["ip"] = "127.0.0.1"
 
-        raw_profile = pool_config.get("camouflage") or pool_config.get("profile") or {}
-        profile_dict = dict(raw_profile)
-        server_name = profile_dict.get("server_name", "tunnel.test")
-        profile = {
-            "mode": "waterwall",
-            "server_name": server_name,
-            "port": int(pool_config.get("tunnel_port") or profile_dict.get("port", 443)),
-            "binary": profile_dict.get("binary") or "/tmp/waterwall-bin/Waterwall",
-            "certificate": profile_dict.get("certificate") or f"/etc/ssl/certs/{server_name}.crt",
-            "key": profile_dict.get("key") or profile_dict.get("private_key") or f"/etc/ssl/private/{server_name}.key"
-        }
+        raw_profile = dict(pool_config.get("camouflage") or pool_config.get("profile") or {})
+        mode = str(raw_profile.get("mode") or pool_config.get("waterwall_mode") or "trojan")
+        merged = default_settings(mode)
+        merged.update({k: v for k, v in raw_profile.items() if v is not None})
+        prof = waterwall_profile(mode, merged)
 
         ports = pool_config.get("client_ports", ["2222"])
-        outer_port = pool_config.get("tunnel_port", profile.get("port", 443))
+        outer_port = pool_config.get("tunnel_port", prof.get("port", 443))
 
         # Independent probe ingress port (strictly loopback-only on Iran) separate from client_ports
         client_ports_set = set(int(p) for p in ports)
@@ -69,9 +64,7 @@ class WaterWallAdapter(BaseTunnelAdapter):
 
         if "waterwall" not in node:
             node["waterwall"] = {
-                "profile": copy.deepcopy(profile),
-                "uuid_tcp": str(uuid.uuid4()),
-                "uuid_udp": str(uuid.uuid4()),
+                "profile": copy.deepcopy(prof),
                 "outer_port": int(outer_port),
                 "probe_port": probe_ingress_port,
                 "probe_ingress_port": probe_ingress_port,
@@ -79,18 +72,12 @@ class WaterWallAdapter(BaseTunnelAdapter):
                 "backend_port": backend_port
             }
         else:
-            node["waterwall"].setdefault("uuid_tcp", str(uuid.uuid4()))
-            node["waterwall"].setdefault("uuid_udp", str(uuid.uuid4()))
             node["waterwall"].setdefault("outer_port", int(outer_port))
             node["waterwall"]["probe_port"] = probe_ingress_port
             node["waterwall"]["probe_ingress_port"] = probe_ingress_port
             node["waterwall"]["probe_backend_port"] = probe_backend_port
             node["waterwall"].setdefault("backend_port", backend_port)
-            if "profile" not in node["waterwall"]:
-                node["waterwall"]["profile"] = copy.deepcopy(profile)
-            else:
-                for k, v in profile.items():
-                    node["waterwall"]["profile"].setdefault(k, v)
+            node["waterwall"].setdefault("profile", copy.deepcopy(prof))
 
         kharej_ip = kharej_server.get("ip", "127.0.0.1")
         iran_chain, kharej_chain = chain_configs(node, kharej_ip, ports)

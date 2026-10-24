@@ -34,11 +34,10 @@ class SharedInfrastructureTests(unittest.TestCase):
         """Unified adapter contract and discovery."""
         import core.backpack_adapter
         import core.gre_adapter
-        import core.xhttp_adapter
         import core.waterwall_adapter
 
         registered = list_registered_adapters()
-        for engine in ["backpack", "gre_ipv4", "xhttp", "waterwall"]:
+        for engine in ["backpack", "gre_ipv4", "waterwall"]:
             self.assertIn(engine, registered)
             adapter = get_adapter(engine)
             self.assertIsNotNone(adapter)
@@ -56,16 +55,16 @@ class SharedInfrastructureTests(unittest.TestCase):
 
     def test_dependency_manifests(self):
         """Pinned versions, licenses, architectures, and checksum validation."""
-        xray_manifest = get_dependency_manifest("xray")
-        self.assertIsNotNone(xray_manifest)
-        self.assertEqual(xray_manifest.pinned_version, "v26.3.27")
-        self.assertEqual(xray_manifest.license_spdx, "MPL-2.0")
-        self.assertIn("x86_64", xray_manifest.architectures)
+        ww_manifest = get_dependency_manifest("waterwall")
+        self.assertIsNotNone(ww_manifest)
+        self.assertEqual(ww_manifest.pinned_version, "v1.46.96")
+        self.assertEqual(ww_manifest.license_spdx, "GPL-3.0")
+        self.assertIn("x86_64", ww_manifest.architectures)
 
-        ok, msg = validate_binary_prerequisites("xray", "x86_64")
+        ok, msg = validate_binary_prerequisites("waterwall", "x86_64")
         self.assertTrue(ok)
 
-        ok_bad_arch, msg_bad = validate_binary_prerequisites("xray", "mips")
+        ok_bad_arch, msg_bad = validate_binary_prerequisites("waterwall", "mips")
         self.assertFalse(ok_bad_arch)
         self.assertIn("not supported", msg_bad)
 

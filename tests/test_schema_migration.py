@@ -42,9 +42,9 @@ class SchemaMigrationTests(unittest.TestCase):
                     "transport": "gre",
                     "gre_mtu": 1400
                 },
-                "xhttp_pool": {
-                    "transport": "xhttp",
-                    "camouflage": {"server_name": "example.com"}
+                "waterwall_pool": {
+                    "transport": "waterwall",
+                    "camouflage": {"mode": "trojan", "password": "secret-pass-1234", "server_name": "tunnel.test"}
                 }
             }
         }
@@ -56,7 +56,7 @@ class SchemaMigrationTests(unittest.TestCase):
         self.assertEqual(migrated["pools"]["legacy_pck_pool"]["engine"], "backpack")
         self.assertEqual(migrated["pools"]["legacy_pck_pool"]["dns_policy"], "strict")
         self.assertEqual(migrated["pools"]["gre_pool"]["engine"], "gre_ipv4")
-        self.assertEqual(migrated["pools"]["xhttp_pool"]["engine"], "xhttp")
+        self.assertEqual(migrated["pools"]["waterwall_pool"]["engine"], "waterwall")
 
         # v2 assertions: custom_links, resource_reservations, persistent_jobs
         self.assertIn("custom_links", migrated)
@@ -77,9 +77,9 @@ class SchemaMigrationTests(unittest.TestCase):
         self.assertEqual(gre_comp["encryption"]["type"], "ipsec")
         self.assertEqual(gre_comp["transport"]["mtu"], 1400)
 
-        xhttp_comp = migrated["pools"]["xhttp_pool"]["composition"]
-        self.assertIn(xhttp_comp["camouflage"]["type"], ("xhttp", "xhttp_grpc"))
-        self.assertEqual(xhttp_comp["camouflage"]["domain"], "example.com")
+        waterwall_comp = migrated["pools"]["waterwall_pool"]["composition"]
+        self.assertEqual(waterwall_comp["network"]["type"], "direct")
+        self.assertEqual(waterwall_comp["encryption"]["type"], "tls13")
 
         # Verify preservation of legacy fields
         self.assertEqual(migrated["pools"]["legacy_pck_pool"]["transport"], "pck")

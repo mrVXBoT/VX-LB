@@ -790,52 +790,53 @@
             <label class="field-label" for="new-pool-engine">اسکریپت و هستهٔ پایهٔ تونل</label>
             <select id="new-pool-engine" class="field-input select-styled" onchange="onPoolEngineChanged()">
               <option value="backpack" selected>موتور جت پک</option>
-              <option value="waterwall">اسکریپت WaterWall (موتور گراف نود L7 VLESS + TLS + Mux)</option>
-              <option value="xray">استتار پیشرفته Xray (حالت‌های XHTTP، XHTTPS و Nova)</option>
+              <option value="waterwall">سد کرج</option>
+              <option value="gost">غول چراغ جادو</option>
               <option value="kernel">فاضلاب لینوکس</option>
-              <option value="spoof">پروفایل‌های پردازش بسته — پنج حالت آزمایشی</option>
-              <option value="other">سایر پروتکل‌های وب و اضطراری (WebSocket, HTTP/2, Slipstream)</option>
+              <option value="spoof">پردازش بسته (DPI Spoof)</option>
+              <option value="other">اتاق بحران (وب و اضطراری)</option>
             </select>
           </div>
           <div class="input-group">
             <label class="field-label" for="new-pool-proto">روش انتقال / ترنسپورت اختصاصی</label>
             <select id="new-pool-proto" class="field-input select-styled" onchange="onPoolTransportChanged()">
-              <option value="tcp" selected>01. جت پک تخمی (کمترین مصرف CPU و تأخیر پایه)</option>
-              <option value="stealth">02. جت پک شخمی (پروتکل استتار Noise بدون اثرانگشت) [پیشنهادی]</option>
-              <option value="pck">03. جت پک تخمی تخیلی (بسته‌های خام مقاوم در برابر تزریق TCP RST)</option>
-              <option value="kcp">04. جت پک طرح گیمینگ (UDP + KCP + FEC)</option>
-              <option value="wss">05. جت پک خایه افکن (WebSocket Secure TLS 1.3)</option>
-              <option value="quic">06. جت پک سوپر کیری خفن (UDP + QUIC با TLS 1.3)</option>
+              <option value="tcp" selected>جت پک تخمی</option>
+              <option value="stealth">جت پک شخمی</option>
+              <option value="pck">جت پک تخمی تخیلی</option>
+              <option value="kcp">جت پک طرح گیمینگ</option>
+              <option value="wss">جت پک خایه افکن</option>
+              <option value="quic">جت پک سوپر کیری خفن</option>
             </select>
             <p id="new-pool-transport-desc" class="field-hint" style="margin-top:6px;"></p>
           </div>
-          <div id="https-create-fields" class="hidden">
-            <p class="field-hint">در حالت‌های خانوادهٔ HTTPS/Xray (شامل XHTTP، XHTTPS، Nova و GRE-XHTTP)، ترافیک با استتار پیشرفته و شبیه‌سازی مرورگر منتقل می‌شود. دامنه و گواهی معتبر مربوط به سرور خارج است.</p>
-            <div class="input-group"><label class="field-label" for="https-server-name">دامنهٔ TLS سرور خارج</label><input id="https-server-name" class="field-input" placeholder="tunnel.example.com" dir="ltr" maxlength="253" disabled required></div>
-            <div class="input-group"><label class="field-label" for="https-outer-port">پورت ترجیحی اتصال به سرور خارج</label><input id="https-outer-port" class="field-input" value="443" type="number" min="1" max="65535" dir="ltr" disabled required><p class="field-hint">اگر اشغال باشد، یکی از پورت‌های HTTPS آزاد انتخاب می‌شود؛ پورت واقعی هر نود نمایش داده خواهد شد.</p></div>
-            <p id="waterwall-certificate-hint" class="field-hint hidden">WaterWall به گواهی صادرشده از CA عمومی مورد اعتماد نیاز دارد؛ نصب CA خصوصی در سیستم به‌تنهایی کافی نیست.</p>
-            <div id="https-xmux-fields" class="hidden">
-              <div class="input-group">
-                <label class="field-label" for="https-xmux-concurrency">تعداد اتصالات هم‌زمان xmux (پیش‌فرض 8)</label>
-                <input type="number" id="https-xmux-concurrency" class="field-input" value="8" min="1" max="32" dir="ltr" disabled>
+
+          <div id="waterwall-create-fields" class="input-group hidden">
+            <div class="input-group"><label class="field-label" for="waterwall-outer-port">پورت ترجیحی اتصال به سرور خارج</label><input id="waterwall-outer-port" class="field-input" value="443" type="number" min="1" max="65535" dir="ltr" disabled required></div>
+            <div class="input-group"><label class="field-label" for="waterwall-binary">مسیر WaterWall روی هر دو سرور</label><input id="waterwall-binary" class="field-input" value="/usr/local/bin/waterwall" dir="ltr" disabled></div>
+            <div id="waterwall-trojan-fields" class="hidden">
+              <div class="input-group"><label class="field-label" for="waterwall-trojan-password">رمز عبور مشترک Trojan (حداقل ۸ نویسه)</label><input id="waterwall-trojan-password" class="field-input" type="text" dir="ltr" disabled></div>
+              <div class="input-group"><label class="field-label" for="waterwall-trojan-tls">بسته‌بندی TLS (نیازمند گواهی)</label><input id="waterwall-trojan-tls" type="checkbox" onchange="onWaterwallModeChanged()" disabled></div>
+              <div id="waterwall-tls-fields" class="hidden">
+                <div class="input-group"><label class="field-label" for="waterwall-server-name">دامنهٔ TLS سرور خارج</label><input id="waterwall-server-name" class="field-input" placeholder="tunnel.example.com" dir="ltr" maxlength="253" disabled></div>
+                <div class="input-group"><label class="field-label" for="waterwall-certificate">مسیر گواهی</label><input id="waterwall-certificate" class="field-input" placeholder="/etc/letsencrypt/live/DOMAIN/fullchain.pem" dir="ltr" disabled></div>
+                <div class="input-group"><label class="field-label" for="waterwall-key">مسیر کلید خصوصی</label><input id="waterwall-key" class="field-input" placeholder="/etc/letsencrypt/live/DOMAIN/privkey.pem" dir="ltr" disabled></div>
               </div>
             </div>
-            <div id="https-nova-fields" class="hidden">
-              <div class="input-group">
-                <label class="field-label">محدوده بایت‌های برش TLS ClientHello (پیش‌فرض 10 تا 30 بایت)</label>
-                <div style="display:flex;gap:8px;">
-                  <input type="number" id="https-fragment-min" class="field-input" value="10" min="5" max="50" placeholder="حداقل" dir="ltr" disabled>
-                  <input type="number" id="https-fragment-max" class="field-input" value="30" min="10" max="100" placeholder="حداکثر" dir="ltr" disabled>
-                </div>
-              </div>
+            <div id="waterwall-reality-fields" class="hidden">
+              <div class="input-group"><label class="field-label" for="waterwall-reality-password">رمز مشترک Reality (۱ تا ۳۲ بایت)</label><input id="waterwall-reality-password" class="field-input" type="text" dir="ltr" disabled></div>
+              <div class="input-group"><label class="field-label" for="waterwall-reality-sni">دامنهٔ بازدیدکننده برای استتار</label><input id="waterwall-reality-sni" class="field-input" value="www.microsoft.com" dir="ltr" disabled></div>
             </div>
-            <details class="https-advanced"><summary class="field-label">مسیر گواهی و فایل اجرایی <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m6 9 6 6 6-6"/></svg></summary>
-            <div id="https-certificate-fields">
-              <div class="input-group"><label class="field-label" for="https-certificate">مسیر گواهی صادرشده روی سرور خارج</label><input id="https-certificate" class="field-input" placeholder="/etc/letsencrypt/live/DOMAIN/fullchain.pem" dir="ltr" disabled></div>
-              <div class="input-group"><label class="field-label" for="https-key">مسیر کلید خصوصی روی سرور خارج</label><input id="https-key" class="field-input" placeholder="/etc/letsencrypt/live/DOMAIN/privkey.pem" dir="ltr" disabled><p class="field-hint">فقط مسیر فایل را وارد کنید، نه محتوای کلید. فیلد خالی از مسیر استاندارد دامنه استفاده می‌کند. DNS دامنه باید به سرور خارج اشاره کند؛ گواهی معتبر پیش از فعال‌سازی بررسی می‌شود.</p></div>
+            <div id="waterwall-reverse-fields" class="hidden">
+              <div class="input-group"><label class="field-label" for="waterwall-reverse-secret">مخفی تونل معکوس</label><input id="waterwall-reverse-secret" class="field-input" value="vxlb-waterwall-reverse" dir="ltr" disabled></div>
             </div>
-            <div class="input-group"><label class="field-label" for="https-binary">مسیر Xray روی هر دو سرور</label><input id="https-binary" class="field-input" value="/usr/local/bin/xray" dir="ltr" disabled></div></details>
-            <p class="field-hint">هیچ روشی تضمین غیرقابل‌شناسایی بودن ندارد. قطع انتقال امن، به اتصال خام تبدیل نمی‌شود.</p>
+            <div id="waterwall-bgp4-fields" class="hidden">
+              <div class="input-group"><label class="field-label" for="waterwall-bgp4-password">رمز فریم BGP (اختیاری)</label><input id="waterwall-bgp4-password" class="field-input" type="text" dir="ltr" disabled></div>
+            </div>
+          </div>
+          <div id="gost-create-fields" class="input-group hidden">
+            <div class="input-group"><label class="field-label" for="gost-password">رمز عبور مشترک (حداقل ۸ نویسه)</label><input id="gost-password" class="field-input" type="text" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="gost-outer-port">پورت ترجیحی اتصال به سرور خارج</label><input id="gost-outer-port" class="field-input" value="8443" type="number" min="1" max="65535" dir="ltr" disabled required></div>
+            <div class="input-group"><label class="field-label" for="gost-binary">مسیر GOST روی هر دو سرور</label><input id="gost-binary" class="field-input" value="/usr/local/bin/gost" dir="ltr" disabled></div>
           </div>
           <div id="tun-create-fields" class="input-group hidden">
             <p class="field-hint">اینترفیس واقعی TUN لینوکس با حامل UDP/Noise در BackPack L3 و محدودسازی MSS اختصاصی؛ انتقال TCP/UDP پیش از فعال‌شدن بررسی می‌شود.</p>
@@ -1087,11 +1088,10 @@
             <label class="field-label" for="transport-change-engine">موتور و هستهٔ پایهٔ تونل</label>
             <select id="transport-change-engine" class="field-input select-styled" onchange="onTransportChangeEngineChanged()">
               <option value="backpack">موتور جت پک</option>
-              <option value="waterwall">اسکریپت WaterWall (موتور گراف نود L7 VLESS + TLS + Mux)</option>
-              <option value="xray">استتار پیشرفته Xray (حالت‌های XHTTP، XHTTPS و Nova)</option>
+              <option value="waterwall">سد کرج</option>
               <option value="kernel">فاضلاب لینوکس</option>
               <option value="spoof" disabled>پردازش بسته — استخر جداگانه بسازید</option>
-              <option value="other">سایر پروتکل‌های وب و اضطراری (WebSocket, HTTP/2, Slipstream)</option>
+              <option value="other">اتاق بحران (وب و اضطراری)</option>
             </select>
           </div>
           <div class="input-group">
@@ -1101,16 +1101,7 @@
             </select>
             <p id="transport-target-desc" class="field-hint" style="margin-top:6px;"></p>
           </div>
-          <div id="transport-change-tls-fields" class="hidden">
-            <div class="input-group">
-              <label class="field-label" for="transport-tls-server-name">دامنهٔ TLS سرور خارج</label>
-              <input id="transport-tls-server-name" class="field-input" placeholder="tunnel.example.com" dir="ltr" maxlength="253">
-            </div>
-            <div class="input-group">
-              <label class="field-label" for="transport-tls-outer-port">پورت ترجیحی اتصال به سرور خارج</label>
-              <input id="transport-tls-outer-port" class="field-input" value="443" type="number" min="1" max="65535" dir="ltr">
-            </div>
-          </div>
+
           <div id="transport-change-spoof-fields" class="hidden">
             <div class="input-group">
               <label class="field-label" for="transport-spoof-fake-sni">نام دامنهٔ جعلی SNI</label>

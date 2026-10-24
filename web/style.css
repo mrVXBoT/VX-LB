@@ -244,9 +244,9 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .engine-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .engine-badge.engine-backpack { color: #34d399; background: rgba(52, 211, 153, 0.12); border-color: rgba(52, 211, 153, 0.28); }
 .engine-badge.engine-waterwall { color: #38bdf8; background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.28); }
-.engine-badge.engine-xray { color: #2dd4bf; background: rgba(45, 212, 191, 0.12); border-color: rgba(45, 212, 191, 0.28); }
 .engine-badge.engine-kernel { color: #fbbf24; background: rgba(251, 191, 36, 0.12); border-color: rgba(251, 191, 36, 0.28); }
 .engine-badge.engine-other { color: #f472b6; background: rgba(244, 114, 182, 0.12); border-color: rgba(244, 114, 182, 0.28); }
+.engine-badge.engine-gost { color: #a78bfa; background: rgba(167, 139, 250, 0.12); border-color: rgba(167, 139, 250, 0.28); }
 .pool-nodes-summary { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 11px; color: var(--text-sub); background: var(--bg-elevated); border: 1px solid var(--border-subtle); }
 .pool-nodes-summary svg { width: 12px; height: 12px; color: var(--text-muted); }
 .node-latency-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10px; direction: ltr; color: var(--status-good); background: var(--status-good-bg); border: 1px solid rgba(161, 223, 195, 0.2); }

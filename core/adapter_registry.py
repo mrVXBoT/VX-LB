@@ -21,7 +21,6 @@ def _ensure_builtins_loaded():
     _BUILTINS_LOADED = True
     import core.backpack_adapter
     import core.gre_adapter
-    import core.xhttp_adapter
     import core.waterwall_adapter
     import core.kernel_tunnels_adapter
     import core.overlay_tunnels_adapter

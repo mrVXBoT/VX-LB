@@ -263,9 +263,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                         "spoof": {"profile":n.get("transport"),"wire_verified":n.get("spoof",{}).get("wire_evidence",{}).get("passed") is True,"fake_sni":n.get("spoof",{}).get("fake_sni") if n.get("transport") in ("fake-sni","hop-ttl-injection") else None,"ttl_delta":n.get("spoof",{}).get("ttl_delta") if n.get("transport")=="hop-ttl-injection" else None} if n.get("engine")=="spoof" and n.get("spoof") else None,
                         "http_connect": {"public_port":n.get("http_connect",{}).get("public_port"),"mode":n.get("transport"),"mutual_tls":True} if n.get("engine") in ("http","https") else None,
                         "status_note": n.get("status_note") or p_val.get("status_note") if n.get("engine") == "wireguard" else None,
-                        "https": {"server_name":n.get("https",{}).get("profile",{}).get("server_name"),"outer_port":n.get("https",{}).get("outer_port")} if n.get("engine") == "xray" else None,
-                         "waterwall": {"uuid_tcp": n.get("waterwall", {}).get("uuid_tcp"), "outer_port": n.get("waterwall", {}).get("outer_port"), "server_name": n.get("waterwall", {}).get("profile", {}).get("server_name") or n.get("waterwall", {}).get("server_name"), "profile": n.get("waterwall", {}).get("profile")} if n.get("engine") == "waterwall" else None,
-                        "gre_https": {"local_private":n['gre_https'][0]['private'],"remote_private":n['gre_https'][1]['private'],"mtu":n['gre_https'][0]['mtu']} if n.get('gre_https') else None,
+                        "waterwall": {"uuid_tcp": n.get("waterwall", {}).get("uuid_tcp"), "outer_port": n.get("waterwall", {}).get("outer_port"), "server_name": n.get("waterwall", {}).get("profile", {}).get("server_name") or n.get("waterwall", {}).get("server_name"), "profile": n.get("waterwall", {}).get("profile")} if n.get("engine") == "waterwall" else None,
                         "transport": n.get("transport", p_val.get("transport", "tcp")),
                         "status": "PROVISIONING" if n.get("creation_pending") else "DOWN" if n.get("provisioning") else telem.get("status", "IDLE"),
                         "reason": p_val.get("creation_job", {}).get("message", "در انتظار راه‌اندازی") if n.get("creation_pending") else "راه‌اندازی نود کامل نشده؛ منابع آن را بررسی یا پاک‌سازی کنید" if n.get("provisioning") else telem.get("reason", "Awaiting checks"),
@@ -298,7 +296,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "wireguard_port": p_val.get("wireguard_port") or p_val.get("tunnel_port"),
                     "status_note": p_val.get("status_note"),
                     "vni": p_val.get("vni"),
-                     "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name")} if p_val.get("engine") in ("xray", "waterwall") else None,
+                     "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name","profile")} if p_val.get("engine") in ("waterwall", "gost") else None,
                     "operation_task": p_val.get("operation_task"),
                     "creation_job": p_val.get("creation_job"),
                     "creation_placeholder": p_val.get("creation_placeholder", False),
@@ -545,14 +543,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 return self._send_json({"error": f"SSH connection failed: {msg}"}, 502)
 
             eng = target_node.get('engine', 'backpack')
-            if eng == 'xray':
-                from core.https_tunnel import unit
-                resources=[unit(target_node)]
-                if target_node.get('transport')=='gre_xhttp':
-                    from core.gre_https import units
-                    resources.extend(units(target_node))
-                _, log_text, _ = ssh.execute('journalctl --no-pager -n 80 '+' '.join('-u '+name for name in resources))
-            elif eng == 'waterwall':
+            if eng == 'waterwall':
                 node_name = target_node.get("node_name", "")
                 svc = f"{node_name}.service" if node_name else "ldw*.service"
                 alt_svc = f"vxlb-waterwall-{node_name}.service" if node_name else "vxlb-waterwall*.service"
@@ -961,7 +952,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "dns_port": body.get("dns_port", 53),
                     "rate_limit": body.get("rate_limit", 1000)
                 })
-            elif transport in ("xhttp", "xhttps", "gre_xhttp", "reality", "nova", "waterwall"):
+            elif transport in ("xhttp", "xhttps", "gre_xhttp", "reality", "nova", "waterwall", "gost"):
                 extra_args["camouflage"] = body.get("camouflage", {})
             elif transport == "tun":
                 extra_args["mtu"] = body.get("tun_mtu") or body.get("mtu", 1280)

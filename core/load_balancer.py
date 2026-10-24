@@ -101,9 +101,6 @@ class LoadBalancerManager:
         if transport in {'http', 'https'}:
             from core.http_transport import create
             return create(pool_name, kharej_server, iran_servers, client_ports, transport=transport, callback=callback)
-        if transport in {'xhttp', 'xhttps', 'gre_xhttp', 'reality', 'nova'}:
-            from core.https_tunnel import create
-            return create(pool_name, kharej_server, iran_servers, transport, client_ports, camouflage, callback)
         if transport == 'tun':
             from core.tun_adapter import create
             t_mtu = int(kwargs.get("tun_mtu") or kwargs.get("mtu") or 1280)
@@ -125,6 +122,9 @@ class LoadBalancerManager:
             return create(pool_name, kharej_server, iran_servers, client_ports, mtu=g_mtu, vni=kwargs.get("vni"), callback=callback)
         if transport == 'waterwall':
             from core.waterwall import create
+            return create(pool_name, kharej_server, iran_servers, client_ports, camouflage, callback)
+        if transport == 'gost':
+            from core.gost_engine import create
             return create(pool_name, kharej_server, iran_servers, client_ports, camouflage, callback)
         if transport == 'vxlan_ipsec':
             from core.vxlan_ipsec import create
@@ -385,8 +385,8 @@ class LoadBalancerManager:
         if pool.get('engine') == 'waterwall':
             from core.waterwall import add
             return add(pool_name, new_iran_server, callback)
-        if pool.get('engine') == 'xray':
-            from core.https_tunnel import add
+        if pool.get('engine') == 'gost':
+            from core.gost_engine import add
             return add(pool_name, new_iran_server, callback)
         if pool.get('transport') == 'gre':
             from core.gre import add
@@ -568,8 +568,8 @@ class LoadBalancerManager:
         if pool.get('engine') == 'waterwall':
             from core.waterwall import remove
             return remove(pool_name, iran_ip, callback)
-        if pool.get('engine') == 'xray':
-            from core.https_tunnel import remove
+        if pool.get('engine') == 'gost':
+            from core.gost_engine import remove
             return remove(pool_name, iran_ip, callback)
         if pool.get('transport') == 'gre':
             from core.gre import remove
@@ -668,8 +668,8 @@ class LoadBalancerManager:
         if pool.get('engine') == 'waterwall':
             from core.waterwall import remove_pool
             return remove_pool(pool_name, callback)
-        if pool.get('engine') == 'xray':
-            from core.https_tunnel import remove_pool
+        if pool.get('engine') == 'gost':
+            from core.gost_engine import remove_pool
             return remove_pool(pool_name, callback)
         if pool.get('transport') == 'gre':
             from core.gre import remove_pool
@@ -781,11 +781,11 @@ class LoadBalancerManager:
             if set(map(str, ports)) == set(map(str, pool.get('client_ports', []))):
                 return False, 'No port change was requested'
             return change_ports(pool_name, ports)
-        if pool.get('transport') == 'gre' or pool.get('engine') in ('xray', 'waterwall'):
+        if pool.get('transport') == 'gre' or pool.get('engine') in ('waterwall', 'gost'):
             if pool.get('engine') == 'waterwall':
                 from core.waterwall import change_ports
-            elif pool.get('engine') == 'xray':
-                from core.https_tunnel import change_ports
+            elif pool.get('engine') == 'gost':
+                from core.gost_engine import change_ports
             else:
                 from core.gre import change_ports
             try: ports = [*pool.get('client_ports', []), *validate_ports(new_ports)]
@@ -948,11 +948,11 @@ class LoadBalancerManager:
             if set(map(str, ports)) == set(map(str, pool.get('client_ports', []))):
                 return False, 'No port change was requested'
             return change_ports(pool_name, ports)
-        if pool.get('transport') == 'gre' or pool.get('engine') in ('xray', 'waterwall'):
+        if pool.get('transport') == 'gre' or pool.get('engine') in ('waterwall', 'gost'):
             if pool.get('engine') == 'waterwall':
                 from core.waterwall import change_ports
-            elif pool.get('engine') == 'xray':
-                from core.https_tunnel import change_ports
+            elif pool.get('engine') == 'gost':
+                from core.gost_engine import change_ports
             else:
                 from core.gre import change_ports
             try: ports = [p for p in pool.get('client_ports', []) if str(p) != validate_port(port_to_remove)]

@@ -27,7 +27,7 @@ def reserve_probe_port(ssh, exclude, preferred=None, bind_host="127.0.0.1"):
     program='''import socket,sys,json
 exclude=set(map(int,json.loads(sys.argv[1])));preferred=int(sys.argv[2]);host=sys.argv[3]
 for attempt in range(100):
- t tcp=socket.socket();udp=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+ tcp=socket.socket();udp=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
  try:
   candidate=preferred if attempt==0 else 0
   if candidate and candidate in exclude:continue

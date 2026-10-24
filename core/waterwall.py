@@ -1,8 +1,9 @@
-"""WaterWall: flexible node-based tunneling with TLS/VLESS/Mux composition.
+"""WaterWall: flexible node-based tunneling with real WaterWall protocol modes.
 
-Tested chain for dual TCP/UDP with verified TLS 1.3:
-Iran: TcpUdpListener → Router(network) → Router(source-port) → VlessClient(port const) → MuxClient → TlsClient → TcpConnector
-Kharej: TcpUdpListener → TlsServer → VlessServer → MuxServer → TcpUdpConnector
+Supported modes (see core/waterwall_modes.py):
+trojan, reality, reverse, halfduplex, bgp4. Every mode keeps VX-LB's
+port-forwarding semantics: Iran listens on the client ports and forwards to the
+same port on Kharej's loopback backend.
 """
 import copy
 import ipaddress
@@ -18,13 +19,13 @@ from core.storage import get_pools, save_pool, delete_pool, atomic_update
 from core.validation import validate_pool_name, validate_ports, validate_port
 from core.transport_change import connect
 from core.gre import write
+from core.waterwall_modes import MODES, MODE_LABELS, iran_chain, kharej_chain, default_settings
 
 def execute(ssh, command, timeout=30):
     code, out, error = ssh.execute(command, timeout=timeout)
     if code:
         raise RuntimeError(error.strip() or out.strip() or 'WaterWall command failed')
 
-MODES = {'waterwall'}
 DIRECTORY = '/etc/vxlb/waterwall'
 BINARY_DEFAULT = '/usr/local/bin/waterwall'
 HELPER = os.environ.get('VX_LB_WATERWALL_PROBE_HELPER') or '/usr/local/bin/vxlb-waterwall-probe'
@@ -47,435 +48,49 @@ def absolute(value):
     return value
 
 def profile(mode, data):
-    """Validate and normalize WaterWall profile settings."""
+    """Validate and normalize a WaterWall mode profile."""
     if mode not in MODES or not isinstance(data, dict):
         raise ValueError('پروفایل WaterWall معتبر نیست')
-    name = domain(data.get('server_name'))
     result = {
         'mode': mode,
-        'server_name': name,
         'port': int(validate_port(data.get('port', 443))),
-        'binary': absolute(data.get('binary') or BINARY_DEFAULT)
+        'binary': absolute(data.get('binary') or BINARY_DEFAULT),
     }
-    result.update(
-        certificate=absolute(data.get('certificate') or f'/etc/letsencrypt/live/{name}/fullchain.pem'),
-        key=absolute(data.get('key') or f'/etc/letsencrypt/live/{name}/privkey.pem')
-    )
+    if mode == 'trojan':
+        password = str(data.get('password') or '')
+        if len(password) < 8:
+            raise ValueError('رمز عبور Trojan باید حداقل ۸ نویسه باشد')
+        result['password'] = password
+        if data.get('tls') and data.get('certificate') and data.get('key'):
+            result['certificate'] = absolute(data['certificate'])
+            result['key'] = absolute(data['key'])
+            result['server_name'] = domain(data.get('server_name') or 'tunnel.test')
+    elif mode == 'reality':
+        password = str(data.get('password') or '')
+        if not (1 <= len(password.encode('utf-8')) <= 32):
+            raise ValueError('رمز Reality باید ۱ تا ۳۲ بایت باشد')
+        result['password'] = password
+        result['server_name'] = domain(data.get('server_name') or 'www.microsoft.com')
+    elif mode == 'reverse':
+        result['secret'] = str(data.get('secret') or 'vxlb-waterwall-reverse')
+        try:
+            result['secret_length'] = int(data.get('secret_length') or 640)
+        except (TypeError, ValueError):
+            raise ValueError('طول مخفی Reverse نامعتبر است')
+        if not (1 <= result['secret_length'] <= 1024):
+            raise ValueError('طول مخفی Reverse باید بین ۱ تا ۱۰۲۴ باشد')
+    elif mode in ('halfduplex', 'bgp4'):
+        result['password'] = str(data.get('password') or '')
     return result
 
 def chain_configs(node, outside_ip, ports):
-    """Generate Iran and Kharej chain JSON configs with Router splitting TCP/UDP.
-
-    Since TcpUdpListener doesn't translate protocols, we need explicit routing
-    to separate TCP and UDP traffic into dedicated branches with their own
-    VlessClient/Server instances.
-    """
-    ww = node['waterwall']
-    profile_settings = ww['profile']
-    ports_list = [int(p) for p in validate_ports(ports)]
-    probe_port = ww.get('probe_port')
-    backend_port = ww.get('backend_port')
-    probe_backend_port = ww.get('probe_backend_port')
-    allowed_ports = sorted(set(
-        ports_list +
-        ([int(backend_port)] if isinstance(backend_port, int) else []) +
-        ([int(probe_port)] if probe_port else []) +
-        ([int(probe_backend_port)] if probe_backend_port else [])
-    ))
-
-    probe_target_port = probe_backend_port or backend_port or (int(probe_port) if probe_port else 'dest_context->port')
-    if isinstance(probe_target_port, str) and probe_target_port.isdigit():
-        probe_target_port = int(probe_target_port)
-    target_port = ww.get('backend_port') if (isinstance(ww.get('backend_port'), int) and len(ports_list) == 1 and not probe_port) else 'dest_context->port'
-    uuid_tcp = ww['uuid_tcp']
-    uuid_udp = ww['uuid_udp']
-    mux_mode = 'counter'
-
-    # Iran chain: TcpUdpListener (0.0.0.0 for public user ports) → protocol-router (network)
-    #   → per-protocol port-router (source-port = local listener port) → per-port VlessClient
-    #   (constant target port, written into the VLESS header) → MuxClient → TlsClient → TcpConnector.
-    # dest_context->port is never populated by a listener, so VlessClient must use a constant
-    # target; routing by source-port preserves one VLESS destination per accepted client port.
-    # If probe_port is configured, a separate local-only pipeline (127.0.0.1 for probe port) is included in the same chain
-    def vless_branch(name_prefix, uid, protocol, port, next_name):
-        return {
-            'name': f'{name_prefix}-{port}',
-            'type': 'VlessClient',
-            'settings': {
-                'uuid': uid,
-                'address': '127.0.0.1',
-                'port': port,
-                'protocol': protocol,
-                'domain-strategy': 'do-not-resolve-domains'
-            },
-            'next': next_name
-        }
-
-    tcp_port_rules = [
-        {'source-port': p, 'target': f'tcp-vless-client-{p}'}
-        for p in ports_list
-    ]
-    udp_port_rules = [
-        {'source-port': p, 'target': f'udp-vless-client-{p}'}
-        for p in ports_list
-    ]
-
-    iran_nodes = [
-        {
-            'name': 'tcp-udp-listener',
-            'type': 'TcpUdpListener',
-            'settings': {
-                'address': '0.0.0.0',
-                'port': ports_list[0] if len(ports_list) == 1 else ports_list,
-                'nodelay': True,
-                'large-send-buffer': True,
-                'large-recv-buffer': True
-            },
-            'next': 'protocol-router'
-        },
-        {
-            'name': 'protocol-router',
-            'type': 'Router',
-            'settings': {
-                'rules': [
-                    {
-                        'network': 'udp',
-                        'target': 'udp-port-router'
-                    }
-                ]
-            },
-            'next': 'tcp-port-router'
-        },
-        {
-            'name': 'tcp-port-router',
-            'type': 'Router',
-            'settings': {'rules': tcp_port_rules},
-            'next': 'blackhole-iran-tcp'
-        },
-        {
-            'name': 'udp-port-router',
-            'type': 'Router',
-            'settings': {'rules': udp_port_rules},
-            'next': 'blackhole-iran-udp'
-        },
-        {
-            'name': 'blackhole-iran-tcp',
-            'type': 'BlackHole',
-            'settings': {'mode': 'active'}
-        },
-        {
-            'name': 'blackhole-iran-udp',
-            'type': 'BlackHole',
-            'settings': {'mode': 'active'}
-        },
-        # TCP branches: one VlessClient per client port, constant target port
-        *[vless_branch('tcp-vless-client', uuid_tcp, 'tcp', p, 'tcp-mux-client')
-          for p in ports_list],
-        {
-            'name': 'tcp-mux-client',
-            'type': 'MuxClient',
-            'settings': {
-                'mode': mux_mode,
-                'connection-capacity': 128,
-                'keepalive': True,
-                'ping-interval': 15000,
-                'tolerance-ms': 45000
-            },
-            'next': 'tcp-tls-client'
-        },
-        {
-            'name': 'tcp-tls-client',
-            'type': 'TlsClient',
-            'settings': {
-                'sni': profile_settings['server_name'],
-                'verify': True,
-                'alpns': ['h2'],
-                'x25519mlkem768': True
-            },
-            'next': 'tcp-connector'
-        },
-        {
-            'name': 'tcp-connector',
-            'type': 'TcpConnector',
-            'settings': {
-                'address': outside_ip,
-                'port': ww['outer_port'],
-                'nodelay': True,
-                'large-send-buffer': True,
-                'large-recv-buffer': True
-            }
-        },
-        # UDP branches
-        *[vless_branch('udp-vless-client', uuid_udp, 'udp', p, 'udp-mux-client')
-          for p in ports_list],
-        {
-            'name': 'udp-mux-client',
-            'type': 'MuxClient',
-            'settings': {
-                'mode': mux_mode,
-                'connection-capacity': 128,
-                'keepalive': True,
-                'ping-interval': 15000,
-                'tolerance-ms': 45000
-            },
-            'next': 'udp-tls-client'
-        },
-        {
-            'name': 'udp-tls-client',
-            'type': 'TlsClient',
-            'settings': {
-                'sni': profile_settings['server_name'],
-                'verify': True,
-                'alpns': ['h2'],
-                'x25519mlkem768': True
-            },
-            'next': 'udp-connector'
-        },
-        {
-            'name': 'udp-connector',
-            'type': 'TcpConnector',
-            'settings': {
-                'address': outside_ip,
-                'port': ww['outer_port'],
-                'nodelay': True,
-                'large-send-buffer': True,
-                'large-recv-buffer': True
-            }
-        }
-    ]
-
-    if probe_port and int(probe_port) not in ports_list:
-        # Dedicated local-only probe pipeline: strictly binds to 127.0.0.1
-        iran_nodes.extend([
-            {
-                'name': 'tcp-udp-probe-listener',
-                'type': 'TcpUdpListener',
-                'settings': {
-                    'address': '127.0.0.1',
-                    'port': int(probe_port),
-                    'nodelay': True,
-                    'large-send-buffer': True,
-                    'large-recv-buffer': True
-                },
-                'next': 'protocol-router-probe'
-            },
-            {
-                'name': 'protocol-router-probe',
-                'type': 'Router',
-                'settings': {
-                    'rules': [
-                        {
-                            'network': 'udp',
-                            'target': 'udp-vless-client-probe'
-                        }
-                    ]
-                },
-                'next': 'tcp-vless-client-probe'
-            },
-            {
-                'name': 'tcp-vless-client-probe',
-                'type': 'VlessClient',
-                'settings': {
-                    'uuid': uuid_tcp,
-                    'address': '127.0.0.1',
-                    'port': probe_target_port,
-                    'protocol': 'tcp',
-                    'domain-strategy': 'do-not-resolve-domains'
-                },
-                'next': 'tcp-mux-client-probe'
-            },
-            {
-                'name': 'tcp-mux-client-probe',
-                'type': 'MuxClient',
-                'settings': {
-                    'mode': mux_mode,
-                    'connection-capacity': 128,
-                    'keepalive': True,
-                    'ping-interval': 15000,
-                    'tolerance-ms': 45000
-                },
-                'next': 'tcp-tls-client-probe'
-            },
-            {
-                'name': 'tcp-tls-client-probe',
-                'type': 'TlsClient',
-                'settings': {
-                    'sni': profile_settings['server_name'],
-                    'verify': True,
-                    'alpns': ['h2'],
-                    'x25519mlkem768': True
-                },
-                'next': 'tcp-connector-probe'
-            },
-            {
-                'name': 'tcp-connector-probe',
-                'type': 'TcpConnector',
-                'settings': {
-                    'address': outside_ip,
-                    'port': ww['outer_port'],
-                    'nodelay': True,
-                    'large-send-buffer': True,
-                    'large-recv-buffer': True
-                }
-            },
-            {
-                'name': 'udp-vless-client-probe',
-                'type': 'VlessClient',
-                'settings': {
-                    'uuid': uuid_udp,
-                    'address': '127.0.0.1',
-                    'port': probe_target_port,
-                    'protocol': 'udp',
-                    'domain-strategy': 'do-not-resolve-domains'
-                },
-                'next': 'udp-mux-client-probe'
-            },
-            {
-                'name': 'udp-mux-client-probe',
-                'type': 'MuxClient',
-                'settings': {
-                    'mode': mux_mode,
-                    'connection-capacity': 128,
-                    'keepalive': True,
-                    'ping-interval': 15000,
-                    'tolerance-ms': 45000
-                },
-                'next': 'udp-tls-client-probe'
-            },
-            {
-                'name': 'udp-tls-client-probe',
-                'type': 'TlsClient',
-                'settings': {
-                    'sni': profile_settings['server_name'],
-                    'verify': True,
-                    'alpns': ['h2'],
-                    'x25519mlkem768': True
-                },
-                'next': 'udp-connector-probe'
-            },
-            {
-                'name': 'udp-connector-probe',
-                'type': 'TcpConnector',
-                'settings': {
-                    'address': outside_ip,
-                    'port': ww['outer_port'],
-                    'nodelay': True,
-                    'large-send-buffer': True,
-                    'large-recv-buffer': True
-                }
-            }
-        ])
-
-    iran_chain = {
-        'name': 'iran-secure-' + node['node_name'],
-        'nodes': iran_nodes
-    }
-
-    # Kharej chain: TcpListener → TlsServer → MuxServer → VlessServer → Router (destination-port whitelist) → (TCP: TcpConnector | UDP: UdpConnector) | BlackHole
-    kharej_chain = {
-        'name': 'kharej-secure-' + node['node_name'],
-        'nodes': [
-            {
-                'name': 'tcp-listener',
-                'type': 'TcpListener',
-                'settings': {
-                    'address': '0.0.0.0',
-                    'port': ww['outer_port'],
-                    'nodelay': True,
-                    'large-send-buffer': True,
-                    'large-recv-buffer': True
-                },
-                'next': 'tls-server'
-            },
-            {
-                'name': 'tls-server',
-                'type': 'TlsServer',
-                'settings': {
-                    'cert-file': profile_settings['certificate'],
-                    'key-file': profile_settings['key'],
-                    'select-alpns': ['h2'],
-                    'min-version': 'TLSv1.3',
-                    'max-version': 'TLSv1.3',
-                    'session-timeout': 300,
-                    'handshake-timeout-ms': 60000,
-                    'session-tickets': True
-                },
-                'next': 'mux-server'
-            },
-            {
-                'name': 'mux-server',
-                'type': 'MuxServer',
-                'settings': {
-                    'child-buffer-limit': 134217728,
-                    'child-buffer-resume-threshold': 524288,
-                    'parent-buffer-limit': 536870912,
-                    'max-children': 10000,
-                    'keepalive': True
-                },
-                'next': 'vless-server'
-            },
-            {
-                'name': 'vless-server',
-                'type': 'VlessServer',
-                'settings': {
-                    'users': [uuid_tcp, uuid_udp],
-                    'connect': True,
-                    'udp': True,
-                    'verbose': False
-                },
-                'next': 'backend-router'
-            },
-            {
-                'name': 'backend-router',
-                'type': 'Router',
-                'settings': {
-                    'rules': [
-                        {
-                            'network': 'udp',
-                            'destination-port': allowed_ports[0] if len(allowed_ports) == 1 else allowed_ports,
-                            'target': 'udp-connector-backend'
-                        },
-                        {
-                            'network': 'tcp',
-                            'destination-port': allowed_ports[0] if len(allowed_ports) == 1 else allowed_ports,
-                            'target': 'tcp-connector-backend'
-                        }
-                    ]
-                },
-                'next': 'blackhole-reject'
-            },
-            {
-                'name': 'blackhole-reject',
-                'type': 'BlackHole',
-                'settings': {
-                    'mode': 'active'
-                }
-            },
-            {
-                'name': 'tcp-connector-backend',
-                'type': 'TcpConnector',
-                'settings': {
-                    'address': '127.0.0.1',
-                    'port': target_port,
-                    'nodelay': True,
-                    'large-send-buffer': True,
-                    'large-recv-buffer': True
-                }
-            },
-            {
-                'name': 'udp-connector-backend',
-                'type': 'UdpConnector',
-                'settings': {
-                    'address': '127.0.0.1',
-                    'port': target_port,
-                    'large-send-buffer': True,
-                    'large-recv-buffer': True
-                }
-            }
-        ]
-    }
-
-    return iran_chain, kharej_chain
+    """Generate Iran and Kharej chain configs for the node's WaterWall mode."""
+    mode = node['waterwall']['profile']['mode']
+    chain_ports = list(ports)
+    probe_port = node['waterwall'].get('probe_port') or node['waterwall'].get('probe_ingress_port')
+    if probe_port and str(probe_port) not in chain_ports:
+        chain_ports.append(str(probe_port))
+    return iran_chain(mode, node, outside_ip, chain_ports), kharej_chain(mode, node, chain_ports)
 
 def core_config(chain_file):
     """Generate WaterWall core.json."""
@@ -599,14 +214,13 @@ def verify(iran, kharej, node, ports=None):
         if out.strip():
             raise RuntimeError(f'WaterWall errors on {side}: {out.strip()}')
 
-    # 2. Determine probe ingress port and Kharej echo responder port
+    # 2. Determine probe ingress port and Kharej echo responder port.
+    # Probe through a real client port (which the chain actually listens on)
+    # instead of a reserved probe port that no longer exists.
+    configured = [int(p) for p in (ports or [])]
     ww = node['waterwall']
-    probe_ingress_port = ww.get('probe_ingress_port') or ww.get('probe_port') or ww.get('backend_port')
-    if not probe_ingress_port and ports:
-        probe_ingress_port = int(ports[0])
-
-    # Kharej echo destination produced by configure
-    probe_echo_port = ww.get('probe_backend_port') or ww.get('backend_port') or probe_ingress_port
+    probe_ingress_port = ww.get('probe_ingress_port') or ww.get('probe_port') or (configured[0] if configured else ww.get('backend_port'))
+    probe_echo_port = ww.get('probe_backend_port') or ww.get('probe_port') or (configured[0] if configured else ww.get('backend_port'))
 
     if not probe_ingress_port or not probe_echo_port:
         raise RuntimeError('No probe port configured for WaterWall verification')
@@ -624,10 +238,12 @@ def verify(iran, kharej, node, ports=None):
             raise RuntimeError(f'Kharej probe echo responder failed to start on port {probe_echo_port}: {line}')
 
         # Probe from Iran to Iran entry port (which carries traffic through the tunnel to Kharej)
+        mode = node['waterwall'].get('profile', {}).get('mode', 'trojan')
+        tcp_only = ' tcp-only' if mode != 'trojan' else ''
         error = None
         for attempt in range(4):
             try:
-                execute(iran, f'python3 {HELPER} probe {probe_ingress_port} {secrets.token_hex(16)}', timeout=15)
+                execute(iran, f'python3 {HELPER} probe {probe_ingress_port} {secrets.token_hex(16)}{tcp_only}', timeout=15)
                 return  # Verification succeeded!
             except RuntimeError as failure:
                 error = failure
@@ -736,32 +352,36 @@ def add(name, server, callback=None):
         sessions.append(kharej)
 
         p = pool['camouflage']
-        binary = shlex.quote(p['binary'])
-        for ssh in sessions:
-            execute(ssh, f'test "$(id -u)" = 0 && test -x {binary} && command -v python3 && command -v iptables && command -v systemctl')
+        for ssh, role in zip(sessions, ('iran', 'kharej')):
+            ok, msg = install_waterwall(ssh, role, {'camouflage': p})
+            if not ok:
+                raise RuntimeError(msg)
             write(ssh, HELPER, Path(__file__).with_name('waterwall_probe.py').read_text())
             execute(ssh, f'chmod +x {HELPER}')
 
         # Allocate ports
         outer = free_port(kharej, [p['port'], 443, 8443, 2053, 2083], exclude=pool['client_ports'])
-        probe_port = free_port(kharej, exclude=[outer, *pool['client_ports']])
-        probe_port = free_port(iran, [probe_port], exclude=pool['client_ports'])
+        backend = int(validate_port(pool['client_ports'][0]))
 
         node['waterwall'] = {
             'profile': copy.deepcopy(p),
-            'uuid_tcp': str(uuid.uuid4()),
-            'uuid_udp': str(uuid.uuid4()),
             'outer_port': outer,
-            'probe_port': probe_port,
-            'backend_port': probe_port
+            'backend_port': backend
         }
 
-        # Verify DNS
-        check_dns = f'import socket,sys; addresses={{x[4][0] for x in socket.getaddrinfo(sys.argv[1],443)}}; assert sys.argv[2] in addresses, "DNS domain must point to the outside server"'
-        execute(kharej, f'python3 -c {shlex.quote(check_dns)} {shlex.quote(p["server_name"])} {shlex.quote(pool["kharej_server"]["ip"])}')
+        # Trojan handles many ports natively, so give it a dedicated free probe
+        # port that the echo can bind without colliding with a real backend.
+        if p.get('mode') == 'trojan':
+            probe_port = free_port(kharej, exclude=[outer, backend, *pool['client_ports']])
+            probe_port = free_port(iran, [probe_port], exclude=pool['client_ports'])
+            node['waterwall']['probe_port'] = probe_port
+            node['waterwall']['backend_port'] = probe_port
 
-        # Verify certificate
-        execute(kharej, f'openssl x509 -in {shlex.quote(p["certificate"])} -checkend 86400 -noout')
+        # TLS-backed modes need the SNI domain to point at Kharej and a valid cert
+        if p.get('certificate') and p.get('key') and p.get('server_name'):
+            check_dns = f'import socket,sys; addresses={{x[4][0] for x in socket.getaddrinfo(sys.argv[1],443)}}; assert sys.argv[2] in addresses, "DNS domain must point to the outside server"'
+            execute(kharej, f'python3 -c {shlex.quote(check_dns)} {shlex.quote(p["server_name"])} {shlex.quote(pool["kharej_server"]["ip"])}')
+            execute(kharej, f'openssl x509 -in {shlex.quote(p["certificate"])} -checkend 86400 -noout')
 
         # Generate configs
         iran_chain, kharej_chain = chain_configs(node, pool['kharej_server']['ip'], pool['client_ports'])
@@ -831,7 +451,11 @@ def create(name, kharej, servers, ports, settings, callback=None):
     try:
         name = validate_pool_name(name)
         ports = validate_ports(ports)
-        settings = profile('waterwall', settings)
+        mode = str((settings or {}).get('mode') or 'trojan')
+        if mode not in MODES:
+            raise ValueError(f'WaterWall mode نامعتبر: {mode}')
+        settings = profile(mode, settings)
+        settings['mode'] = mode
 
         if not ports or not servers or name in get_pools():
             raise ValueError('نام تکراری یا فهرست سرورها/پورت‌ها خالی است')
@@ -854,6 +478,7 @@ def create(name, kharej, servers, ports, settings, callback=None):
         'name': name,
         'transport': 'waterwall',
         'engine': 'waterwall',
+        'waterwall_mode': mode,
         'camouflage': settings,
         'kharej_server': kharej,
         'client_ports': ports,

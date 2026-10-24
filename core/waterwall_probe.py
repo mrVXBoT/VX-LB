@@ -42,31 +42,31 @@ async def echo(port):
         await server.wait_closed()
         transport.close()
 
-def probe(port, nonce):
+def probe(port, nonce, protocols=('tcp', 'udp')):
     payload = (nonce.encode() * 1024)[:32768]
-    # 1. TCP Probe
-    with socket.create_connection(('127.0.0.1', port), timeout=5) as s:
-        s.settimeout(5)
-        s.sendall(payload)
-        data = b''
-        while len(data) < len(payload):
-            chunk = s.recv(min(4096, len(payload) - len(data)))
-            if not chunk:
-                break
-            data += chunk
-        if data != payload:
-            raise RuntimeError(f'WaterWall TCP nonce mismatch: got {len(data)} bytes, expected {len(payload)}')
+    if 'tcp' in protocols:
+        with socket.create_connection(('127.0.0.1', port), timeout=5) as s:
+            s.settimeout(5)
+            s.sendall(payload)
+            data = b''
+            while len(data) < len(payload):
+                chunk = s.recv(min(4096, len(payload) - len(data)))
+                if not chunk:
+                    break
+                data += chunk
+            if data != payload:
+                raise RuntimeError(f'WaterWall TCP nonce mismatch: got {len(data)} bytes, expected {len(payload)}')
 
-    # 2. UDP Probe
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.settimeout(5)
-        s.connect(('127.0.0.1', port))
-        for i in range(8):
-            packet = str(i).encode() + payload[:1000]
-            s.send(packet)
-            reply = s.recv(2048)
-            if reply != packet:
-                raise RuntimeError(f'WaterWall UDP nonce mismatch on packet {i}')
+    if 'udp' in protocols:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.settimeout(5)
+            s.connect(('127.0.0.1', port))
+            for i in range(8):
+                packet = str(i).encode() + payload[:1000]
+                s.send(packet)
+                reply = s.recv(2048)
+                if reply != packet:
+                    raise RuntimeError(f'WaterWall UDP nonce mismatch on packet {i}')
 
     print('WATERWALL_PROBE_OK')
 
@@ -76,6 +76,9 @@ if __name__ == '__main__':
     if sys.argv[1] == 'echo':
         asyncio.run(echo(int(sys.argv[2])))
     elif sys.argv[1] == 'probe':
-        probe(int(sys.argv[2]), sys.argv[3])
+        protocols = ('tcp', 'udp')
+        if len(sys.argv) > 4 and sys.argv[4] == 'tcp-only':
+            protocols = ('tcp',)
+        probe(int(sys.argv[2]), sys.argv[3], protocols)
     else:
         raise ValueError(f'Unknown action: {sys.argv[1]}')

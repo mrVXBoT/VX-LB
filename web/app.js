@@ -668,28 +668,36 @@ function rememberOperationHistory(pool, open) {
   if (open) operationHistoryOpen.add(pool); else operationHistoryOpen.delete(pool);
 }
 
+const WATERWALL_MODE_TITLES = {
+  halfduplex: "شلنگ یکطرفه",
+  reverse: "سیفون",
+  trojan: "فلکه آب",
+  bgp4: "لوله فشار قوی",
+  reality: "توهم تئوری توتئه"
+};
+
 function getEngineBadge(engine, transport) {
   const eng = (engine || "").toLowerCase();
   const tr = (transport || "").toLowerCase();
   let cls = "engine-other";
   let label = engine || transport || "Unknown";
 
-  if (eng === "backpack" || ["stealth", "pck", "mux"].includes(tr)) {
-    cls = "engine-backpack";
-    label = "جت پک";
-  } else if (eng === "waterwall" || tr === "waterwall") {
+  if (["ws", "http", "https", "slipstream"].includes(tr) || eng === "slipstream") {
+    cls = "engine-other";
+    label = "اتاق بحران";
+  } else if (eng === "waterwall" || tr === "waterwall" || ["halfduplex", "reverse", "trojan", "bgp4", "reality"].includes(tr)) {
     cls = "engine-waterwall";
-    label = "WaterWall";
-  } else if (eng === "xray" || ["xhttp", "grpc", "ws", "h2", "gre_xhttp"].includes(tr)) {
-    cls = "engine-xray";
-    label = "Xray";
+    label = "سد کرج";
+  } else if (eng === "gost" || tr === "gost") {
+    cls = "engine-gost";
+    label = "غول چراغ جادو";
   } else if (["wireguard", "gre", "vxlan", "tun", "dc6", "geneve", "geneve_ipsec", "gre6", "ip6ip6"].includes(eng) ||
              ["wireguard", "gre", "vxlan", "tun", "dc6", "geneve", "geneve_ipsec", "gre6", "ip6ip6"].includes(tr)) {
     cls = "engine-kernel";
-    label = (eng === "wireguard" || tr === "wireguard") ? "WireGuard" : "Kernel";
-  } else if (eng === "slipstream" || tr === "slipstream") {
-    cls = "engine-other";
-    label = "Slipstream";
+    label = (eng === "wireguard" || tr === "wireguard") ? "موش فاضلاب" : "فاضلاب لینوکس";
+  } else if (eng === "backpack" || ["stealth", "pck", "mux", "tcp", "kcp", "wss"].includes(tr)) {
+    cls = "engine-backpack";
+    label = "جت پک";
   }
 
   return `<span class="engine-badge ${cls}"><span class="engine-badge-dot"></span><span>${escapeHtml(label)}</span></span>`;
@@ -777,7 +785,7 @@ function renderPools(pools) {
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
               </button>
-              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))} · گواهی اختصاصی` : n.engine === "waterwall" ? `WaterWall · VLESS / TLS 1.3 / Mux · ${escapeHtml(n.waterwall?.profile?.server_name || p.camouflage?.server_name || "")}:${escapeHtml(String(n.waterwall?.outer_port || ""))}` : n.engine === "xray" ? `Xray · ${(n.transport === "gre_xhttp" ? "GRE / XHTTP / TLS" : escapeHtml(n.transport))} · ${escapeHtml(n.https?.server_name)}:${escapeHtml(n.https?.outer_port)}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
+              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))} · گواهی اختصاصی` : n.engine === "waterwall" ? `سد کرج (${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "فلکه آب")}) · پورت خارج ${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}` : n.engine === "gost" ? `GOST · ${escapeHtml(p.camouflage?.profile || n.gost?.profile || "shadowsocks-tcp")} · پورت خارج ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 8443))}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
             </div>
             ${n.gre_https ? `<div class="gre-private-route"><span>GRE داخل HTTPS:</span><bdi dir="ltr">${escapeHtml(n.gre_https.local_private)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre_https.remote_private)}</bdi><span>MTU ${escapeHtml(n.gre_https.mtu)}</span></div>` : ''}
             ${(n.engine === 'tun' || p.transport === 'tun') ? `<div class="gre-private-route"><span>لینک TUN:</span><bdi dir="ltr">${escapeHtml(n.tun?.iran_inner || "10.210.1.1")}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.tun?.kharej_inner || "10.210.1.2")}</bdi><span>(${escapeHtml(n.tun?.interface || "tun")}) · لایه 3 کرنل</span></div>` : ''}
@@ -1331,18 +1339,31 @@ async function submitCreatePool(e) {
                server_name: document.getElementById('spoof-fake-sni')?.value || 'www.shaparak.ir'
              }
            } :
-           ['xhttp','xhttps','nova','gre_xhttp','waterwall','reality'].includes(transport) ? {
-             camouflage: {
-               server_name: document.getElementById('https-server-name').value,
-               port: document.getElementById('https-outer-port').value,
-               binary: document.getElementById('https-binary').value,
-               certificate: document.getElementById('https-certificate').value,
-               key: document.getElementById('https-key').value,
-               xmux_concurrency: document.getElementById('https-xmux-concurrency')?.value || 8,
-               tls_fragment_min: document.getElementById('https-fragment-min')?.value || 10,
-               tls_fragment_max: document.getElementById('https-fragment-max')?.value || 30
-             }
-           } : {})
+            transport === 'waterwall' ? (() => {
+              const wm = getSelectedWaterwallMode();
+              const pw = (document.getElementById('waterwall-trojan-password')?.value || document.getElementById('waterwall-reality-password')?.value || document.getElementById('waterwall-bgp4-password')?.value || '').trim();
+              return {
+                camouflage: {
+                  mode: wm,
+                  port: document.getElementById('waterwall-outer-port')?.value || '443',
+                  binary: document.getElementById('waterwall-binary')?.value || '/usr/local/bin/waterwall',
+                  password: (wm === 'trojan' || wm === 'reality') ? (pw || genSecret(16)) : pw,
+                  server_name: document.getElementById('waterwall-reality-sni')?.value || document.getElementById('waterwall-server-name')?.value || '',
+                  secret: document.getElementById('waterwall-reverse-secret')?.value || '',
+                  tls: document.getElementById('waterwall-trojan-tls')?.checked || false,
+                  certificate: document.getElementById('waterwall-certificate')?.value || '',
+                  key: document.getElementById('waterwall-key')?.value || ''
+                }
+              };
+            })() :
+            transport === 'gost' ? {
+              camouflage: {
+                profile: getSelectedGostProfile(),
+                port: document.getElementById('gost-outer-port')?.value || '8443',
+                binary: document.getElementById('gost-binary')?.value || '/usr/local/bin/gost',
+                password: (document.getElementById('gost-password')?.value || '').trim() || genSecret(16)
+              }
+            } : {})
       }
     });
     if (res.success) {
@@ -2067,41 +2088,54 @@ const ENGINE_TRANSPORTS = {
   backpack: {
     label: "موتور جت پک",
     transports: [
-      { value: "tcp", label: "01. جت پک تخمی (کمترین مصرف CPU و تأخیر پایه)", hint: "اتصال مستقیم خام با سرعت حداکثری و حداقل بار پردازنده" },
-      { value: "stealth", label: "02. جت پک شخمی (پروتکل استتار Noise بدون اثرانگشت) [پیشنهادی]", hint: "رمزنگاری نویز ضد DPI و غیرقابل شناسایی در لایه 4" },
-      { value: "pck", label: "03. جت پک تخمی تخیلی (بسته‌های خام مقاوم در برابر تزریق TCP RST)", hint: "مقاوم در برابر دستکاری و ریست‌های فایروال و شبکه" },
-      { value: "kcp", label: "04. جت پک طرح گیمینگ (UDP + KCP + FEC)", hint: "پروتکل پرسرعت مبتنی بر UDP مناسب بازی و خطوط با پکت‌لاس" },
-      { value: "wss", label: "05. جت پک خایه افکن (WebSocket Secure TLS 1.3)", hint: "شبیه‌سازی اثرانگشت مرورگر (uTLS) و عبور امن از CDNها" },
-      { value: "quic", label: "06. جت پک سوپر کیری خفن (UDP + QUIC با TLS 1.3)", hint: "هندشیک سریع 0-RTT با رمزنگاری مدرن" }
+      { value: "tcp", label: "جت پک تخمی", hint: "اتصال مستقیم خام با سرعت حداکثری و حداقل بار پردازنده" },
+      { value: "stealth", label: "جت پک شخمی", hint: "رمزنگاری نویز ضد DPI و غیرقابل شناسایی در لایه 4" },
+      { value: "pck", label: "جت پک تخمی تخیلی", hint: "مقاوم در برابر دستکاری و ریست‌های فایروال و شبکه" },
+      { value: "kcp", label: "جت پک طرح گیمینگ", hint: "پروتکل پرسرعت مبتنی بر UDP مناسب بازی و خطوط با پکت‌لاس" },
+      { value: "wss", label: "جت پک خایه افکن", hint: "شبیه‌سازی اثرانگشت مرورگر (uTLS) و عبور امن از CDNها" },
+      { value: "quic", label: "جت پک سوپر کیری خفن", hint: "هندشیک سریع 0-RTT با رمزنگاری مدرن" }
     ]
   },
   waterwall: {
-    label: "اسکریپت WaterWall (موتور گراف نود L7 VLESS + TLS + Mux)",
+    label: "سد کرج",
     transports: [
-      { value: "waterwall", label: "WaterWall (VLESS + TLS 1.3 + Mux - زنجیره گراف L7)", hint: "VLESS/TLS/Mux؛ نیازمند گواهی صادرشده از CA عمومی مورد اعتماد موتور" }
+      { value: "waterwall", mode: "halfduplex", label: "شلنگ یکطرفه", hint: "مسیر آپلود و دانلود جداگانه برای عبور از اختلالات نامتقارن" },
+      { value: "waterwall", mode: "reverse", label: "سیفون", hint: "اتصال معکوس سرور ایران به خارج جهت دور زدن مسدودی پورت‌های ورودی" },
+      { value: "waterwall", mode: "trojan", label: "فلکه آب", hint: "رمز عبور مشترک سبک بدون نیاز به گواهی SSL" },
+      { value: "waterwall", mode: "bgp4", label: "لوله فشار قوی", hint: "فریم‌بندی شبیه BGP برای استتار ترافیک" },
+      { value: "waterwall", mode: "reality", label: "توهم تئوری توتئه", hint: "استتار ریالیتی معکوس با دامین جعلی و بدون گواهی" }
     ]
   },
-  xray: {
-    label: "استتار پیشرفته Xray (حالت‌های XHTTP، XHTTPS و Nova)",
+  gost: {
+    label: "غول چراغ جادو",
     transports: [
-      { value: "xhttp", label: "09. SplitHTTP (تفکیک دوطرفه دانلود/آپلود با پدینگ تصادفی)", hint: "جداسازی کامل استریم آپلود و دانلود برای شکستن سیستم‌های DPI نامتقارن" },
-      { value: "xhttps", label: "10. XHTTP + TLS 1.3 + XMUX (استتار پیشرفته)", hint: "کانکشن‌های چندگانه موازی xmux و استتار روی دامنه‌های معتبر" },
-      { value: "nova", label: "13. Nova (XHTTP/TLS با قطعه‌بندی ابتدای اتصال)", hint: "تکه‌تکه‌کردن پکت‌های هندشیک TLS جهت دور زدن قطعی‌های هوشمند فایروال" },
-      { value: "gre_xhttp", label: "GRE با رمزنگاری و استتار HTTPS", hint: "کپسوله‌سازی بسته‌های لایه 3 GRE داخل استریم استتارشدهٔ HTTPS" }
+      { value: "gost", profile: "shadowsocks-tcp", label: "جوراب مشکی", hint: "رمزنگاری aes-256-gcm؛ استاندارد و سازگار با کل کلاینت‌ها" },
+      { value: "gost", profile: "shadowsocks-udp", label: "جوراب کشی", hint: "رلهٔ UDP با رمزنگاری aes-256-gcm" },
+      { value: "gost", profile: "shadowsocks-tls", label: "سایه مجلسی", hint: "SS روی TLS با گواهی استتار" },
+      { value: "gost", profile: "shadowsocks-ws", label: "سایه خایه کرده", hint: "SS در قالب WebSocket برای عبور از CDN" },
+      { value: "gost", profile: "obfs4", label: "سوراخ موش", hint: "پل Tor؛ بیشینه استتار" },
+      { value: "gost", profile: "obfs4-tls", label: "سولاخ موش", hint: "obfs4 روی TLS" },
+      { value: "gost", profile: "grpc", label: "موشک بالستیک", hint: "پرفورمنس بالا؛ ضد فیلترینگ قوی" },
+      { value: "gost", profile: "grpc-tls", label: "موشک نقطه‌زن", hint: "gRPC روی TLS" },
+      { value: "gost", profile: "ssh", label: "دالان", hint: "فوروارد ssh پروتکل" },
+      { value: "gost", profile: "kcp-obfs4", label: "رگبار موش", hint: "KCP fast3 + obfs4" },
+      { value: "gost", profile: "web-tunnel", label: "مرد نامرئی (هیز)", hint: "HTTP + MWSS چندرسانه‌ای" },
+      { value: "gost", profile: "gaming-socks5-kcp", label: "گیمینگ (کصشر)", hint: "SOCKS5 + KCP برای بازی" },
+      { value: "gost", profile: "quic-socks5", label: "کوییک کوییک", hint: "QUIC + SOCKS5" }
     ]
   },
   kernel: {
     label: "فاضلاب لینوکس",
     transports: [
-      { value: "tun", label: "08. لوله پولیکا (TUN روی لایه ۳)", hint: "کارت شبکهٔ واقعی لینوکس در عمق فاضلاب؛ آزمون TCP/UDP پیش از فعال‌شدن" },
-      { value: "dc6", label: "11. کانال سیکیم (DC6 / IPv6 عمومی)", hint: "حامل GRE6 یا IP6IP6 با IPv6 عمومی؛ SIT با IPv4 عمومی. آزمون دوطرفهٔ TCP/UDP پیش از فعال‌شدن" },
-      { value: "wireguard", label: "موش فاضلاب (WireGuard فوق سریع)", hint: "سریع‌ترین و مدرن‌ترین پروتکل VPN کرنل با کلیدهای نامتقارن" },
-      { value: "gre", label: "لجن (GRE با IPsec)", hint: "تونل لایه 3 رسمی با رمزگذاری سخت‌افزاری IPsec AES-GCM" },
-      { value: "gre6", label: "زباله دونی (GRE6 روی IPv6)", hint: "کپسوله‌سازی GRE روی آدرس‌های Native IPv6 بدون رمزنگاری" },
-      { value: "ip6ip6", label: "لوله دوبل (IP6IP6)", hint: "تونل مستقیم نقطه به نقطه بین سرورهای دارای IPv6 عمومی" },
-      { value: "vxlan", label: "کانال آب (VXLAN فله‌ای)", hint: "گسترش شبکه محلی L2 با سه روش Point-to-Point، Bridge و FDB — برای رمزنگاری کانال لجن را انتخاب کنید" },
-      { value: "vxlan_ipsec", label: "کانال لجن (VXLAN + IPsec)", hint: "لینک VXLAN کپسوله‌شده در IPsec ESP احرازشده؛ نیازمند strongSwan/charon روی هر دو سرور" },
-      { value: "geneve_ipsec", label: "منهول سیکیم (Geneve + IPsec)", hint: "پروتکل مجازی‌سازی نسل جدید شبکه با افزونه‌های متادیتا و رمزنگاری" }
+      { value: "wireguard", label: "موش فاضلاب", hint: "سریع‌ترین و مدرن‌ترین پروتکل VPN کرنل با کلیدهای نامتقارن" },
+      { value: "tun", label: "لوله پولیکا", hint: "کارت شبکهٔ واقعی لینوکس در عمق فاضلاب؛ آزمون TCP/UDP پیش از فعال‌شدن" },
+      { value: "gre", label: "لجن", hint: "تونل لایه 3 رسمی با رمزگذاری سخت‌افزاری IPsec AES-GCM" },
+      { value: "gre6", label: "زباله دونی", hint: "کپسوله‌سازی GRE روی آدرس‌های Native IPv6 بدون رمزنگاری" },
+      { value: "ip6ip6", label: "لوله دوبل", hint: "تونل مستقیم نقطه به نقطه بین سرورهای دارای IPv6 عمومی" },
+      { value: "vxlan", label: "کانال آب", hint: "گسترش شبکه محلی L2 با سه روش Point-to-Point، Bridge و FDB — برای رمزنگاری کانال لجن را انتخاب کنید" },
+      { value: "vxlan_ipsec", label: "کانال لجن", hint: "لینک VXLAN کپسوله‌شده در IPsec ESP احرازشده؛ نیازمند strongSwan/charon روی هر دو سرور" },
+      { value: "dc6", label: "کانال سیکیم", hint: "حامل GRE6 یا IP6IP6 با IPv6 عمومی؛ SIT با IPv4 عمومی. آزمون دوطرفهٔ TCP/UDP پیش از فعال‌شدن" },
+      { value: "geneve_ipsec", label: "منهول سیکیم", hint: "پروتکل مجازی‌سازی نسل جدید شبکه با افزونه‌های متادیتا و رمزنگاری" }
     ]
   },
   spoof: {
@@ -2123,12 +2157,12 @@ const ENGINE_TRANSPORTS = {
     ]
   },
   other: {
-    label: "سایر پروتکل‌های وب و اضطراری (WebSocket, HTTP/2, Slipstream)",
+    label: "اتاق بحران (پروتکل‌های وب و اضطراری)",
     transports: [
-      { value: "ws", label: "02. WebSocket Plaintext RFC 6455 (پشت ریورس‌پروکسی)", hint: "استریم وب‌سوکت ساده جهت کار پشت CDN یا Nginx/Caddy" },
-      { value: "http", label: "HTTP/1.1 CONNECT + mTLS (آزمایشی)", hint: "حامل CONNECT با انتقال TCP/UDP و گواهی اختصاصی دوطرفه؛ بدون ادعای HTTP/2 یا تقلید مرورگر" },
-      { value: "https", label: "HTTPS CONNECT + mTLS (آزمایشی)", hint: "CONNECT روی TLS1.3 با گواهی اختصاصی و اعتبارسنجی هویت دوطرفه؛ دامنه یا گواهی عمومی لازم نیست" },
-      { value: "slipstream", label: "Slipstream (آزمایشی — تونل اضطراری DNS)", hint: "مسیر پشتیبان و اضطراری برای عبور از فیلترینگ کامل از طریق پرس‌وجوهای DNS" }
+      { value: "ws", label: "سولاخ کلودفلر (WebSocket)", hint: "استریم وب‌سوکت ساده جهت کار پشت CDN یا Nginx/Caddy" },
+      { value: "http", label: "پیک موتوری (HTTP CONNECT)", hint: "حامل CONNECT با انتقال TCP/UDP و گواهی اختصاصی دوطرفه؛ بدون ادعای HTTP/2 یا تقلید مرورگر" },
+      { value: "https", label: "رمزی ممزی (HTTPS CONNECT)", hint: "CONNECT روی TLS1.3 با گواهی اختصاصی و اعتبارسنجی هویت دوطرفه؛ دامنه یا گواهی عمومی لازم نیست" },
+      { value: "slipstream", label: "دود سرخپوستی (تونل اضطراری DNS)", hint: "مسیر پشتیبان و اضطراری برای عبور از فیلترینگ کامل از طریق پرس‌وجوهای DNS" }
     ]
   }
 };
@@ -2146,7 +2180,7 @@ function populatePoolTransports(engineKey, preferredTransport) {
   const cfg = ENGINE_TRANSPORTS[engineKey] || ENGINE_TRANSPORTS.backpack;
   const opts = cfg.transports;
   const chosen = opts.some(t => !t.disabled && t.value === preferredTransport) ? preferredTransport : (engineKey === "kernel" ? "wireguard" : (opts.find(t => !t.disabled)?.value || ""));
-  protoSel.innerHTML = opts.map(t => `<option value="${escapeHtml(t.value)}" ${t.disabled ? "disabled" : ""} ${t.value === chosen ? "selected" : ""}>${escapeHtml(t.label)}</option>`).join("");
+  protoSel.innerHTML = opts.map(t => `<option value="${escapeHtml(t.value)}"${t.mode ? ` data-mode="${escapeHtml(t.mode)}"` : ''}${t.profile ? ` data-profile="${escapeHtml(t.profile)}"` : ''} ${t.disabled ? "disabled" : ""} ${t.value === chosen ? "selected" : ""}>${escapeHtml(t.label)}</option>`).join("");
   protoSel.value = chosen;
   updateTransportDesc(engineKey, chosen);
 }
@@ -2155,8 +2189,37 @@ function updateTransportDesc(engineKey, transportValue) {
   const descEl = document.getElementById("new-pool-transport-desc");
   if (!descEl) return;
   const cfg = ENGINE_TRANSPORTS[engineKey] || ENGINE_TRANSPORTS[TRANSPORT_TO_ENGINE[transportValue]] || ENGINE_TRANSPORTS.backpack;
-  const found = cfg.transports.find(t => t.value === transportValue);
+  const protoSel = document.getElementById("new-pool-proto");
+  const opt = protoSel && protoElSelected(protoSel);
+  const mode = opt && opt.dataset && opt.dataset.mode;
+  const profile = opt && opt.dataset && opt.dataset.profile;
+  let found = null;
+  if (profile) {
+    found = cfg.transports.find(t => t.profile === profile);
+  } else if (mode) {
+    found = cfg.transports.find(t => t.mode === mode);
+  } else {
+    found = cfg.transports.find(t => t.value === transportValue);
+  }
   descEl.textContent = found ? found.hint : "";
+}
+
+function protoElSelected(sel) {
+  return sel && sel.selectedOptions && sel.selectedOptions[0];
+}
+
+function genSecret(length) {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let out = '';
+  let arr = null;
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    arr = new Uint32Array(length);
+    crypto.getRandomValues(arr);
+  }
+  for (let i = 0; i < length; i++) {
+    out += chars[arr ? arr[i] % chars.length : Math.floor(Math.random() * chars.length)];
+  }
+  return out;
 }
 
 function onPoolEngineChanged() {
@@ -2173,6 +2236,47 @@ function onPoolTransportChanged() {
   const engineKey = engineSel ? engineSel.value : (TRANSPORT_TO_ENGINE[transport] || "backpack");
   updateTransportDesc(engineKey, transport);
   updateGreCreateFields();
+}
+
+function getSelectedWaterwallMode() {
+  const protoEl = document.getElementById('new-pool-proto');
+  const opt = protoEl && protoEl.selectedOptions && protoEl.selectedOptions[0];
+  return (opt && opt.dataset && opt.dataset.mode) || 'trojan';
+}
+
+function getSelectedGostProfile() {
+  const protoEl = document.getElementById('new-pool-proto');
+  const opt = protoEl && protoEl.selectedOptions && protoEl.selectedOptions[0];
+  return (opt && opt.dataset && opt.dataset.profile) || 'shadowsocks-tcp';
+}
+
+function onWaterwallModeChanged() {
+  const m = getSelectedWaterwallMode();
+  const groups = {
+    trojan: 'waterwall-trojan-fields',
+    reality: 'waterwall-reality-fields',
+    reverse: 'waterwall-reverse-fields',
+    bgp4: 'waterwall-bgp4-fields'
+  };
+  Object.values(groups).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+  const target = groups[m];
+  if (target) {
+    const tg = document.getElementById(target);
+    if (tg) tg.classList.remove('hidden');
+  }
+  const tlsCheck = document.getElementById('waterwall-trojan-tls');
+  const tlsFields = document.getElementById('waterwall-tls-fields');
+  if (tlsCheck && tlsFields) {
+    const on = tlsCheck.checked;
+    tlsFields.classList.toggle('hidden', !on);
+    ['waterwall-server-name', 'waterwall-certificate', 'waterwall-key'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !on;
+    });
+  }
 }
 
 function openTransportModal(name) {
@@ -2215,7 +2319,18 @@ function updateTransportModalDesc(engineKey, transportValue) {
   const descEl = document.getElementById("transport-target-desc");
   if (!descEl) return;
   const cfg = ENGINE_TRANSPORTS[engineKey] || ENGINE_TRANSPORTS[TRANSPORT_TO_ENGINE[transportValue]] || ENGINE_TRANSPORTS.backpack;
-  const found = cfg.transports.find(t => t.value === transportValue);
+  const targetSel = document.getElementById('transport-target');
+  const opt = targetSel && protoElSelected(targetSel);
+  const mode = opt && opt.dataset && opt.dataset.mode;
+  const profile = opt && opt.dataset && opt.dataset.profile;
+  let found = null;
+  if (profile) {
+    found = cfg.transports.find(t => t.profile === profile);
+  } else if (mode) {
+    found = cfg.transports.find(t => t.mode === mode);
+  } else {
+    found = cfg.transports.find(t => t.value === transportValue);
+  }
   descEl.textContent = found ? found.hint : "";
 }
 
@@ -2231,7 +2346,7 @@ function populateTransportModalOptions(engineKey, currentTransport) {
   targetSel.innerHTML = `<option value="" disabled ${!opts.some(t => !unavailable(t) && t.value !== currentTransport) ? 'selected' : ''}>نوع جدید را انتخاب کنید</option>` +
     opts.map(t => {
       const isCurrent = t.value === currentTransport;
-      return `<option value="${escapeHtml(t.value)}" ${isCurrent || unavailable(t) ? 'disabled' : ''}>${escapeHtml(t.label)}${isCurrent ? ' (نوع فعلی)' : ''}</option>`;
+      return `<option value="${escapeHtml(t.value)}" ${isCurrent || unavailable(t) ? 'disabled ' : ''}${t.mode ? `data-mode="${escapeHtml(t.mode)}" ` : ''}${t.profile ? `data-profile="${escapeHtml(t.profile)}" ` : ''}>${escapeHtml(t.label)}${isCurrent ? ' (نوع فعلی)' : ''}</option>`;
     }).join("");
 
   const firstAvailable = opts.find(t => !unavailable(t) && t.value !== currentTransport);
@@ -2267,14 +2382,9 @@ function updateTransportModalAdaptiveFields() {
   const targetSel = document.getElementById('transport-target');
   const transport = targetSel ? targetSel.value : "";
 
-  const tlsGroup = document.getElementById('transport-change-tls-fields');
   const fecGroup = document.getElementById('transport-change-fec-fields');
   const mtuGroup = document.getElementById('transport-change-mtu-fields');
   const slipGroup = document.getElementById('transport-change-slipstream-fields');
-
-  if (tlsGroup) {
-    tlsGroup.classList.toggle('hidden', !['xhttp', 'xhttps', 'nova', 'gre_xhttp', 'waterwall'].includes(transport));
-  }
   const dc6Group = document.getElementById('transport-change-dc6-fields');
   if (dc6Group) {
     dc6Group.classList.toggle('hidden', transport !== 'dc6');
@@ -2322,13 +2432,6 @@ async function submitTransportChange(event) {
       payload.dns_resolvers = (document.getElementById('transport-spoof-dns-resolvers')?.value || '').trim();
       payload.fake_send_ip = (document.getElementById('transport-spoof-fake-send-ip')?.value || '').trim();
       payload.knock_key = (document.getElementById('transport-spoof-knock-key')?.value || '').trim();
-    }
-    if (['xhttp', 'xhttps', 'nova', 'gre_xhttp', 'waterwall'].includes(transport)) {
-      const serverName = (document.getElementById('transport-tls-server-name')?.value || '').trim();
-      const outerPort = parseInt(document.getElementById('transport-tls-outer-port')?.value || '443', 10);
-      payload.camouflage = { server_name: serverName, port: outerPort };
-      payload.server_name = serverName;
-      payload.port = outerPort;
     }
     if (['gre', 'gre6', 'ip6ip6', 'wireguard', 'vxlan', 'geneve_ipsec', 'tun'].includes(transport)) {
       payload.mtu = parseInt(document.getElementById('transport-mtu-input')?.value || '1400', 10);
@@ -2515,43 +2618,35 @@ function updateGreCreateFields() {
     if (dc6) updateDc6CarrierHint();
   }
 
-  // HTTPS / Xray family
-  const https = ['xhttp', 'xhttps', 'nova', 'gre_xhttp', 'waterwall', 'reality'].includes(mode);
-  const section = document.getElementById('https-create-fields');
-  if (!section) return;
-  section.classList.toggle('hidden', !https);
-  document.getElementById('waterwall-certificate-hint')?.classList.toggle('hidden', mode !== 'waterwall');
-  const binaryInput = document.getElementById('https-binary');
-  if (binaryInput) {
-    const defaults = ['/usr/local/bin/xray', '/usr/local/bin/waterwall'];
-    if (!binaryInput.value || defaults.includes(binaryInput.value)) {
-      binaryInput.value = mode === 'waterwall' ? defaults[1] : defaults[0];
+  // WaterWall modes
+  const wwDiv = document.getElementById('waterwall-create-fields');
+  if (wwDiv) {
+    const isWW = mode === 'waterwall';
+    wwDiv.classList.toggle('hidden', !isWW);
+    const binInput = document.getElementById('waterwall-binary');
+    if (binInput && (!binInput.value || binInput.value === '/usr/local/bin/xray')) {
+      binInput.value = '/usr/local/bin/waterwall';
+    }
+    ['waterwall-outer-port', 'waterwall-binary',
+     'waterwall-trojan-password', 'waterwall-trojan-tls', 'waterwall-server-name',
+     'waterwall-certificate', 'waterwall-key', 'waterwall-reality-password',
+     'waterwall-reality-sni', 'waterwall-reverse-secret', 'waterwall-bgp4-password'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !isWW;
+    });
+    if (isWW) {
+      onWaterwallModeChanged();
     }
   }
-  const binaryLabel = document.querySelector('label[for="https-binary"]');
-  if (binaryLabel) binaryLabel.textContent = mode === 'waterwall' ? 'مسیر WaterWall روی هر دو سرور' : 'مسیر Xray روی هر دو سرور';
-  section.querySelectorAll('input').forEach(input => input.disabled = !https);
-  document.getElementById('https-certificate-fields')?.classList.toggle('hidden', !https);
-  ['https-certificate', 'https-key'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.disabled = !https;
-  });
 
-  const xmuxDiv = document.getElementById('https-xmux-fields');
-  if (xmuxDiv) {
-    const isXmux = mode === 'xhttps';
-    xmuxDiv.classList.toggle('hidden', !isXmux);
-    const el = document.getElementById('https-xmux-concurrency');
-    if (el) el.disabled = !isXmux;
-  }
-
-  const novaDiv = document.getElementById('https-nova-fields');
-  if (novaDiv) {
-    const isNova = mode === 'nova';
-    novaDiv.classList.toggle('hidden', !isNova);
-    ['https-fragment-min', 'https-fragment-max'].forEach(id => {
+  // GOST profiles
+  const gostDiv = document.getElementById('gost-create-fields');
+  if (gostDiv) {
+    const isGost = mode === 'gost';
+    gostDiv.classList.toggle('hidden', !isGost);
+    ['gost-password', 'gost-outer-port', 'gost-binary'].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.disabled = !isNova;
+      if (el) el.disabled = !isGost;
     });
   }
 

@@ -249,10 +249,10 @@ def get_engine_for_transport(transport: str) -> str:
     if not transport:
         return 'backpack'
     t = str(transport).strip().lower()
-    if t in {'xhttp', 'xhttps', 'gre_xhttp', 'reality', 'nova'}:
-        return 'xray'
     if t == 'waterwall':
         return 'waterwall'
+    if t == 'gost':
+        return 'gost'
     if t == 'wireguard':
         return 'wireguard'
     if t in {'geneve', 'geneve_ipsec'}:
@@ -314,7 +314,7 @@ def _engine_module(engine):
         'geneve': 'core.geneve',
         'geneve_ipsec': 'core.geneve',
         'waterwall': 'core.waterwall',
-        'xray': 'core.https_tunnel',
+        'gost': 'core.gost_engine',
         'slipstream': 'core.slipstream_adapter',
         'spoof': 'core.spoof_adapter',
         'http': 'core.http_transport',
@@ -375,21 +375,7 @@ def teardown_pool_runtime(pool):
     kharej = pool.get('kharej_server')
     ports = pool.get('client_ports', [])
 
-    if engine == 'xray':
-        from core.https_tunnel import clean
-        for node in nodes:
-            try:
-                ir_ssh = connect(node)
-                clean(ir_ssh, node, ports, True)
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                clean(kh_ssh, node, ports, False)
-                kh_ssh.close()
-            except Exception: pass
-
-    elif engine == 'waterwall':
+    if engine == 'waterwall':
         from core.waterwall import clean
         for node in nodes:
             try:
@@ -401,6 +387,15 @@ def teardown_pool_runtime(pool):
                 kh_ssh = connect(kharej)
                 clean(kh_ssh, node, False)
                 kh_ssh.close()
+            except Exception: pass
+
+    elif engine == 'gost':
+        from core.gost_engine import remove as gost_remove
+        pool_name = pool.get('name')
+        for node in nodes:
+            try:
+                if pool_name:
+                    gost_remove(pool_name, node['ip'])
             except Exception: pass
 
     elif engine == 'wireguard':
@@ -1048,12 +1043,7 @@ def start_change(name, target, background=True, repair=False, **kwargs):
         if pool.get('transport') == 'gre' and target_engine not in KERNEL_ENGINES:
             return False, 'GRE موتور مستقلی است؛ این تغییر تنها به موتورهای هسته (kernel) پشتیبانی می‌شود؛ برای بقیه استخر جدید بسازید'
 
-        if target_engine == 'xray' or target in {'xhttp', 'xhttps', 'nova', 'gre_xhttp'}:
-            cam = kwargs.get('camouflage') or pool.get('camouflage') or {}
-            server_name = cam.get('server_name') or kwargs.get('server_name')
-            if not server_name:
-                return False, 'وارد کردن دامنهٔ TLS سرور خارج برای استتار Xray الزامی است'
-        elif target == 'slipstream':
+        if target == 'slipstream':
             domain = kwargs.get('domain') or (kwargs.get('camouflage') or {}).get('domain') or (pool.get('camouflage') or {}).get('domain')
             if not domain:
                 return False, 'وارد کردن دامنه برای تونل Slipstream الزامی است'
@@ -1083,9 +1073,7 @@ def start_change(name, target, background=True, repair=False, **kwargs):
 def recover_changes():
     for name, pool in load_data().get('pools', {}).items():
         if (pool.get('transport_change') or {}).get('status') in ACTIVE - {'rollback_failed'}:
-            if pool.get('engine') == 'xray':
-                update_job(name, status='rollback_failed', message='به‌روزرسانی HTTPS قطع شده؛ بازگردانی را اجرا کنید')
-            elif pool.get('engine') == 'waterwall':
+            if pool.get('engine') == 'waterwall':
                 update_job(name, status='rollback_failed', message='به‌روزرسانی WaterWall قطع شده؛ بازگردانی را اجرا کنید')
             else:
                 threading.Thread(target=run_change, args=(name, True), daemon=True).start()

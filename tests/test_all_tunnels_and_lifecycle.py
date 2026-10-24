@@ -15,7 +15,7 @@ class AllTunnelsAndLifecycleTests(unittest.TestCase):
         expected_engines = [
             "backpack", "waterwall", "trusttunnel", "slipstream",
             "backhaul", "frp", "rathole", "gost", "hysteria2",
-            "ip6ip6", "gre_ipv4", "gre_xhttp", "xhttp", "gre6", "gretap",
+            "ip6ip6", "gre_ipv4", "gre6", "gretap",
             "gre6tap", "gre6tap_ipsec", "sit", "6to4_unicast", "vxlan",
             "geneve", "geneve_ipsec", "geneve_gre6", "wireguard",
             "wireguard_hybrid", "erspan", "eoip", "l2tp", "isatap"
@@ -306,7 +306,7 @@ class AllTunnelsAndLifecycleTests(unittest.TestCase):
         preview = PhasedMigrationManager.execute_migration_dry_run(
             pool_name="pool1",
             current_transport="wireguard",
-            target_transport="xhttp",
+            target_transport="slipstream",
             ports=[443, 80],
         )
         self.assertEqual(preview["pool_name"], "pool1")
@@ -316,10 +316,10 @@ class AllTunnelsAndLifecycleTests(unittest.TestCase):
 
         report = PhasedMigrationManager.format_partial_failure_report(
             pool_name="pool1",
-            attempted_transport="xhttp",
+            attempted_transport="slipstream",
             failed_stage="bidirectional_probe",
             error_details="TLS handshake timeout",
-            remaining_resources=["/etc/systemd/system/xhttp.service"],
+            remaining_resources=["/etc/systemd/system/slipstream.service"],
         )
         self.assertEqual(report["status"], "PARTIAL_FAILURE_ROLLED_BACK")
         self.assertFalse(report["data_tested"])

@@ -29,7 +29,7 @@ class TestProductionReadinessGate(unittest.TestCase):
 
     def test_verified_engine_approved_directly(self):
         # Engines that completed production verification
-        for eng in ["backpack", "gre_ipv4", "gre_xhttp", "xhttp"]:
+        for eng in ["backpack", "gre_ipv4"]:
             ok, msg = validate_production_readiness(eng, is_production=True)
             self.assertTrue(ok, f"Verified engine {eng} failed production validation: {msg}")
             self.assertIn("verified", msg.lower())
@@ -59,12 +59,12 @@ class TestProductionReadinessGate(unittest.TestCase):
         self.assertIn("Unknown", msg)
 
     def test_engine_production_gate_report(self):
-        rep_xhttp = get_engine_production_gate_report("xhttp")
-        self.assertTrue(rep_xhttp["found"])
-        self.assertEqual(rep_xhttp["support_status"], "verified")
-        self.assertTrue(rep_xhttp["production_ready"])
-        self.assertTrue(rep_xhttp["requires_binary"])
-        self.assertTrue(rep_xhttp["binary_verified"])
+        rep_bp = get_engine_production_gate_report("backpack")
+        self.assertTrue(rep_bp["found"])
+        self.assertEqual(rep_bp["support_status"], "verified")
+        self.assertTrue(rep_bp["production_ready"])
+        self.assertTrue(rep_bp["requires_binary"])
+        self.assertTrue(rep_bp["binary_verified"])
 
         rep_ww = get_engine_production_gate_report("waterwall")
         self.assertTrue(rep_ww["found"])

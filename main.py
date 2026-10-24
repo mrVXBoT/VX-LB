@@ -309,22 +309,51 @@ def create_load_balancer_flow():
     console.print(f"[bold green]Selected Transport: {selected_transport}[/bold green]\n")
     gre_options = {"gre_mtu": Prompt.ask("GRE MTU (576-1400)", default="1400")} if selected_transport == "gre" else {}
 
-    if selected_transport in {'xhttp','gre_xhttp'}:
-        tls_name=Prompt.ask("TLS server name on Kharej")
-        settings={'server_name':tls_name,'binary':Prompt.ask("Xray binary path on both servers",default='/usr/local/bin/xray'),
-                  'port':Prompt.ask("Preferred outer port on Kharej",default='443')}
-        if selected_transport in {'xhttp','gre_xhttp'}:
-            settings['certificate']=Prompt.ask("Certificate chain on Kharej",default='/etc/letsencrypt/live/'+tls_name+'/fullchain.pem')
-            settings['key']=Prompt.ask("Private key file on Kharej",default='/etc/letsencrypt/live/'+tls_name+'/privkey.pem')
-        gre_options={'camouflage':settings}
-    elif selected_transport == 'waterwall':
-        tls_name = Prompt.ask("TLS server name on Kharej (SNI / domain)")
+    if selected_transport == 'waterwall':
+        import secrets as _secrets
+        from core.waterwall_modes import MODES, MODE_LABELS, MODE_HINTS, default_settings
+        console.print("[bold cyan]WaterWall mode:[/bold cyan]")
+        mode_choices = {str(i): m for i, m in enumerate(MODES, 1)}
+        for i, m in mode_choices.items():
+            console.print(f"  [{i}] {MODE_LABELS[m]} — {MODE_HINTS[m]}")
+        wmode = Prompt.ask("Select WaterWall mode", choices=list(mode_choices), default="1")
+        mode = mode_choices[wmode]
+        settings = default_settings(mode)
+        settings['mode'] = mode
+        settings['port'] = Prompt.ask("Preferred outer port on Kharej", default=str(settings.get('port', 443)))
+        settings['binary'] = Prompt.ask("WaterWall binary path on both servers", default=settings.get('binary'))
+        if mode == 'trojan':
+            settings['password'] = Prompt.ask("Trojan shared password (min 8 chars)", default=_secrets.token_hex(8))
+            settings['tls'] = Prompt.ask("Wrap with TLS? (y/n) — requires certs", choices=['y', 'n'], default='n') == 'y'
+            if settings['tls']:
+                tls_name = Prompt.ask("TLS server name on Kharej (SNI / domain)")
+                settings['server_name'] = tls_name
+                settings['certificate'] = Prompt.ask("Certificate path", default='/etc/letsencrypt/live/' + tls_name + '/fullchain.pem')
+                settings['key'] = Prompt.ask("Private key path", default='/etc/letsencrypt/live/' + tls_name + '/privkey.pem')
+            else:
+                settings.pop('server_name', None)
+        elif mode == 'reality':
+            settings['password'] = Prompt.ask("Reality shared secret (1-32 bytes)", default=_secrets.token_hex(12))
+            settings['server_name'] = Prompt.ask("Visitor/fake domain for camouflage", default='www.microsoft.com')
+        elif mode == 'reverse':
+            settings['secret'] = Prompt.ask("Reverse tunnel secret", default='vxlb-waterwall-reverse')
+        elif mode == 'bgp4':
+            settings['password'] = Prompt.ask("BGP frame password (optional)", default='')
+        gre_options = {'camouflage': settings}
+    elif selected_transport == 'gost':
+        import secrets as _secrets_gost
+        from core.gost_engine import PROFILES, PROFILE_LABELS
+        console.print("[bold cyan]GOST profile:[/bold cyan]")
+        profile_choices = {str(i): p for i, p in enumerate(PROFILES, 1)}
+        for i, p in profile_choices.items():
+            console.print(f"  [{i}] {PROFILE_LABELS[p]}")
+        gchoice = Prompt.ask("Select GOST profile", choices=list(profile_choices), default="1")
+        g_profile = profile_choices[gchoice]
         settings = {
-            'server_name': tls_name,
-            'binary': Prompt.ask("WaterWall binary path on both servers", default='/usr/local/bin/waterwall'),
-            'port': Prompt.ask("Preferred outer port on Kharej", default='443'),
-            'certificate': Prompt.ask("Certificate chain on Kharej", default='/etc/letsencrypt/live/' + tls_name + '/fullchain.pem'),
-            'key': Prompt.ask("Private key file on Kharej", default='/etc/letsencrypt/live/' + tls_name + '/privkey.pem')
+            'profile': g_profile,
+            'password': Prompt.ask("GOST shared password (min 8 chars)", default=_secrets_gost.token_hex(8)),
+            'port': Prompt.ask("Preferred outer port on Kharej", default='8443'),
+            'binary': Prompt.ask("GOST binary path on both servers", default='/usr/local/bin/gost'),
         }
         gre_options = {'camouflage': settings}
     elif selected_transport == 'geneve_ipsec':
@@ -839,13 +868,6 @@ def change_pool_transport_flow(pool_name: str):
                 ok, message = change_mtu(pool_name, int(mtu))
             console.print(message, markup=False)
         return
-    if pool.get('engine') == 'xray':
-        if pool.get('transport_change',{}).get('status')=='rollback_failed':
-            from core.https_tunnel import change_ports
-            with mutation_lock():ok,message=change_ports(pool_name,pool['client_ports'],recovery=True)
-            console.print(message,markup=False)
-        else:console.print('HTTPS is an independent engine; create a new pool to change its security mode.')
-        return
     job = pool.get("transport_change") or {}
     if job.get("status") == "rollback_failed":
         console.print("Previous rollback is incomplete; new changes remain locked.")
@@ -862,7 +884,7 @@ def change_pool_transport_flow(pool_name: str):
             return
     else:
         console.print(f"Current transport: {pool.get('transport')} | Nodes: {len(pool.get('nodes', []))}", markup=False)
-        choices = {key: value for key, value in SUPPORTED_TRANSPORTS.items() if value[0] != pool.get('transport') and value[0] not in {"gre","xhttp","gre_xhttp","reality","waterwall","geneve_ipsec","vxlan","gre6","ip6ip6","wireguard"}}
+        choices = {key: value for key, value in SUPPORTED_TRANSPORTS.items() if value[0] != pool.get('transport') and value[0] not in {"gre","waterwall","geneve_ipsec","vxlan","gre6","ip6ip6","wireguard"}}
         for key, (_, label) in choices.items():
             console.print(f"  [{key}] {label}", markup=False)
         console.print("  [0] Return", markup=False)
