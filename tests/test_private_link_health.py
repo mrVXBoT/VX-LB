@@ -83,13 +83,3 @@ def test_default_dns_policy_does_not_route_listener_only_idle_nodes():
     manager.return_value.sync_subdomain.assert_not_called()
     assert report['pool_reports']['p']['dns_policy']=='strict'
     assert report['pool_reports']['p']['cloudflare_sync']['status']=='SUSPENDED_NO_HEALTHY_NODES'
-
-
-def test_paqet_service_active_is_unverified_and_has_structured_port_details():
-    from core import paqet_adapter
-    ssh=MagicMock();ssh.execute.side_effect=[(0,'active\n',''),(0,'','')]
-    with patch.object(paqet_adapter,'connect',return_value=ssh):
-        status,_,details=paqet_adapter.health('p',{'node_name':'node'},['443'])
-    assert status=='IDLE'
-    assert details['443']['path_verified'] is False
-    assert details['443']['status']=='IDLE'

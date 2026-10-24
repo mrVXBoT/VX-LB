@@ -10,7 +10,7 @@ from core.dependency_manifest import PLATFORM_DEPENDENCIES, verify_file_sha256
 from core.nfqws2_profiles import VERSION as NFQWS2_VERSION, ARCHIVE_SHA256 as NFQWS2_ARCHIVE_SHA256
 
 DEPOT_ENGINES = (
-    "backpack", "waterwall", "paqet", "slipstream", "slipstream-server",
+    "backpack", "waterwall", "slipstream", "slipstream-server",
     "xray", "trusttunnel", "backhaul", "frp", "frpc", "rathole", "gost", "hysteria2",
 )
 
@@ -24,7 +24,6 @@ ALIASES = {
     "slipstream": ("slipstream-client",),
     "slipstream-server": ("slipstream-server",),
     "waterwall": ("Waterwall",),
-    "paqet": ("paqet",),
     "backpack": ("backpack",),
     "xray": ("xray",),
     "trusttunnel": ("trusttunnel",),

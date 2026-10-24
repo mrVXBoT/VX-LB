@@ -248,7 +248,7 @@ def create(name, kharej, servers, ports, domain=None, resolvers=None, dns_port=5
 
 def add(name, server, callback=None):
     from core.slipstream_adapter import get_pools, save_pool, SlipstreamAdapter
-    from core.paqet_probe import reserve_probe_port
+    from core.tunnel_probe import reserve_probe_port
     from core.transport_change import mutation_lock
     with mutation_lock():
         pool = get_pools().get(name)

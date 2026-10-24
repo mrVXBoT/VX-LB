@@ -13,7 +13,7 @@ class BinaryBundlerTests(unittest.TestCase):
     def check_archive(self, kind):
         binary = b'verified executable' * 100
         stream = io.BytesIO()
-        member = 'nested/Waterwall' if kind == 'zip' else 'paqet_linux_amd64'
+        member = 'nested/Waterwall' if kind == 'zip' else 'engine_linux_amd64'
         if kind == 'zip':
             with zipfile.ZipFile(stream, 'w') as archive:
                 archive.writestr(member, binary)

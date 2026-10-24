@@ -92,29 +92,6 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
             }
         }
     ),
-    "paqet": BinaryManifest(
-        name="Paqet",
-        engine_id="paqet",
-        pinned_version="v1.0.0-alpha.21",
-        license_spdx="Apache-2.0",
-        executable_name="paqet",
-        required_capabilities=["cap_net_raw", "cap_net_admin"],
-        architectures={
-            "x86_64": {
-                "sha256": "edb5d928443b3d47e5c7c86ae394dbac117826e7ddb7c27355fbd2cdd9ee1791",
-                "source_url": "https://github.com/hanselime/paqet/releases/download/v1.0.0-alpha.21/paqet-linux-amd64-v1.0.0-alpha.21.tar.gz",
-                "archive_type": "tar.gz", "archive_member": "paqet_linux_amd64",
-                "archive_sha256": "4f2f69e0493746726598485ef18df43372470a1514f8021594137e522f0f4fc7",
-                "is_verified": True
-            },
-            "aarch64": {
-                "sha256": "f6db279a57a772a250efffe4bb0a79b112495331568ccc0f6e5f4398bbe962e3",
-                "source_url": "https://github.com/hanselime/paqet/releases/download/v1.0.0-alpha.21/paqet-linux-arm64-v1.0.0-alpha.21.tar.gz",
-                "archive_type": "tar.gz", "archive_member": "paqet_linux_arm64",
-                "is_verified": True
-            }
-        }
-    ),
     "trusttunnel": BinaryManifest(
         name="TrustTunnel",
         engine_id="trusttunnel",

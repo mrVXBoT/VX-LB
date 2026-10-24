@@ -245,14 +245,6 @@ const originalApiFetch = context.apiFetch;
   console.log('PASS: HTTPS profile rendering and hidden field constraints');
 
   // Verify cascading engine to transport population
-  element('new-pool-engine').value = 'paqet';
-  run('onPoolEngineChanged()');
-  assert.doesNotMatch(element('new-pool-proto').innerHTML, /value="quantum"/);
-  assert.doesNotMatch(element('new-pool-proto').innerHTML, /value="quantum\+"/);
-  assert.doesNotMatch(element('new-pool-proto').innerHTML, /value="quantum-gaming"/);
-  assert.match(element('new-pool-proto').innerHTML, /value="paqet"/);
-  assert.doesNotMatch(element('new-pool-proto').innerHTML, /value="stealth"/);
-
   element('new-pool-engine').value = 'backpack';
   run('onPoolEngineChanged()');
   assert.match(element('new-pool-proto').innerHTML, /value="stealth"/);
@@ -292,18 +284,11 @@ const originalApiFetch = context.apiFetch;
   assert.match(element('transport-target').innerHTML, /value="tcp"/);
   assert.match(element('transport-summary').innerHTML, /test-p1/);
 
-  // Switch target engine to paqet in transport modal
-  element('transport-change-engine').value = 'paqet';
+  // Switch target engine to waterwall in transport modal
+  element('transport-change-engine').value = 'waterwall';
   run('onTransportChangeEngineChanged()');
-  assert.doesNotMatch(element('transport-target').innerHTML, /value="quantum"/);
-  assert.doesNotMatch(element('transport-target').innerHTML, /value="quantum\+"/);
-  assert.match(element('transport-target').innerHTML, /value="paqet"/);
+  assert.match(element('transport-target').innerHTML, /value="waterwall"/);
   assert.doesNotMatch(element('transport-target').innerHTML, /value="stealth"/);
-
-  // The single Paqet transport has no FEC-specific fields.
-  element('transport-target').value = 'paqet';
-  run('onTransportChangeTransportChanged()');
-  assert.equal(element('transport-change-fec-fields').classList.contains('hidden'), true);
 
   // Switch target engine to xray and verify TLS fields unhide
   element('transport-change-engine').value = 'xray';
@@ -320,9 +305,9 @@ const originalApiFetch = context.apiFetch;
   assert.doesNotMatch(element('transport-target').innerHTML, /value="https" disabled/);
   assert.match(element('transport-target').innerHTML, /value="ws" disabled/);
   assert.equal(element('transport-target').value, 'https');
-  element('transport-change-engine').value = 'paqet';
+  element('transport-change-engine').value = 'waterwall';
   run('onTransportChangeEngineChanged()');
-  assert.match(element('transport-target').innerHTML, /value="paqet" disabled/);
+  assert.match(element('transport-target').innerHTML, /value="waterwall" disabled/);
   assert.equal(element('transport-target').value, '');
   run(`cachedStatus = {pools:[{name:'tcp-pool',transport:'tcp',engine:'backpack',nodes:[]}]}`);
   run("openTransportModal('tcp-pool')");

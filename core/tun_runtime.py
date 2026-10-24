@@ -14,7 +14,7 @@ from core.gre import write
 from core.kernel_relay_ports import node_credentials, verify_listeners
 from core.ipv6_tunnel_tools import render_relay_service
 from core.private_link_health import probe_pair
-from core.paqet_probe import reserve_probe_port
+from core.tunnel_probe import reserve_probe_port
 
 DEFAULT_MTU = 1280
 DIRECTORY = '/etc/vxlb/tun'

@@ -21,7 +21,6 @@ class ApiExtensionsTests(unittest.TestCase):
         data = json.loads(written.decode("utf-8"))
         self.assertIn("wireguard", data)
         self.assertIn("waterwall", data)
-        self.assertIn("paqet", data)
         self.assertEqual(data["6to4_anycast"]["support_status"], "unsupported")
 
     def test_api_links_endpoint(self):
@@ -34,7 +33,7 @@ class ApiExtensionsTests(unittest.TestCase):
         data = json.loads(written.decode("utf-8"))
         self.assertIn("link1", data)
 
-    def test_api_logs_waterwall_and_paqet(self):
+    def test_api_logs_waterwall(self):
         fake_storage = {
             "pools": {
                 "WPool": {

@@ -6,14 +6,11 @@ Transport profiles:
 3. wss: WebSocket Secure over TLS 1.3 (Browser fingerprint, CDN-compatible)
 4. http: HTTP/1.1 Chunked / h2c (Corporate header obfuscation)
 5. https: HTTP/2 Multiplexed over TLS (RFC 9113)
-6. quantum: Fast-ARQ KCP over UDP / FakeTCP
-7. quantum+: KCP + Reed-Solomon Forward Error Correction (FEC 10:3 / 6:2)
-8. tun: Linux Kernel Virtual L3 TUN (/dev/net/tun with TCPMSS clamp)
-9. xhttp: Xray SplitHTTP (Decoupled GET/POST with X-Padding)
-10. xhttps: XHTTP over TLS 1.3 / REALITY with xmux
-11. dc6: Direct Connect IPv6 Carrier (ip6gre / sit / ip6ip6)
-12. quantum-gaming: Zero-Jitter KCP Packet Mode (10ms interval, packet duplication)
-13. nova: Next-Gen Obfuscated Hybrid (QUIC/H3 + Port Hopping, TLS ClientHello Slicing)
+6. tun: Linux Kernel Virtual L3 TUN (/dev/net/tun with TCPMSS clamp)
+7. xhttp: Xray SplitHTTP (Decoupled GET/POST with X-Padding)
+8. xhttps: XHTTP over TLS 1.3 / REALITY with xmux
+9. dc6: Direct Connect IPv6 Carrier (ip6gre / sit / ip6ip6)
+10. nova: Next-Gen Obfuscated Hybrid (QUIC/H3 + Port Hopping, TLS ClientHello Slicing)
 
 Includes kernel-based telemetry via direct Linux kernel struct tcp_info extraction.
 """
@@ -177,65 +174,7 @@ TRANSPORTS_13_CATALOG: Dict[str, TransportSpecification] = {
         requires_encryption=True, encryption_type="tls",
         default_parameters={"http_version": "1.1", "method": "CONNECT", "mutual_tls": True},
     ),
-    # 06) quantum
-    "quantum": TransportSpecification(
-        id="quantum",
-        display_name="Quantum (Fast-ARQ KCP)",
-        display_name_fa="کوانتوم (KCP تهاجمی سریع)",
-        category=CAT_KCP_ACCELERATOR,
-        category_title_fa=CATEGORY_TITLES[CAT_KCP_ACCELERATOR],
-        layer="L4.5",
-        underlying_protocol="UDP / FakeTCP / KCP Protocol Fast3",
-        reference_core="xtaci/kcptun / Paqet / mKCP",
-        header_overhead_bytes=24,
-        dpi_resistance="متوسط",
-        recommended_use="پکت‌لاس‌های متوسط برای حذف گلوگاه کنترل ازدحام TCP و حفظ حداکثر پهنای باند",
-        min_mtu=1200,
-        max_mtu=1400,
-        default_mtu=1350,
-        kernel_modules=[],
-        requires_encryption=True,
-        encryption_type="noise",
-        default_parameters={
-            "nodelay": 1,
-            "interval": 20,
-            "resend": 2,
-            "nc": 1,
-            "rto_factor": 1.5,
-            "sockbuf": 16777216,
-        },
-    ),
-    # 07) quantum+
-    "quantum+": TransportSpecification(
-        id="quantum+",
-        display_name="Quantum+ (KCP + Reed-Solomon FEC)",
-        display_name_fa="کوانتوم پلاس (KCP + ماتریس FEC)",
-        category=CAT_KCP_ACCELERATOR,
-        category_title_fa=CATEGORY_TITLES[CAT_KCP_ACCELERATOR],
-        layer="L4.5",
-        underlying_protocol="UDP / KCP + Reed-Solomon GF(2^8) FEC Matrix",
-        reference_core="klauspost/reedsolomon / kcp-go / Paqet",
-        header_overhead_bytes=32,
-        dpi_resistance="بالا",
-        recommended_use="پکت‌لاس‌های فاجعه‌بار (۱۰٪ تا ۳۰٪)؛ تحمل قطعی ۳ پکت از هر ۱۳ پکت بدون بازفرست",
-        min_mtu=1200,
-        max_mtu=1320,
-        default_mtu=1300,
-        kernel_modules=[],
-        requires_encryption=True,
-        encryption_type="noise",
-        supports_fec=True,
-        default_parameters={
-            "nodelay": 1,
-            "interval": 20,
-            "resend": 2,
-            "nc": 1,
-            "fec_datashard": 10,
-            "fec_parityshard": 3,
-            "fec_matrix": "vandermonde",
-        },
-    ),
-    # 08) tun
+    # 06) tun
     "tun": TransportSpecification(
         id="tun",
         display_name="Linux Kernel L3 TUN",
@@ -345,35 +284,7 @@ TRANSPORTS_13_CATALOG: Dict[str, TransportSpecification] = {
             "remote_ipv6": "",
         },
     ),
-    # 12) quantum-gaming
-    "quantum-gaming": TransportSpecification(
-        id="quantum-gaming",
-        display_name="Quantum Gaming (Zero-Jitter KCP)",
-        display_name_fa="کوانتوم گیمینگ (حداقل پینگ و جیتر)",
-        category=CAT_KCP_ACCELERATOR,
-        category_title_fa=CATEGORY_TITLES[CAT_KCP_ACCELERATOR],
-        layer="L4.5",
-        underlying_protocol="KCP Packet Mode (10ms tick) / Zero-Jitter Duplication",
-        reference_core="kcp-go / UDPspeeder",
-        header_overhead_bytes=24,
-        dpi_resistance="متوسط",
-        recommended_use="بازی‌های آنلاین و تماس صوتی بلادرنگ (حذف کامل تاخیر بافرینگ و جهش پینگ)",
-        min_mtu=1200,
-        max_mtu=1400,
-        default_mtu=1350,
-        kernel_modules=[],
-        requires_encryption=True,
-        encryption_type="noise",
-        default_parameters={
-            "nodelay": 1,
-            "interval": 10,
-            "resend": 1,
-            "nc": 1,
-            "acknodelay": True,
-            "packet_duplication": 2,
-        },
-    ),
-    # 13) nova
+    # 12) nova
     "nova": TransportSpecification(
         id="nova",
         display_name="Nova Hybrid Obfuscation",
@@ -448,15 +359,7 @@ def validate_transport_params(transport_id: str, params: Optional[dict] = None) 
     merged["mtu"] = mtu
 
     # Protocol-specific validations
-    if spec.id == "quantum+":
-        data_shard = int(merged.get("fec_datashard", 10))
-        parity_shard = int(merged.get("fec_parityshard", 3))
-        if data_shard < 1 or parity_shard < 1 or data_shard + parity_shard > 32:
-            return False, "ضرایب FEC نامعتبر است (سقف مجموع شاردها ۳۲ است)", {}
-        merged["fec_datashard"] = data_shard
-        merged["fec_parityshard"] = parity_shard
-
-    elif spec.id == "dc6":
+    if spec.id == "dc6":
         carrier = merged.get("carrier_type", "ip6gre")
         if carrier not in {"ip6gre", "ip6ip6", "sit"}:
             return False, "نوع حامل IPv6 نامعتبر است (باید ip6gre، ip6ip6 یا sit باشد)", {}

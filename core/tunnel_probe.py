@@ -1,8 +1,10 @@
 """Loopback-only nonce probe through a temporary route in the real tunnel."""
+import json
 import re
 import secrets
 import shlex
 import time
+from core.validation import validate_ports, validate_port
 
 ECHO_SERVER = '''import socket,time
 s=socket.socket();s.bind(("127.0.0.1",0));s.listen(4);s.settimeout(1)
@@ -20,6 +22,26 @@ while time.monotonic()<end:
    c.sendall(b"VX-LB-PROBE:"+data)
  except (OSError,TimeoutError):pass
 '''
+
+def reserve_probe_port(ssh, exclude, preferred=None, bind_host="127.0.0.1"):
+    program='''import socket,sys,json
+exclude=set(map(int,json.loads(sys.argv[1])));preferred=int(sys.argv[2]);host=sys.argv[3]
+for attempt in range(100):
+ t tcp=socket.socket();udp=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+ try:
+  candidate=preferred if attempt==0 else 0
+  if candidate and candidate in exclude:continue
+  tcp.bind((host,candidate));port=tcp.getsockname()[1]
+  if port in exclude:continue
+  udp.bind((host,port));print(port);break
+ except OSError:pass
+ finally:tcp.close();udp.close()
+else:raise RuntimeError('No probe port available')
+'''
+    code,out,_=ssh.execute('python3 -c '+shlex.quote(program)+' '+shlex.quote(json.dumps(list(exclude)))+' '+str(int(preferred or 0))+' '+shlex.quote(bind_host))
+    if code:raise RuntimeError('Could not allocate probe port')
+    return int(validate_port(out.strip()))
+
 
 def add_probe_route(config, listen_port, backend_port):
     # Do not change any existing mapping or transport option.

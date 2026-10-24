@@ -36,10 +36,9 @@ class SharedInfrastructureTests(unittest.TestCase):
         import core.gre_adapter
         import core.xhttp_adapter
         import core.waterwall_adapter
-        import core.paqet_unified_adapter
 
         registered = list_registered_adapters()
-        for engine in ["backpack", "gre_ipv4", "xhttp", "waterwall", "paqet"]:
+        for engine in ["backpack", "gre_ipv4", "xhttp", "waterwall"]:
             self.assertIn(engine, registered)
             adapter = get_adapter(engine)
             self.assertIsNotNone(adapter)

@@ -243,7 +243,6 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .engine-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 8px; font-size: 11px; font-weight: 500; border: 1px solid var(--border-subtle); background: var(--bg-elevated); direction: ltr; }
 .engine-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .engine-badge.engine-backpack { color: #34d399; background: rgba(52, 211, 153, 0.12); border-color: rgba(52, 211, 153, 0.28); }
-.engine-badge.engine-paqet { color: #c084fc; background: rgba(192, 132, 252, 0.12); border-color: rgba(192, 132, 252, 0.28); }
 .engine-badge.engine-waterwall { color: #38bdf8; background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.28); }
 .engine-badge.engine-xray { color: #2dd4bf; background: rgba(45, 212, 191, 0.12); border-color: rgba(45, 212, 191, 0.28); }
 .engine-badge.engine-kernel { color: #fbbf24; background: rgba(251, 191, 36, 0.12); border-color: rgba(251, 191, 36, 0.28); }

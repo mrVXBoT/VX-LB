@@ -37,7 +37,7 @@ class SlipstreamDeploymentContracts(unittest.TestCase):
             patch('core.load_balancer.LoadBalancerManager.check_port_conflicts', autospec=True, return_value=(True, '')),
             patch('core.slipstream_deploy.connection', side_effect=connect),
             patch('core.slipstream_adapter.SlipstreamAdapter.install', return_value=(True, 'verified')),
-            patch('core.paqet_probe.reserve_probe_port', side_effect=reserve),
+            patch('core.tunnel_probe.reserve_probe_port', side_effect=reserve),
             patch('core.slipstream_deploy.identity_material', return_value=self.security),
         ]
         for target in targets:
@@ -107,7 +107,7 @@ class SlipstreamDeploymentContracts(unittest.TestCase):
         self.assertNotIn('another', self.pools)
 
     def test_occupied_outside_dns_listener_is_not_replaced(self):
-        with patch('core.paqet_probe.reserve_probe_port', return_value=49000):
+        with patch('core.tunnel_probe.reserve_probe_port', return_value=49000):
             self.assertFalse(self.create()[0])
         self.publisher.assert_not_called()
         self.prober.assert_not_called()

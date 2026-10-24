@@ -3,7 +3,7 @@
 Explicitly separate:
 1. Transport Layer (L2/L3/L4/L7 overlay/carrier network)
 2. Encryption Layer (ipsec, tls, wireguard, noise, none)
-3. Camouflage Layer (xhttp, waterwall, paqet, dns_subdomain, stealth, pck, wss, none)
+3. Camouflage Layer (xhttp, waterwall, dns_subdomain, stealth, pck, wss, none)
 
 Provides:
 - TransportLayer, EncryptionLayer, CamouflageLayer, PoolComposition dataclasses.
@@ -35,7 +35,7 @@ VALID_ENCRYPTION_TYPES = {
 }
 
 VALID_CAMOUFLAGE_TYPES = {
-    "none", "xhttp", "waterwall", "paqet", "dns_subdomain", "stealth", "pck", "wss",
+    "none", "xhttp", "waterwall", "dns_subdomain", "stealth", "pck", "wss",
     # Aliases
     "xhttp_grpc", "raw_tcp_kcp", "dns_delegation"
 }
@@ -92,7 +92,7 @@ class EncryptionLayer:
 
 @dataclass
 class CamouflageLayer:
-    type: str  # none, xhttp, waterwall, paqet, dns_subdomain, stealth, pck, wss
+    type: str  # none, xhttp, waterwall, dns_subdomain, stealth, pck, wss
     mode: Optional[str] = None
     domain: Optional[str] = None
     rate_limit: Optional[int] = None
@@ -360,16 +360,6 @@ def legacy_transport_to_composition(transport: str, **kwargs) -> PoolComposition
         e_enabled = True
         c_type = "waterwall"
         c_mode = c_mode or "vless_mux"
-    elif tr in ("paqet",):
-        t_type = "raw_tcp"
-        t_layer = "L4"
-        t_mtu = kwargs.get("mtu") or 1400
-        e_type = "noise"
-        e_cipher = e_cipher or "aes128"
-        e_auth = e_auth or "psk"
-        e_enabled = True
-        c_type = "paqet"
-        c_mode = c_mode or "kcp_raw"
     elif tr in ("slipstream",):
         t_type = "dns"
         t_layer = "L7"
@@ -491,8 +481,6 @@ def composition_to_legacy_string(comp: Union[PoolComposition, Dict[str, Any]]) -
         return "wireguard"
     if c.type == "waterwall":
         return "waterwall"
-    if c.type in ("paqet", "raw_tcp_kcp") or t.type == "raw_tcp":
-        return "paqet"
     if c.type in ("xhttp", "xhttp_grpc"):
         return "xhttp"
     if c.type == "wss":
@@ -579,7 +567,7 @@ def infer_composition_from_pool(pool: dict) -> Dict[str, Any]:
     if isinstance(nodes, list) and nodes:
         first_node = nodes[0]
         if isinstance(first_node, dict):
-            for eng_key in ("geneve", "vxlan", "wireguard", "gre", "gre6", "ip6ip6", "paqet", "waterwall"):
+            for eng_key in ("geneve", "vxlan", "wireguard", "gre", "gre6", "ip6ip6", "waterwall"):
                 cfg = first_node.get(eng_key)
                 if isinstance(cfg, dict):
                     if "vni" not in params and cfg.get("vni") is not None:
@@ -707,19 +695,6 @@ def get_available_compositions() -> List[Dict[str, Any]]:
                 "transport": {"type": "tcp", "layer": "L7", "default_mtu": 1500},
                 "encryption": {"type": "tls", "cipher": "tls13", "auth_mode": "sni"},
                 "camouflage": {"type": "waterwall", "mode": "vless_mux"}
-            }
-        },
-        {
-            "id": "paqet",
-            "name": "Paqet Raw TCP KCP",
-            "description": "High performance raw TCP carrier with KCP error correction.",
-            "layer": "L4",
-            "security": "noise",
-            "composition": legacy_transport_to_composition("paqet").to_dict(),
-            "schema": {
-                "transport": {"type": "raw_tcp", "layer": "L4", "default_mtu": 1400},
-                "encryption": {"type": "noise", "cipher": "aes128", "auth_mode": "psk"},
-                "camouflage": {"type": "paqet", "mode": "kcp_raw"}
             }
         },
         {

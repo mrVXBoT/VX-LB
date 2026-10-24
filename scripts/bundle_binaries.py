@@ -35,16 +35,6 @@ TARGETS = [
         "dest": "backpack",
     },
     {
-        "name": "paqet",
-        "arch": "x86_64",
-        "url": "https://github.com/hanselime/paqet/releases/download/v1.0.0-alpha.21/paqet-linux-amd64-v1.0.0-alpha.21.tar.gz",
-        "is_tar": True,
-        "tar_member": "paqet_linux_amd64",
-        "archive_sha256": "4f2f69e0493746726598485ef18df43372470a1514f8021594137e522f0f4fc7",
-        "sha256": "edb5d928443b3d47e5c7c86ae394dbac117826e7ddb7c27355fbd2cdd9ee1791",
-        "dest": "paqet",
-    },
-    {
         "name": "waterwall",
         "arch": "x86_64",
         "url": "https://github.com/radkesvat/WaterWall/releases/download/v1.46.96/Waterwall-linux-gcc-x64.zip",

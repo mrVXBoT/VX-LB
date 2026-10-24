@@ -110,7 +110,6 @@ class CompositionValidationTests(unittest.TestCase):
             legacy_transport_to_composition("wireguard"),
             legacy_transport_to_composition("slipstream", domain="sub.example.com"),
             legacy_transport_to_composition("waterwall"),
-            legacy_transport_to_composition("paqet"),
             legacy_transport_to_composition("tcp"),
             legacy_transport_to_composition("pck"),
         ]
@@ -209,7 +208,6 @@ class CompositionTranslationTests(unittest.TestCase):
             "vxlan",
             "wireguard",
             "waterwall",
-            "paqet",
             "slipstream",
             "gre6",
             "ip6ip6",
@@ -287,7 +285,6 @@ class CompositionCatalogTests(unittest.TestCase):
         self.assertIn("wireguard", ids)
         self.assertIn("slipstream", ids)
         self.assertIn("waterwall", ids)
-        self.assertIn("paqet", ids)
 
 
 class CompositionWebIntegrationTests(unittest.TestCase):

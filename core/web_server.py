@@ -264,8 +264,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                         "http_connect": {"public_port":n.get("http_connect",{}).get("public_port"),"mode":n.get("transport"),"mutual_tls":True} if n.get("engine") in ("http","https") else None,
                         "status_note": n.get("status_note") or p_val.get("status_note") if n.get("engine") == "wireguard" else None,
                         "https": {"server_name":n.get("https",{}).get("profile",{}).get("server_name"),"outer_port":n.get("https",{}).get("outer_port")} if n.get("engine") == "xray" else None,
-                        "waterwall": {"uuid_tcp": n.get("waterwall", {}).get("uuid_tcp"), "outer_port": n.get("waterwall", {}).get("outer_port"), "server_name": n.get("waterwall", {}).get("profile", {}).get("server_name") or n.get("waterwall", {}).get("server_name"), "profile": n.get("waterwall", {}).get("profile")} if n.get("engine") == "waterwall" else None,
-                        "paqet": {"tunnel_port": n.get("paqet", {}).get("tunnel_port") or n.get("tunnel_port"), "interface": n.get("paqet", {}).get("interface"), "cipher": n.get("paqet", {}).get("cipher"), "kcp_mode": n.get("paqet", {}).get("kcp_mode")} if n.get("engine") == "paqet" else None,
+                         "waterwall": {"uuid_tcp": n.get("waterwall", {}).get("uuid_tcp"), "outer_port": n.get("waterwall", {}).get("outer_port"), "server_name": n.get("waterwall", {}).get("profile", {}).get("server_name") or n.get("waterwall", {}).get("server_name"), "profile": n.get("waterwall", {}).get("profile")} if n.get("engine") == "waterwall" else None,
                         "gre_https": {"local_private":n['gre_https'][0]['private'],"remote_private":n['gre_https'][1]['private'],"mtu":n['gre_https'][0]['mtu']} if n.get('gre_https') else None,
                         "transport": n.get("transport", p_val.get("transport", "tcp")),
                         "status": "PROVISIONING" if n.get("creation_pending") else "DOWN" if n.get("provisioning") else telem.get("status", "IDLE"),
@@ -299,7 +298,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "wireguard_port": p_val.get("wireguard_port") or p_val.get("tunnel_port"),
                     "status_note": p_val.get("status_note"),
                     "vni": p_val.get("vni"),
-                    "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name")} if p_val.get("engine") in ("xray", "waterwall", "paqet") else None,
+                     "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name")} if p_val.get("engine") in ("xray", "waterwall") else None,
                     "operation_task": p_val.get("operation_task"),
                     "creation_job": p_val.get("creation_job"),
                     "creation_placeholder": p_val.get("creation_placeholder", False),
@@ -558,10 +557,6 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 svc = f"{node_name}.service" if node_name else "ldw*.service"
                 alt_svc = f"vxlb-waterwall-{node_name}.service" if node_name else "vxlb-waterwall*.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {alt_svc} 2>/dev/null || journalctl --no-pager -n 80 | grep -i waterwall")
-            elif eng == 'paqet':
-                node_name = target_node.get("node_name", "")
-                svc = f"paqet-{node_name}.service" if node_name else "paqet*.service"
-                _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc}")
             elif eng in ('gre', 'gre_ipv4'):
                 node_name = target_node.get("node_name", "")
                 svc = f"vxlb-gre-{node_name}.service" if node_name else "vxlb-gre*.service"
@@ -966,11 +961,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "dns_port": body.get("dns_port", 53),
                     "rate_limit": body.get("rate_limit", 1000)
                 })
-            elif transport in ("xhttp", "xhttps", "gre_xhttp", "reality", "nova", "waterwall", "paqet"):
-                extra_args["camouflage"] = body.get("camouflage", {})
-            elif transport in ("quantum", "quantum+", "quantum-gaming"):
-                extra_args["fec_datashard"] = body.get("fec_datashard", 10)
-                extra_args["fec_parityshard"] = body.get("fec_parityshard", 3)
+            elif transport in ("xhttp", "xhttps", "gre_xhttp", "reality", "nova", "waterwall"):
                 extra_args["camouflage"] = body.get("camouflage", {})
             elif transport == "tun":
                 extra_args["mtu"] = body.get("tun_mtu") or body.get("mtu", 1280)

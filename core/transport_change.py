@@ -251,8 +251,6 @@ def get_engine_for_transport(transport: str) -> str:
     t = str(transport).strip().lower()
     if t in {'xhttp', 'xhttps', 'gre_xhttp', 'reality', 'nova'}:
         return 'xray'
-    if t in {'quantum', 'quantum+', 'quantum-gaming', 'paqet'}:
-        return 'paqet'
     if t == 'waterwall':
         return 'waterwall'
     if t == 'wireguard':
@@ -316,7 +314,6 @@ def _engine_module(engine):
         'geneve': 'core.geneve',
         'geneve_ipsec': 'core.geneve',
         'waterwall': 'core.waterwall',
-        'paqet': 'core.paqet_adapter',
         'xray': 'core.https_tunnel',
         'slipstream': 'core.slipstream_adapter',
         'spoof': 'core.spoof_adapter',
@@ -394,20 +391,6 @@ def teardown_pool_runtime(pool):
 
     elif engine == 'waterwall':
         from core.waterwall import clean
-        for node in nodes:
-            try:
-                ir_ssh = connect(node)
-                clean(ir_ssh, node, True)
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                clean(kh_ssh, node, False)
-                kh_ssh.close()
-            except Exception: pass
-
-    elif engine == 'paqet':
-        from core.paqet_adapter import clean
         for node in nodes:
             try:
                 ir_ssh = connect(node)
@@ -1104,8 +1087,6 @@ def recover_changes():
                 update_job(name, status='rollback_failed', message='به‌روزرسانی HTTPS قطع شده؛ بازگردانی را اجرا کنید')
             elif pool.get('engine') == 'waterwall':
                 update_job(name, status='rollback_failed', message='به‌روزرسانی WaterWall قطع شده؛ بازگردانی را اجرا کنید')
-            elif pool.get('engine') == 'paqet':
-                update_job(name, status='rollback_failed', message='به‌روزرسانی Paqet قطع شده؛ بازگردانی را اجرا کنید')
             else:
                 threading.Thread(target=run_change, args=(name, True), daemon=True).start()
 

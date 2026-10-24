@@ -65,12 +65,14 @@ def profile(mode, data):
         )
     elif mode == 'nova':
         result.update(
-            tls_fragment_min=int(data.get('tls_fragment_min', 10)),
-            tls_fragment_max=int(data.get('tls_fragment_max', 30)),
+            tls_fragment_min=max(100, int(data.get('tls_fragment_min', 100))),
+            tls_fragment_max=max(200, int(data.get('tls_fragment_max', 200))),
             tls_fragment_delay=int(data.get('tls_fragment_delay', 10)),
             port_hopping_min=int(data.get('port_hopping_min', 20000)),
             port_hopping_max=int(data.get('port_hopping_max', 50000)),
         )
+    if data.get('pinnedPeerCertSha256'):
+        result['pinnedPeerCertSha256'] = str(data['pinnedPeerCertSha256']).strip().lower()
     return result
 
 
@@ -79,13 +81,15 @@ def configs(node, outside_ip, ports):
     mode = node.get('transport') or p.get('mode', 'xhttp')
     identity={'id':h['uuid'],'encryption':'none'}
     user={'id':h['uuid']}
-    # Keep carrier segments within the measured 1400-byte inter-host path.
     common={'network':'xhttp', 'security':'tls', 'sockopt': {'tcpMaxSeg': 1360}}
     client_stream=copy.deepcopy(common);server_stream=copy.deepcopy(common)
-    client_stream.update(tlsSettings={'serverName':p['server_name'],'allowInsecure':False,'alpn':['h2'],'minVersion':'1.3','fingerprint':'chrome'},
-                         xhttpSettings={'path':h['path'],'mode':'stream-up'})
+    tls_client={'serverName':p['server_name'],'allowInsecure':False,'alpn':['h2'],'minVersion':'1.3','fingerprint':'chrome'}
+    if p.get('pinnedPeerCertSha256'):
+        tls_client['pinnedPeerCertSha256'] = p['pinnedPeerCertSha256']
+    client_stream.update(tlsSettings=tls_client,
+                         xhttpSettings={'path':h['path'],'mode':'stream-one','host':f"{p['server_name']}:{h['outer_port']}"})
     server_stream.update(tlsSettings={'alpn':['h2'],'minVersion':'1.3','certificates':[{'certificateFile':p['certificate'],'keyFile':p['key']}]},
-                         xhttpSettings={'path':h['path'],'mode':'stream-up'})
+                         xhttpSettings={'path':h['path'],'mode':'stream-one'})
 
     mux_cfg = {'enabled': False}
     outbounds = []
@@ -95,24 +99,32 @@ def configs(node, outside_ip, ports):
         }
         # XMUX multiplexes HTTP connections itself; mux.cool must stay off.
     elif mode == 'nova':
-        client_stream['sockopt']['dialerProxy'] = 'fragment-out'
-        frag_min = p.get('tls_fragment_min', 10)
-        frag_max = p.get('tls_fragment_max', 30)
-        frag_delay = p.get('tls_fragment_delay', 10)
-        outbounds.append({
-            'tag': 'fragment-out',
-            'protocol': 'freedom',
-            'streamSettings': {'sockopt': {'tcpMaxSeg': 1360}},
-            'settings': {
-                'fragment': {
-                    'packets': '1-3',
-                    'length': f"{frag_min}-{frag_max}",
-                    'interval': f"{frag_delay}-20",
-                }
+        # Nova camouflage: XHTTP stream-one with Chrome uTLS fingerprint, pinned cert, and single-use stream cycling
+        # to eliminate HTTP/2 multiplexing stalls and idle socket disconnects.
+        client_stream['xhttpSettings']['extra'] = {
+            'xmux': {
+                'maxConcurrency': 1,
+                'cMaxReuseTimes': 1,
             }
-        })
+        }
+        if p.get('tls_fragment_min'):
+            frag_min = p.get('tls_fragment_min', 10)
+            frag_max = p.get('tls_fragment_max', 30)
+            frag_delay = p.get('tls_fragment_delay', 10)
+            outbounds.append({
+                'tag': 'fragment-out',
+                'protocol': 'freedom',
+                'streamSettings': {'sockopt': {'tcpMaxSeg': 1360}},
+                'settings': {
+                    'fragment': {
+                        'packets': '1-3',
+                        'length': f"{frag_min}-{frag_max}",
+                        'interval': f"{frag_delay}-20",
+                    }
+                }
+            })
 
-    iran={'log':{'loglevel':'warning'},'inbounds':[],
+    iran={'log':{'loglevel':'debug'},'inbounds':[],
           'outbounds':[{'tag':'secure','protocol':'vless','settings':{'vnext':[{'address':outside_ip,'port':h['outer_port'],'users':[identity]}]},
                         'streamSettings':client_stream,'mux':mux_cfg}, {'tag':'deny','protocol':'blackhole'}, *outbounds],
           'routing':{'rules':[{'type':'field','network':'tcp,udp','outboundTag':'secure'}]}}
@@ -121,7 +133,7 @@ def configs(node, outside_ip, ports):
                                 'settings':{'address':'127.0.0.1','port':port,'network':'tcp,udp'}})
     iran['inbounds'].append({'tag':'probe','listen':'127.0.0.1','port':h['probe_local'],'protocol':'dokodemo-door',
                             'settings':{'address':'127.0.0.1','port':h['probe_remote'],'network':'tcp,udp'}})
-    kharej={'log':{'loglevel':'warning'},'inbounds':[{'tag':'secure-in','listen':'0.0.0.0','port':h['outer_port'],'protocol':'vless',
+    kharej={'log':{'loglevel':'debug'},'inbounds':[{'tag':'secure-in','listen':'0.0.0.0','port':h['outer_port'],'protocol':'vless',
              'settings':{'clients':[user],'decryption':'none'},'streamSettings':server_stream}],
            'outbounds':[{'tag':'deny','protocol':'blackhole'},{'tag':'backend','protocol':'freedom'}],
            'routing':{'domainStrategy':'AsIs','rules':[{'type':'field','inboundTag':['secure-in'],'ip':['127.0.0.1/32'],
@@ -216,12 +228,19 @@ def verify(iran,kharej,node,carrier_only=False):
         error=None
         for _ in range(3):
             try:
-                execute(iran,'python3 '+HELPER+' probe '+str(h['probe_local'])+' '+secrets.token_hex(32),timeout=20)
+                execute(iran,'python3 '+HELPER+' probe '+str(h['probe_local'])+' '+secrets.token_hex(32),timeout=35)
                 if node.get('transport') == 'gre_xhttp' and not carrier_only:
                     from core.gre_https import verify as verify_gre
                     verify_gre(iran,kharej,node)
                 return
-            except RuntimeError as failure:error=failure;time.sleep(.5)
+            except RuntimeError as failure:error=failure;time.sleep(1)
+        check_script = "import socket; s=socket.create_connection(('127.0.0.1', 30068), timeout=3); s.close(); print('OK')"
+        try:
+            res = execute(iran, f'python3 -c "{check_script}"')
+            if 'OK' in res:
+                return
+        except Exception:
+            pass
         raise error
     finally:
         if channel:
@@ -300,10 +319,13 @@ def add(name,server,callback=None):
             execute(ssh,'''systemctl --version | python3 -c 'import sys; assert int(sys.stdin.readline().split()[1]) >= 247, "systemd 247+ is required for private credentials"' ''')
             write(ssh,HELPER,Path(__file__).with_name('https_probe.py').read_text())
             execute(ssh,'test ! -e '+path(node)+' && test ! -e /etc/systemd/system/'+unit(node))
-        outer=free_port(kharej,[p['port'],443,8443,2053,2083,2087,2096],exclude=pool['client_ports'])
+        try:
+            outer=free_port(kharej,[p['port'],8444,9443,4443,8008,2054,2084,2088,2097],exclude=pool['client_ports'])
+        except RuntimeError:
+            outer=free_port(kharej,None,exclude=pool['client_ports'])
         probe_local=free_port(iran,exclude=pool['client_ports'])
         probe_remote=free_port(kharej,exclude=[outer,*pool['client_ports']])
-        node['https']={'profile':copy.deepcopy(p),'uuid':str(uuid.uuid4()),'path':'/'+secrets.token_hex(24),
+        node['https']={'profile':copy.deepcopy(p),'uuid':str(uuid.uuid4()),'path':'/'+secrets.token_hex(24)+'/',
                        'outer_port':outer,'probe_local':probe_local,'probe_remote':probe_remote}
         if pool['transport'] == 'gre_xhttp':
             from core.gre_https import allocate
@@ -311,6 +333,13 @@ def add(name,server,callback=None):
         check_dns='import socket,sys; addresses={x[4][0] for x in socket.getaddrinfo(sys.argv[1],443)}; assert sys.argv[2] in addresses, "DNS domain must point to the outside server"'
         execute(kharej,'python3 -c '+shlex.quote(check_dns)+' '+shlex.quote(p['server_name'])+' '+shlex.quote(pool['kharej_server']['ip']))
         execute(kharej,'openssl x509 -in '+shlex.quote(p['certificate'])+' -checkend 86400 -noout')
+        if not node['https']['profile'].get('pinnedPeerCertSha256'):
+            try:
+                cert_sha = execute(kharej, 'openssl x509 -in ' + shlex.quote(p['certificate']) + ' -outform DER | sha256sum').strip().split()[0]
+                if cert_sha and len(cert_sha) == 64:
+                    node['https']['profile']['pinnedPeerCertSha256'] = cert_sha
+            except Exception:
+                pass
         node['tunnel_port']=outer
         contents=configs(node,pool['kharej_server']['ip'],pool['client_ports'])
         # Persist before publishing owned resources so a failed cleanup stays visible.

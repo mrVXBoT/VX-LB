@@ -14,7 +14,7 @@ VX LB manages tunnel endpoints on Iran and Kharej servers through a Python CLI a
 - Health checks using tunnel probes, connection telemetry, and watchdog consensus.
 - A Persian RTL dashboard with password authentication and login rate limiting.
 
-Transport profiles include BackPack, HTTP-based tunnels, KCP, kernel tunnels, WireGuard, WaterWall, Paqet, Slipstream, and spoof/desynchronization modes. Availability and support status vary by engine; inspect the registry before deploying:
+Transport profiles include BackPack, HTTP-based tunnels, kernel tunnels, WireGuard, WaterWall, Slipstream, and spoof/desynchronization modes. Availability and support status vary by engine; inspect the registry before deploying:
 
 ```bash
 vx-lb --list-capabilities

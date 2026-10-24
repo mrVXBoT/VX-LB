@@ -33,8 +33,6 @@ def migrate_v0_to_v1(data: dict) -> dict:
                 pool["engine"] = "gre_xhttp"
             elif transport in ("waterwall",):
                 pool["engine"] = "waterwall"
-            elif transport in ("paqet",):
-                pool["engine"] = "paqet"
             else:
                 pool["engine"] = "backpack"
         if "dns_policy" not in pool:

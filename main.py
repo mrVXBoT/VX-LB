@@ -284,23 +284,20 @@ def create_load_balancer_flow():
     # 3. Select Transport (Smart Selector & Wizard)
     console.print("\n[bold cyan]3. Select Tunnel Protocol & Engine:[/bold cyan]")
     console.print("  [bold green][1] 🛡️  Most stable & anti-filter (default recommendation):[/bold green] [bold]PCK[/bold] [dim](resilient to network disruption, anti-RST, no drops)[/dim]")
-    console.print("  [bold cyan][2] 🎮  Gaming & lowest ping (high packet loss):[/bold cyan] [bold]Quantum KCP[/bold] [dim](smart Fast-ARQ delivery for minimal ping and jitter)[/dim]")
-    console.print("  [bold magenta][3] ☁️  Traverse Cloudflare CDN (web camouflage):[/bold magenta] [bold]WSS TLS 1.3[/bold] [dim](standard WebSocket traffic over a domain)[/dim]")
-    console.print("  [bold blue][4] ⚡  Direct kernel layer-3 network:[/bold blue] [bold]WireGuard[/bold] [dim](max speed and efficiency via Linux kernel driver)[/dim]")
-    console.print("  [bold red][5] 🚨  Emergency & national intranet:[/bold red] [bold]Slipstream DNS[/bold] [dim](tunnels over DNS port 53 during full international outages)[/dim]")
-    console.print("  [bold yellow][0] 📋  Full expert menu (view and pick from all 40 protocols)[/bold yellow]")
+    console.print("  [bold magenta][2] ☁️  Traverse Cloudflare CDN (web camouflage):[/bold magenta] [bold]WSS TLS 1.3[/bold] [dim](standard WebSocket traffic over a domain)[/dim]")
+    console.print("  [bold blue][3] ⚡  Direct kernel layer-3 network:[/bold blue] [bold]WireGuard[/bold] [dim](max speed and efficiency via Linux kernel driver)[/dim]")
+    console.print("  [bold red][4] 🚨  Emergency & national intranet:[/bold red] [bold]Slipstream DNS[/bold] [dim](tunnels over DNS port 53 during full international outages)[/dim]")
+    console.print("  [bold yellow][0] 📋  Full expert menu (view and pick from all protocols)[/bold yellow]")
     
-    wizard_choice = Prompt.ask("Select profile or enter '0' for full list", choices=["1", "2", "3", "4", "5", "0"], default="1")
+    wizard_choice = Prompt.ask("Select profile or enter '0' for full list", choices=["1", "2", "3", "4", "0"], default="1")
     
     if wizard_choice == "1":
         selected_transport = "pck"
     elif wizard_choice == "2":
-        selected_transport = "quantum"
-    elif wizard_choice == "3":
         selected_transport = "wss"
-    elif wizard_choice == "4":
+    elif wizard_choice == "3":
         selected_transport = "wireguard"
-    elif wizard_choice == "5":
+    elif wizard_choice == "4":
         selected_transport = "slipstream"
     else:
         console.print("\n[bold cyan]--- All Supported Transports (40 Engines) ---[/bold cyan]")
@@ -328,14 +325,6 @@ def create_load_balancer_flow():
             'port': Prompt.ask("Preferred outer port on Kharej", default='443'),
             'certificate': Prompt.ask("Certificate chain on Kharej", default='/etc/letsencrypt/live/' + tls_name + '/fullchain.pem'),
             'key': Prompt.ask("Private key file on Kharej", default='/etc/letsencrypt/live/' + tls_name + '/privkey.pem')
-        }
-        gre_options = {'camouflage': settings}
-    elif selected_transport == 'paqet':
-        settings = {
-            'tunnel_port': Prompt.ask("Preferred Paqet raw KCP port on Kharej", default='9999'),
-            'binary': Prompt.ask("Paqet binary path on both servers", default='/usr/local/bin/paqet'),
-            'cipher': Prompt.ask("Cipher (aes-128-gcm / chacha20-poly1305 / none)", default='aes-128-gcm'),
-            'kcp_mode': Prompt.ask("KCP mode (fast / normal / manual)", default='fast')
         }
         gre_options = {'camouflage': settings}
     elif selected_transport == 'geneve_ipsec':
@@ -493,7 +482,7 @@ def show_pool_success_summary(pool_data: dict):
         # show the real per-node status instead of hardcoding green.
         status = node.get("status", "active")
         status_txt = "🟢 Active" if status == "active" else f"🟡 {status}"
-        t_port = str(node.get("tunnel_port") or (node.get("waterwall",{}).get("outer_port") if node.get("waterwall") else None) or (node.get("paqet",{}).get("tunnel_port") if node.get("paqet") else None) or (node.get("vxlan",{}).get("local_private") if node.get("vxlan") else None) or (node.get("wireguard",{}).get("local_private") if node.get("wireguard") else None) or (node.get("geneve",{}).get("local_private") if node.get("geneve") else None) or (node.get("gre6",{}).get("local_private") if node.get("gre6") else None) or (node.get("ip6ip6",{}).get("local_private") if node.get("ip6ip6") else None) or node.get("gre",{}).get("local_private", "-"))
+        t_port = str(node.get("tunnel_port") or (node.get("waterwall",{}).get("outer_port") if node.get("waterwall") else None) or (node.get("vxlan",{}).get("local_private") if node.get("vxlan") else None) or (node.get("wireguard",{}).get("local_private") if node.get("wireguard") else None) or (node.get("geneve",{}).get("local_private") if node.get("geneve") else None) or (node.get("gre6",{}).get("local_private") if node.get("gre6") else None) or (node.get("ip6ip6",{}).get("local_private") if node.get("ip6ip6") else None) or node.get("gre",{}).get("local_private", "-"))
         table.add_row(node["server_name"], node["ip"], t_port, status_txt)
 
     console.print(table)
@@ -586,7 +575,7 @@ def diagnose_pool_flow(pool_name: str):
         transport = pool.get("transport", "pck")
         engine = pool.get("engine", transport)
         service_name = f"backpack-{node_name}.service"
-        if engine in ("paqet", "waterwall", "slipstream", "wireguard", "vxlan", "gre", "geneve_ipsec"):
+        if engine in ("waterwall", "slipstream", "wireguard", "vxlan", "gre", "geneve_ipsec"):
             service_name = f"vxlb-{engine}-{node_name}.service"
 
         code_svc, out_svc, _ = ir_ssh.execute(f"systemctl is-active {shquote(service_name)} 2>/dev/null || systemctl is-active {shquote(f'backpack-{node_name}.service')} 2>/dev/null || echo 'inactive'")
@@ -873,7 +862,7 @@ def change_pool_transport_flow(pool_name: str):
             return
     else:
         console.print(f"Current transport: {pool.get('transport')} | Nodes: {len(pool.get('nodes', []))}", markup=False)
-        choices = {key: value for key, value in SUPPORTED_TRANSPORTS.items() if value[0] != pool.get('transport') and value[0] not in {"gre","xhttp","gre_xhttp","reality","waterwall","paqet","geneve_ipsec","vxlan","gre6","ip6ip6","wireguard"}}
+        choices = {key: value for key, value in SUPPORTED_TRANSPORTS.items() if value[0] != pool.get('transport') and value[0] not in {"gre","xhttp","gre_xhttp","reality","waterwall","geneve_ipsec","vxlan","gre6","ip6ip6","wireguard"}}
         for key, (_, label) in choices.items():
             console.print(f"  [{key}] {label}", markup=False)
         console.print("  [0] Return", markup=False)

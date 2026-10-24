@@ -22,10 +22,6 @@ SUPPORTED_TRANSPORTS = {
     "7": ("ws", "Plaintext WebSocket RFC 6455 (عبور از ریورس‌پروکسی‌ها)"),
     "8": ("http", "HTTP/1.1 Chunked / h2c (جعل هدرهای استاندارد وب)"),
     "9": ("https", "HTTP/2 Multiplexed over TLS (شبیه‌سازی دقیق ترافیک وب‌گردی)"),
-    # Loss-Resilient KCP & Gaming
-    "10": ("quantum", "Quantum KCP Fast-ARQ (حذف گلوگاه TCP در پکت‌لاس متوسط)"),
-    "11": ("quantum+", "Quantum+ KCP + Reed-Solomon FEC (مقاوم در پکت‌لاس‌های فاجعه‌بار تا ۳۰٪)"),
-    "12": ("quantum-gaming", "Quantum Gaming Zero-Jitter KCP (پکت‌مد لحظه‌ای برای حداقل پینگ و جیتر بازی)"),
     # Kernel L3 Carriers
     "13": ("tun", "Linux Kernel Virtual L3 TUN (مسیریابی کامل لایه ۳ بدون مشکل TCP-over-TCP)"),
     "14": ("dc6", "Direct Connect IPv6 Carrier (استفاده از مسیرهای خلوت و فیلترنشده IPv6)"),
@@ -37,7 +33,6 @@ SUPPORTED_TRANSPORTS = {
     "18": ("gre", "GRE IPv4 + IPsec AES-GCM + TCP/UDP forwarding"),
     "19": ("gre_xhttp", "GRE inside XHTTP + verified TLS 1.3 (encrypted HTTPS carrier)"),
     "20": ("waterwall", "WaterWall VLESS/TLS/Mux (flexible node-based routing)"),
-    "21": ("paqet", "Paqet (آزمایشی — مسیر TCP/UDP با باینری رسمی آزموده شد)"),
     "22": ("geneve_ipsec", "Geneve + IPsec (آزمایشی — آزمون کرنلی لینک تأیید شد)"),
     "23": ("vxlan", "VXLAN (بدون رمزنگاری — سه متد P2P/Bridge/FDB؛ برای رمزنگاری VXLAN+IPsec را انتخاب کنید)"),
     "24": ("wireguard", "WireGuard (رمزنگاری Curve25519 + ChaCha20 — آزمون کرنلی لینک تأیید شد)"),
@@ -62,9 +57,9 @@ SUPPORTED_TRANSPORTS = {
 }
 
 NON_BACKPACK_TRANSPORTS = {
-    "gre", "xhttp", "xhttps", "gre_xhttp", "reality", "waterwall", "paqet",
+    "gre", "xhttp", "xhttps", "gre_xhttp", "reality", "waterwall",
     "geneve_ipsec", "vxlan", "vxlan_ipsec", "gre6", "ip6ip6", "wireguard", "slipstream",
-    "quantum", "quantum+", "quantum-gaming", "tun", "dc6", "nova", "http", "https",
+    "tun", "dc6", "nova", "http", "https",
     "fake-sni", "split-tls", "hop-ttl-injection", "tcp-state-desync",
     "l3-ip-spoof", "l7-header-mutation", "udp-raw-spoof", "dns-spoof", "spoof",
     "spoof-tcp-syn", "spoof-udp-raw", "spoof-icmp", "qs-dns-hybrid", "hyperion-x"

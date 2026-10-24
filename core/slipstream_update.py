@@ -219,7 +219,7 @@ def change(name, updates):
                 credentials(data, node['ip'])  # Preflight all credentials first.
             sessions = open_sessions(data, pool)
             if changed['dns_port'] != pool['dns_port']:
-                from core.paqet_probe import reserve_probe_port
+                from core.tunnel_probe import reserve_probe_port
                 dns_host = pool['kharej_server']['ip'] if int(pool.get('slipstream_runtime_version', 1)) >= 3 else '0.0.0.0'
                 chosen = reserve_probe_port(sessions[('server', pool['kharej_server']['ip'])], [], preferred=changed['dns_port'], bind_host=dns_host)
                 if chosen != changed['dns_port']:

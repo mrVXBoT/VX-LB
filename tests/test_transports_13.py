@@ -1,11 +1,11 @@
 """Unit tests for VX-LB 13 Advanced Transports Engine and kernel-based telemetry.
 
 Verifies:
-1. Complete catalog registration and metadata for all 13 transports.
+1. Complete catalog registration and metadata for all transports.
 2. Parameter bounds and security validation.
 3. kernel-based telemetry kernel tcp_info unpacking and EWMA health scoring.
 4. HMAC canary challenge & response protocol.
-5. Adapter configuration synthesis for tun, dc6, xhttps, nova, and quantum+.
+5. Adapter configuration synthesis for tun, dc6, xhttps, and nova.
 """
 import copy
 import struct
@@ -15,7 +15,6 @@ from unittest.mock import MagicMock, patch
 from core.transports_13 import (
     TRANSPORTS_13_CATALOG,
     CAT_WEB_STREAM,
-    CAT_KCP_ACCELERATOR,
     CAT_L3_CARRIER,
     CAT_ANTI_CENSORSHIP,
     get_transport_spec,
@@ -32,7 +31,6 @@ from core.tunnel import SUPPORTED_TRANSPORTS
 from core.tun_adapter import TunDedicatedAdapter
 from core.dc6_adapter import DC6Adapter
 import core.https_tunnel as https_tunnel
-import core.paqet_adapter as paqet_adapter
 from core.load_balancer import LoadBalancerManager
 
 
@@ -41,12 +39,11 @@ class Transports13CatalogTests(unittest.TestCase):
 
     EXPECTED_IDS = [
         "tcp", "ws", "wss", "http", "https",
-        "quantum", "quantum+", "tun", "xhttp", "xhttps",
-        "dc6", "quantum-gaming", "nova"
+        "tun", "xhttp", "xhttps", "dc6", "nova"
     ]
 
-    def test_all_13_transports_registered(self):
-        self.assertEqual(len(self.EXPECTED_IDS), 13)
+    def test_all_transports_registered(self):
+        self.assertEqual(len(self.EXPECTED_IDS), 10)
         for tid in self.EXPECTED_IDS:
             self.assertTrue(is_13_transport(tid), f"Transport '{tid}' missing from 13 catalog")
             spec = get_transport_spec(tid)
@@ -60,12 +57,11 @@ class Transports13CatalogTests(unittest.TestCase):
     def test_categories_partitioning(self):
         cats = list_transports_by_category()
         self.assertIn(CAT_WEB_STREAM, cats)
-        self.assertIn(CAT_KCP_ACCELERATOR, cats)
         self.assertIn(CAT_L3_CARRIER, cats)
         self.assertIn(CAT_ANTI_CENSORSHIP, cats)
 
         total_transports = sum(len(c["transports"]) for c in cats.values())
-        self.assertEqual(total_transports, 13)
+        self.assertEqual(total_transports, 10)
 
     def test_capabilities_integration(self):
         for tid in self.EXPECTED_IDS:
@@ -96,18 +92,6 @@ class ParameterValidationTests(unittest.TestCase):
         # Invalid MTU (too high)
         ok, msg, _ = validate_transport_params("tcp", {"mtu": 1600})
         self.assertFalse(ok)
-
-    def test_quantum_plus_fec_validation(self):
-        # Valid FEC shards
-        ok, _, p = validate_transport_params("quantum+", {"fec_datashard": 10, "fec_parityshard": 3})
-        self.assertTrue(ok)
-        self.assertEqual(p["fec_datashard"], 10)
-        self.assertEqual(p["fec_parityshard"], 3)
-
-        # Invalid FEC (sum > 32)
-        ok, msg, _ = validate_transport_params("quantum+", {"fec_datashard": 20, "fec_parityshard": 15})
-        self.assertFalse(ok)
-        self.assertIn("FEC", msg)
 
     def test_dc6_carrier_validation(self):
         ok, _, p = validate_transport_params("dc6", {"carrier_type": "ip6gre"})

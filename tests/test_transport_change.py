@@ -143,10 +143,6 @@ class UniversalTransportChangeTests(unittest.TestCase):
             ok, msg = change.start_change('P1', 'waterwall', background=False)
             self.assertTrue(ok)
 
-            # Valid cross-engine transition to paqet quantum queued
-            ok, msg = change.start_change('P1', 'quantum', background=False)
-            self.assertTrue(ok)
-
             # Valid cross-engine transition to xray with camouflage queued
             ok, msg = change.start_change('P1', 'xhttp', background=False, camouflage={'server_name': 'test.com'})
             self.assertTrue(ok)

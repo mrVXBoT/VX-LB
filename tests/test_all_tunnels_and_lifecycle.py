@@ -13,7 +13,7 @@ class AllTunnelsAndLifecycleTests(unittest.TestCase):
     def test_all_checklist_engine_adapters_are_registered(self):
         """Verify that every user-space and kernel tunnel engine is registered in the unified registry."""
         expected_engines = [
-            "backpack", "waterwall", "paqet", "trusttunnel", "slipstream",
+            "backpack", "waterwall", "trusttunnel", "slipstream",
             "backhaul", "frp", "rathole", "gost", "hysteria2",
             "ip6ip6", "gre_ipv4", "gre_xhttp", "xhttp", "gre6", "gretap",
             "gre6tap", "gre6tap_ipsec", "sit", "6to4_unicast", "vxlan",

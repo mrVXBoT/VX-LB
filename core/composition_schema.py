@@ -128,11 +128,6 @@ def deconstruct_legacy_pool(pool: dict) -> UnifiedComposition:
         enc_type = "tls13"
         enc_cipher = "TLS_AES_128_GCM_SHA256"
         cam_type = "xhttp_grpc"
-    elif transport in ("paqet",):
-        net_type = "direct"
-        enc_type = "kcp"
-        enc_cipher = "AES-128"
-        cam_type = "raw_tcp_kcp"
     elif transport in ("slipstream",):
         net_type = "slipstream"
         enc_type = "tls13" if pool.get("slipstream_security") else "none"

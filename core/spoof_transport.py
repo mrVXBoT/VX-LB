@@ -15,7 +15,7 @@ from core.transport_change import connect,mutation_lock
 from core.validation import validate_pool_name,validate_ports
 from core.gre import write
 from core.kernel_relay_ports import node_credentials,verify_listeners
-from core.paqet_probe import reserve_probe_port
+from core.tunnel_probe import reserve_probe_port
 from core.nfqws2_profiles import MODES,hostname,number
 from core import http_transport as http
 from core import nfqws2_install

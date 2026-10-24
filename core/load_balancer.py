@@ -104,15 +104,6 @@ class LoadBalancerManager:
         if transport in {'xhttp', 'xhttps', 'gre_xhttp', 'reality', 'nova'}:
             from core.https_tunnel import create
             return create(pool_name, kharej_server, iran_servers, transport, client_ports, camouflage, callback)
-        if transport in {'quantum', 'quantum+', 'quantum-gaming', 'paqet'}:
-            from core.paqet_adapter import create
-            settings = dict(camouflage or {})
-            settings["transport"] = transport
-            if kwargs.get("fec_datashard"):
-                settings["fec_datashard"] = kwargs.get("fec_datashard")
-            if kwargs.get("fec_parityshard"):
-                settings["fec_parityshard"] = kwargs.get("fec_parityshard")
-            return create(pool_name, kharej_server, iran_servers, client_ports, settings, callback)
         if transport == 'tun':
             from core.tun_adapter import create
             t_mtu = int(kwargs.get("tun_mtu") or kwargs.get("mtu") or 1280)
@@ -394,9 +385,6 @@ class LoadBalancerManager:
         if pool.get('engine') == 'waterwall':
             from core.waterwall import add
             return add(pool_name, new_iran_server, callback)
-        if pool.get('engine') == 'paqet':
-            from core.paqet_adapter import add
-            return add(pool_name, new_iran_server, callback)
         if pool.get('engine') == 'xray':
             from core.https_tunnel import add
             return add(pool_name, new_iran_server, callback)
@@ -580,9 +568,6 @@ class LoadBalancerManager:
         if pool.get('engine') == 'waterwall':
             from core.waterwall import remove
             return remove(pool_name, iran_ip, callback)
-        if pool.get('engine') == 'paqet':
-            from core.paqet_adapter import remove
-            return remove(pool_name, iran_ip, callback)
         if pool.get('engine') == 'xray':
             from core.https_tunnel import remove
             return remove(pool_name, iran_ip, callback)
@@ -680,9 +665,6 @@ class LoadBalancerManager:
         if pool.get('engine') == 'slipstream' or pool.get('transport') == 'slipstream':
             from core.slipstream_adapter import delete_pool
             return delete_pool(pool_name, callback)
-        if pool.get('engine') == 'paqet':
-            from core.paqet_adapter import remove_pool
-            return remove_pool(pool_name, callback)
         if pool.get('engine') == 'waterwall':
             from core.waterwall import remove_pool
             return remove_pool(pool_name, callback)
@@ -799,10 +781,8 @@ class LoadBalancerManager:
             if set(map(str, ports)) == set(map(str, pool.get('client_ports', []))):
                 return False, 'No port change was requested'
             return change_ports(pool_name, ports)
-        if pool.get('transport') == 'gre' or pool.get('engine') in ('xray', 'waterwall', 'paqet'):
-            if pool.get('engine') == 'paqet':
-                from core.paqet_adapter import change_ports
-            elif pool.get('engine') == 'waterwall':
+        if pool.get('transport') == 'gre' or pool.get('engine') in ('xray', 'waterwall'):
+            if pool.get('engine') == 'waterwall':
                 from core.waterwall import change_ports
             elif pool.get('engine') == 'xray':
                 from core.https_tunnel import change_ports
@@ -968,10 +948,8 @@ class LoadBalancerManager:
             if set(map(str, ports)) == set(map(str, pool.get('client_ports', []))):
                 return False, 'No port change was requested'
             return change_ports(pool_name, ports)
-        if pool.get('transport') == 'gre' or pool.get('engine') in ('xray', 'waterwall', 'paqet'):
-            if pool.get('engine') == 'paqet':
-                from core.paqet_adapter import change_ports
-            elif pool.get('engine') == 'waterwall':
+        if pool.get('transport') == 'gre' or pool.get('engine') in ('xray', 'waterwall'):
+            if pool.get('engine') == 'waterwall':
                 from core.waterwall import change_ports
             elif pool.get('engine') == 'xray':
                 from core.https_tunnel import change_ports

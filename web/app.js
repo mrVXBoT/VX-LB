@@ -617,7 +617,7 @@ function operationMarkup(pool, job, kind) {
     <div class="operation-heading">
       <div class="op-heading-title">
         ${active ? '<span class="op-spinner" aria-hidden="true"></span>' : ''}
-        <strong>${['slipstream_runtime','slipstream_settings'].includes(job.kind) ? 'به‌روزرسانی تنظیمات Slipstream' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS' : job.kind === 'relay_ports' ? 'به‌روزرسانی پورت‌های رله' : job.kind === 'waterwall_ports' ? 'به‌روزرسانی پورت‌های WaterWall' : job.kind === 'paqet_ports' ? 'به‌روزرسانی پورت‌های Paqet' : job.kind === 'https_ports' ? 'به‌روزرسانی پورت‌های HTTPS' : operationLabels[kind] || 'عملیات'}</strong>
+        <strong>${['slipstream_runtime','slipstream_settings'].includes(job.kind) ? 'به‌روزرسانی تنظیمات Slipstream' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS' : job.kind === 'relay_ports' ? 'به‌روزرسانی پورت‌های رله' : job.kind === 'waterwall_ports' ? 'به‌روزرسانی پورت‌های WaterWall' : job.kind === 'https_ports' ? 'به‌روزرسانی پورت‌های HTTPS' : operationLabels[kind] || 'عملیات'}</strong>
         <span class="status-badge ${failed ? 'filtered' : active ? 'canary' : 'healthy'}">${failed ? 'نیازمند بررسی' : active ? 'در حال انجام' : job.status === 'rolled_back' ? 'بازگردانی شد' : 'پایان یافت'}</span>
       </div>
       ${clearBtn}
@@ -676,10 +676,7 @@ function getEngineBadge(engine, transport) {
 
   if (eng === "backpack" || ["stealth", "pck", "mux"].includes(tr)) {
     cls = "engine-backpack";
-    label = "BackPack";
-  } else if (eng === "paqet" || tr.startsWith("quantum") || tr === "paqet") {
-    cls = "engine-paqet";
-    label = "Paqet";
+    label = "جت پک";
   } else if (eng === "waterwall" || tr === "waterwall") {
     cls = "engine-waterwall";
     label = "WaterWall";
@@ -780,7 +777,7 @@ function renderPools(pools) {
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
               </button>
-              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : (n.transport || "").startsWith("quantum") ? `${escapeHtml(n.transport)} · KCP Fast3 · ${escapeHtml(String(n.tunnel_port || p.tunnel_port || "443"))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))} · گواهی اختصاصی` : n.engine === "waterwall" ? `WaterWall · VLESS / TLS 1.3 / Mux · ${escapeHtml(n.waterwall?.profile?.server_name || p.camouflage?.server_name || "")}:${escapeHtml(String(n.waterwall?.outer_port || ""))}` : n.engine === "paqet" ? `Paqet · Raw KCP · ${escapeHtml(String(n.paqet?.tunnel_port || n.tunnel_port || p.tunnel_port || "443"))}` : n.engine === "xray" ? `Xray · ${(n.transport === "gre_xhttp" ? "GRE / XHTTP / TLS" : escapeHtml(n.transport))} · ${escapeHtml(n.https?.server_name)}:${escapeHtml(n.https?.outer_port)}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
+              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))} · گواهی اختصاصی` : n.engine === "waterwall" ? `WaterWall · VLESS / TLS 1.3 / Mux · ${escapeHtml(n.waterwall?.profile?.server_name || p.camouflage?.server_name || "")}:${escapeHtml(String(n.waterwall?.outer_port || ""))}` : n.engine === "xray" ? `Xray · ${(n.transport === "gre_xhttp" ? "GRE / XHTTP / TLS" : escapeHtml(n.transport))} · ${escapeHtml(n.https?.server_name)}:${escapeHtml(n.https?.outer_port)}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
             </div>
             ${n.gre_https ? `<div class="gre-private-route"><span>GRE داخل HTTPS:</span><bdi dir="ltr">${escapeHtml(n.gre_https.local_private)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre_https.remote_private)}</bdi><span>MTU ${escapeHtml(n.gre_https.mtu)}</span></div>` : ''}
             ${(n.engine === 'tun' || p.transport === 'tun') ? `<div class="gre-private-route"><span>لینک TUN:</span><bdi dir="ltr">${escapeHtml(n.tun?.iran_inner || "10.210.1.1")}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.tun?.kharej_inner || "10.210.1.2")}</bdi><span>(${escapeHtml(n.tun?.interface || "tun")}) · لایه 3 کرنل</span></div>` : ''}
@@ -1292,12 +1289,7 @@ async function submitCreatePool(e) {
              dc6_mtu: document.getElementById("new-pool-dc6-mtu")?.value || '1280',
              carrier: document.getElementById("new-pool-dc6-carrier")?.value || 'ip6gre'
            } :
-           ['quantum', 'quantum+', 'quantum-gaming'].includes(transport) ? {
-             fec_datashard: parseInt(document.getElementById("new-pool-quantum-data")?.value || '10', 10),
-             fec_parityshard: parseInt(document.getElementById("new-pool-quantum-parity")?.value || '3', 10),
-             camouflage: {kcp_mode: 'fast3'}
-           } :
-           transport === "geneve_ipsec" ? {geneve_mtu:document.getElementById("new-pool-geneve-mtu")?.value || '1280', vni:document.getElementById("new-pool-geneve-vni")?.value || null} :
+            transport === "geneve_ipsec" ? {geneve_mtu:document.getElementById("new-pool-geneve-mtu")?.value || '1280', vni:document.getElementById("new-pool-geneve-vni")?.value || null} :
            transport === "vxlan" ? {
              vxlan_method: document.getElementById("new-pool-vxlan-method")?.value || "p2p",
              vni: document.getElementById("new-pool-vxlan-vni")?.value || "1000",
@@ -1315,8 +1307,7 @@ async function submitCreatePool(e) {
              wireguard_mtu: document.getElementById("new-pool-wireguard-mtu")?.value || '1280',
              enable_psk: document.getElementById("new-pool-wireguard-psk")?.checked || false,
            } :
-           transport === 'paqet' ? {camouflage:{tunnel_port:document.getElementById('paqet-tunnel-port')?.value || '9999',binary:document.getElementById('paqet-binary')?.value || '/usr/local/bin/paqet'}} :
-           transport === "slipstream" ? {
+            transport === "slipstream" ? {
              domain: document.getElementById("slipstream-domain")?.value || "",
              resolvers: (document.getElementById("slipstream-resolvers")?.value || "").split(",").map(r => r.trim()).filter(Boolean),
              dns_port: document.getElementById("slipstream-dns-port")?.value || "53",
@@ -2074,20 +2065,14 @@ async function retryTransportRollback(pool, button) {
 const MANAGED_PACKET_TRANSPORTS = ['fake-sni','split-tls','hop-ttl-injection','tcp-state-desync','l7-header-mutation'];
 const ENGINE_TRANSPORTS = {
   backpack: {
-    label: "اسکریپت BackPack (موتور 6 ترنسپورت بومی L4)",
+    label: "موتور جت پک",
     transports: [
-      { value: "tcp", label: "01. Standard TCP (کمترین مصرف CPU و تأخیر پایه)", hint: "اتصال مستقیم خام با سرعت حداکثری و حداقل بار پردازنده" },
-      { value: "stealth", label: "02. TCP + Stealth (پروتکل استتار Noise بدون اثرانگشت) [پیشنهادی]", hint: "رمزنگاری نویز ضد DPI و غیرقابل شناسایی در لایه 4" },
-      { value: "pck", label: "03. TCP + PCK (بسته‌های خام مقاوم در برابر تزریق TCP RST)", hint: "مقاوم در برابر دستکاری و ریست‌های فایروال و شبکه" },
-      { value: "kcp", label: "04. UDP + KCP + FEC (اصلاح خطای بسته‌های گم‌شده BackPack)", hint: "پروتکل پرسرعت مبتنی بر UDP مناسب بازی و خطوط با پکت‌لاس" },
-      { value: "wss", label: "05. WebSocket Secure TLS 1.3 (شبیه‌سازی مرورگر و عبور CDN)", hint: "شبیه‌سازی اثرانگشت مرورگر (uTLS) و عبور امن از CDNها" },
-      { value: "quic", label: "06. UDP + QUIC (نشست استاندارد با رمزنگاری TLS 1.3)", hint: "هندشیک سریع 0-RTT با رمزنگاری مدرن" }
-    ]
-  },
-  paqet: {
-    label: "اسکریپت Paqet (حامل KCP خام)",
-    transports: [
-      { value: "paqet", label: "Paqet Raw KCP", hint: "حامل رسمی Paqet با KCP خام و forward TCP" }
+      { value: "tcp", label: "01. جت پک تخمی (کمترین مصرف CPU و تأخیر پایه)", hint: "اتصال مستقیم خام با سرعت حداکثری و حداقل بار پردازنده" },
+      { value: "stealth", label: "02. جت پک شخمی (پروتکل استتار Noise بدون اثرانگشت) [پیشنهادی]", hint: "رمزنگاری نویز ضد DPI و غیرقابل شناسایی در لایه 4" },
+      { value: "pck", label: "03. جت پک تخمی تخیلی (بسته‌های خام مقاوم در برابر تزریق TCP RST)", hint: "مقاوم در برابر دستکاری و ریست‌های فایروال و شبکه" },
+      { value: "kcp", label: "04. جت پک طرح گیمینگ (UDP + KCP + FEC)", hint: "پروتکل پرسرعت مبتنی بر UDP مناسب بازی و خطوط با پکت‌لاس" },
+      { value: "wss", label: "05. جت پک خایه افکن (WebSocket Secure TLS 1.3)", hint: "شبیه‌سازی اثرانگشت مرورگر (uTLS) و عبور امن از CDNها" },
+      { value: "quic", label: "06. جت پک سوپر کیری خفن (UDP + QUIC با TLS 1.3)", hint: "هندشیک سریع 0-RTT با رمزنگاری مدرن" }
     ]
   },
   waterwall: {
@@ -2106,17 +2091,17 @@ const ENGINE_TRANSPORTS = {
     ]
   },
   kernel: {
-    label: "حامل‌های شبکه و هسته لینوکس (TUN, DC6, WireGuard, GRE, VXLAN)",
+    label: "فاضلاب لینوکس",
     transports: [
-      { value: "tun", label: "08. TUN روی UDP/Noise (آزمایشی)", hint: "کارت شبکهٔ واقعی لینوکس با حامل رمزنگاری‌شدهٔ BackPack L3؛ آزمون TCP/UDP پیش از فعال‌شدن" },
-      { value: "dc6", label: "11. DC6 (آزمایشی؛ بدون رمزنگاری)", hint: "حامل GRE6 یا IP6IP6 با IPv6 عمومی؛ SIT با IPv4 عمومی. آزمون دوطرفهٔ TCP/UDP پیش از فعال‌شدن" },
-      { value: "wireguard", label: "WireGuard (رمزنگاری Curve25519 هسته لینوکس)", hint: "سریع‌ترین و مدرن‌ترین پروتکل VPN کرنل با کلیدهای نامتقارن" },
-      { value: "gre", label: "GRE با IPsec — بدون استتار HTTPS", hint: "تونل لایه 3 رسمی با رمزگذاری سخت‌افزاری IPsec AES-GCM" },
-      { value: "gre6", label: "GRE6 (آزمایشی — بدون رمزنگاری و استتار)", hint: "کپسوله‌سازی GRE روی آدرس‌های Native IPv6 بدون رمزنگاری" },
-      { value: "ip6ip6", label: "IP6IP6 (آزمایشی — بدون رمزنگاری و استتار)", hint: "تونل مستقیم نقطه به نقطه بین سرورهای دارای IPv6 عمومی" },
-      { value: "vxlan", label: "VXLAN (بدون رمزنگاری — سه متد P2P/Bridge/FDB)", hint: "گسترش شبکه محلی L2 با سه روش Point-to-Point، Bridge و FDB — برای رمزنگاری VXLAN+IPsec را انتخاب کنید" },
-      { value: "vxlan_ipsec", label: "VXLAN + IPsec (آزمایشی — رمزنگاری AES-256-GCM / strongSwan)", hint: "لینک VXLAN کپسوله‌شده در IPsec ESP احرازشده؛ نیازمند strongSwan/charon روی هر دو سرور" },
-      { value: "geneve_ipsec", label: "Geneve + IPsec (آزمایشی — آزمون کرنلی لینک تأیید شد)", hint: "پروتکل مجازی‌سازی نسل جدید شبکه با افزونه‌های متادیتا و رمزنگاری" }
+      { value: "tun", label: "08. لوله پولیکا (TUN روی لایه ۳)", hint: "کارت شبکهٔ واقعی لینوکس در عمق فاضلاب؛ آزمون TCP/UDP پیش از فعال‌شدن" },
+      { value: "dc6", label: "11. کانال سیکیم (DC6 / IPv6 عمومی)", hint: "حامل GRE6 یا IP6IP6 با IPv6 عمومی؛ SIT با IPv4 عمومی. آزمون دوطرفهٔ TCP/UDP پیش از فعال‌شدن" },
+      { value: "wireguard", label: "موش فاضلاب (WireGuard فوق سریع)", hint: "سریع‌ترین و مدرن‌ترین پروتکل VPN کرنل با کلیدهای نامتقارن" },
+      { value: "gre", label: "لجن (GRE با IPsec)", hint: "تونل لایه 3 رسمی با رمزگذاری سخت‌افزاری IPsec AES-GCM" },
+      { value: "gre6", label: "زباله دونی (GRE6 روی IPv6)", hint: "کپسوله‌سازی GRE روی آدرس‌های Native IPv6 بدون رمزنگاری" },
+      { value: "ip6ip6", label: "لوله دوبل (IP6IP6)", hint: "تونل مستقیم نقطه به نقطه بین سرورهای دارای IPv6 عمومی" },
+      { value: "vxlan", label: "کانال آب (VXLAN فله‌ای)", hint: "گسترش شبکه محلی L2 با سه روش Point-to-Point، Bridge و FDB — برای رمزنگاری کانال لجن را انتخاب کنید" },
+      { value: "vxlan_ipsec", label: "کانال لجن (VXLAN + IPsec)", hint: "لینک VXLAN کپسوله‌شده در IPsec ESP احرازشده؛ نیازمند strongSwan/charon روی هر دو سرور" },
+      { value: "geneve_ipsec", label: "منهول سیکیم (Geneve + IPsec)", hint: "پروتکل مجازی‌سازی نسل جدید شبکه با افزونه‌های متادیتا و رمزنگاری" }
     ]
   },
   spoof: {
@@ -2290,9 +2275,6 @@ function updateTransportModalAdaptiveFields() {
   if (tlsGroup) {
     tlsGroup.classList.toggle('hidden', !['xhttp', 'xhttps', 'nova', 'gre_xhttp', 'waterwall'].includes(transport));
   }
-  if (fecGroup) {
-    fecGroup.classList.toggle('hidden', !['quantum+', 'quantum'].includes(transport));
-  }
   const dc6Group = document.getElementById('transport-change-dc6-fields');
   if (dc6Group) {
     dc6Group.classList.toggle('hidden', transport !== 'dc6');
@@ -2347,10 +2329,6 @@ async function submitTransportChange(event) {
       payload.camouflage = { server_name: serverName, port: outerPort };
       payload.server_name = serverName;
       payload.port = outerPort;
-    }
-    if (['quantum+', 'quantum'].includes(transport)) {
-      payload.fec_datashard = parseInt(document.getElementById('transport-fec-data')?.value || '10', 10);
-      payload.fec_parityshard = parseInt(document.getElementById('transport-fec-parity')?.value || '3', 10);
     }
     if (['gre', 'gre6', 'ip6ip6', 'wireguard', 'vxlan', 'geneve_ipsec', 'tun'].includes(transport)) {
       payload.mtu = parseInt(document.getElementById('transport-mtu-input')?.value || '1400', 10);
@@ -2506,16 +2484,6 @@ function updateGreCreateFields() {
     });
   }
 
-  const paqet = mode === 'paqet';
-  const paqetDiv = document.getElementById('paqet-create-fields');
-  if (paqetDiv) {
-    paqetDiv.classList.toggle('hidden', !paqet);
-    ['paqet-tunnel-port', 'paqet-binary'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.disabled = !paqet;
-    });
-  }
-
   const slipstream = mode === 'slipstream';
   const slipstreamDiv = document.getElementById('slipstream-create-fields');
   if (slipstreamDiv) {
@@ -2545,22 +2513,6 @@ function updateGreCreateFields() {
       if (el) el.disabled = !dc6;
     });
     if (dc6) updateDc6CarrierHint();
-  }
-
-  // Quantum Family (KCP, Quantum+, Quantum Gaming)
-  const quantum = ['quantum', 'quantum+', 'quantum-gaming'].includes(mode);
-  const quantumDiv = document.getElementById('quantum-create-fields');
-  if (quantumDiv) {
-    quantumDiv.classList.toggle('hidden', !quantum);
-    const fecDiv = document.getElementById('quantum-fec-inputs');
-    const isFec = mode === 'quantum+';
-    if (fecDiv) {
-      fecDiv.classList.toggle('hidden', !isFec);
-      ['new-pool-quantum-data', 'new-pool-quantum-parity'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.disabled = !isFec;
-      });
-    }
   }
 
   // HTTPS / Xray family
