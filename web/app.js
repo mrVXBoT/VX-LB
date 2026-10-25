@@ -629,6 +629,7 @@ function operationMarkup(pool, job, kind) {
       ${stageBar}
     </div>
     ${kind === 'removal' && job.status === 'failed' && (pool.nodes || []).some(n => n.ip === job.ip) ? `<button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" data-ip="${escapeHtml(job.ip)}" onclick="removeNodeFromPool(this.dataset.pool,this.dataset.ip,this,true)" ${poolIsBusy(pool) ? 'disabled' : ''}>حذف از پنل بدون پاک‌سازی</button>` : ''}
+    ${kind === 'task' && job.kind === 'delete' && job.status === 'failed' ? `<button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" onclick="forgetPool(this.dataset.pool)" ${poolIsBusy(pool) ? 'disabled' : ''}>حذف استخر از پنل بدون پاک‌سازی</button>` : ''}
     ${job.error ? `<details class="operation-error"><summary>جزئیات خطا</summary><pre dir="auto">${escapeHtml(withoutEmoji(job.error))}</pre></details>` : ''}
     ${job.status === 'rollback_failed' && kind === 'gre' ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="recoverGreSettings(this.dataset.pool,this)">بازگردانی تنظیمات ${job.kind === 'slipstream_runtime' ? 'Slipstream' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS' : job.kind === 'relay_ports' ? 'پورت‌ها' : 'GRE'}</button>` : ''}${job.status === 'rollback_failed' && kind !== 'gre' ? `<div class="operation-actions"><button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="retryTransportRollback(this.dataset.pool,this)">تلاش دوباره برای بازگردانی</button><button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" onclick="abandonTransportChange(this.dataset.pool,this)">رها کردن عملیات شکست‌خورده</button></div>` : ''}
   </div>`;
@@ -1713,6 +1714,26 @@ async function deleteEntirePool(poolName) {
     }
   } catch (e) {
     showToast("خطا در ارسال درخواست حذف استخر");
+  }
+}
+
+async function forgetPool(poolName) {
+  if (!await confirmDialog(`استخر '${poolName}' فقط از پنل حذف شود؟ به سرورها متصل نمی‌شویم؛ سرویس‌ها، فایروال و رکوردهای DNS ممکن است باقی بمانند و پاک‌سازی آن‌ها نیاز به بررسی جداگانه دارد.`, { title: 'حذف استخر بدون پاک‌سازی', confirmText: 'فقط از پنل حذف شود' })) return;
+  showToast(`در حال ثبت حذف استخر ${poolName} بدون پاک‌سازی...`);
+  try {
+    const res = await apiFetch("/api/pools/delete", {
+      method: "POST",
+      body: { pool: poolName, forget: true }
+    });
+    if (res.success) {
+      showToast(res.message || "استخر از پنل حذف شد");
+      fetchServers();
+      fetchStatus();
+    } else {
+      showToast(`${res.error || "خطا در حذف استخر از پنل"}`);
+    }
+  } catch (e) {
+    showToast("خطا در ارسال درخواست حذف استخر از پنل");
   }
 }
 

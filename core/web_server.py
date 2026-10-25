@@ -1156,6 +1156,12 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             pool_name = body.get("pool", "").strip()
             if not pool_name:
                 return self._send_json({"error": "نام استخر مشخص نشده است"}, 400)
+            forget = body.get("forget", False)
+            if not isinstance(forget, bool):
+                return self._send_json({"error": "گزینهٔ حذف از پنل باید boolean باشد"}, 400)
+            if forget:
+                ok, msg = LoadBalancerManager.forget_pool(pool_name)
+                return self._send_json({"success": ok, **({"message": msg} if ok else {"error": msg})}, 200 if ok else 409)
             from core.pool_tasks import start as start_task
             ok, result = start_task(pool_name, 'delete')
             return self._send_json({"success": True, "accepted": True, "job": result} if ok else {"error": result}, 202 if ok else 409)

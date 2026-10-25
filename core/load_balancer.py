@@ -667,6 +667,39 @@ class LoadBalancerManager:
         return True, f"Server {iran_ip} removed successfully from load balancer"
 
     @staticmethod
+    def forget_pool(pool_name: str) -> Tuple[bool, str]:
+        """Remove an entire pool from the panel without any SSH/DNS cleanup.
+
+        Records every node under `pending_node_cleanup` (like forget_node) and
+        deletes the pool metadata. Use only when remote servers are unreachable
+        or decommissioned and normal teardown cannot proceed.
+        """
+        removed = [False]
+        def forget(data):
+            pool = data.get('pools', {}).get(pool_name)
+            if not pool:
+                return
+            now = time.strftime('%Y-%m-%d %H:%M:%S')
+            for node in pool.get('nodes', []):
+                data.setdefault('pending_node_cleanup', {})[uuid.uuid4().hex] = {
+                    'pool': pool_name, 'ip': node.get('ip'), 'status': 'unverified',
+                    'recorded_at': now, 'node': copy.deepcopy(node),
+                    'kharej_server': copy.deepcopy(pool.get('kharej_server', {})),
+                    'engine': pool.get('engine', 'backpack'),
+                    'transport': pool.get('transport'),
+                    'client_ports': copy.deepcopy(pool.get('client_ports', [])),
+                }
+                data.get('node_telemetry', {}).pop(f'{pool_name}:{node.get("ip")}', None)
+            data.get('watchdog_status', {}).get('pool_reports', {}).pop(pool_name, None)
+            data.get('pools', {}).pop(pool_name, None)
+            data.get('pool_tasks', {}).pop(pool_name, None)
+            removed[0] = True
+        atomic_update(forget)
+        if not removed[0]:
+            return False, 'استخر یافت نشد'
+        return True, 'استخر از پنل حذف شد؛ پاک‌سازی سرویس‌ها و DNS تأیید نشده است. اطلاعات لازم برای پیگیری نگه داشته شد.'
+
+    @staticmethod
     def delete_entire_pool(pool_name: str, callback: Optional[Callable[[str], None]] = None) -> Tuple[bool, str]:
         """Tears down all tunnels in a pool and deletes it."""
         pools = get_pools()

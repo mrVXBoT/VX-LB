@@ -955,8 +955,14 @@ def manage_pools_menu():
                 target_name = pool_list[int(sel)-1]["name"]
                 if Confirm.ask(f"Are you sure you want to delete load balancer '{target_name}'?", default=False):
                     with console.status("Tearing down tunnels and services..."):
-                        _, msg = LoadBalancerManager.delete_entire_pool(target_name)
-                    console.print(f"[bold green]{msg}[/bold green]")
+                        ok, msg = LoadBalancerManager.delete_entire_pool(target_name)
+                    if ok:
+                        console.print(f"[bold green]{msg}[/bold green]")
+                    else:
+                        console.print(f"[bold red]{msg}[/bold red]")
+                        if Confirm.ask("SSH cleanup failed. Remove this pool from the panel WITHOUT cleanup (پاک‌سازی بعداً)؟", default=False):
+                            ok2, msg2 = LoadBalancerManager.forget_pool(target_name)
+                            console.print("[bold green]" + msg2 + "[/bold green]" if ok2 else "[bold red]" + msg2 + "[/bold red]")
                     time.sleep(1.5)
 
 def change_pool_transport_flow(pool_name: str):
