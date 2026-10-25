@@ -6,6 +6,22 @@
 
 VX LB manages tunnel endpoints on Iran and Kharej servers through a Python CLI and a Persian web dashboard. It deploys remote services over SSH, monitors node health, and updates Cloudflare DNS records for failover and scheduled IP rotation.
 
+## Supported Tunnel Engines & Transports
+
+VX-LB features a modular multi-engine architecture with rich transport profiles and stealth modes:
+
+| Engine | Fun Name (نام فان) | Transport / Mode | Description |
+| :--- | :--- | :--- | :--- |
+| **BackPack** | موتور جت پک | `tcp`<br>`stealth`<br>`pck`<br>`kcp`<br>`wss`<br>`quic` | • **جت پک تخمی**: اتصال مستقیم و بدون سرپوش<br>• **جت پک شخمی**: نویز لایه 4 ضد DPI<br>• **جت پک تخمی تخیلی**: ضد ریست فایروال<br>• **جت پک طرح گیمینگ**: UDP پرسرعت و کاهش پکت‌لاس<br>• **جت پک خایه افکن**: شبیه‌سازی uTLS مرورگر<br>• **جت پک سوپر کیری خفن**: استاندارد 0-RTT با رمزنگاری مدرن |
+| **Paqet** | بستهبندی قاچاق | `kcp` (Fast)<br>`kcp` (Fast3)<br>`kcp` (Normal) | • **انتحاری**: KCP شتاب‌یافته پرسرعت<br>• **سوپر شارژ**: حداکثر فرکانس و توان پکت خام<br>• **لاکپشت فلج**: حالت متعادل و با حداقل بار CPU |
+| **Rathole** | لانه موش | `noise`<br>`tcp`<br>`tls`<br>`websocket` | • **نویز**: رمزنگاری بدون گواهی با کلیدهای X25519<br>• **دودی**: اتصال سریع و خام TCP<br>• **مجلسی**: استتار TLS با گواهی معتبر<br>• **خاله زنک**: تونل معکوس سوار بر WebSocket |
+| **Hedioum** | هدیوم | `socks`<br>`tun`<br>`gateway` | • **جوراب**: رله پرسرعت SOCKS5 اختصاصی<br>• **مترو**: اینترفیس TUN همراه با DNS Forwarder<br>• **عوارضی**: گیت‌وی شفاف لایه 3 برای کل شبکه |
+| **WaterWall** | سد کرج | `trojan`<br>`halfduplex`<br>`reverse`<br>`bgp4`<br>`reality` | • **فلکه آب**: تروسان سبک و سریع<br>• **شلنگ یکطرفه**: آپلود/دانلود تفکیک‌شده<br>• **سیفون**: اتصال معکوس ایران به خارج<br>• **لوله فشار قوی**: پکت‌بندی شبه-BGP<br>• **توهم تئوری توتئه**: استتار Reality بدون گواهی |
+| **GOST** | غول چراغ جادو | Shadowsocks (TCP/UDP/TLS/WS)<br>obfs4 / gRPC / SSH / QUIC | • **جوراب مشکی / جوراب کشی / سایه مجلسی / سایه خایه کرده**<br>• **سوراخ موش**: پل Tor obfs4 با بیشینه استتار<br>• **موشک بالستیک / نقطه‌زن**: gRPC با یا بدون TLS<br>• **دالان**: فوروارد امن بر بستر SSH<br>• **کوییک کوییک**: ترکیب QUIC و SOCKS5 |
+| **FRP** | پیچ شمرون | `tcp`<br>`udp`<br>`dual` | • **پیچ تک‌مسیره**: فوروارد مستقیم پورت TCP<br>• **پیچ پرسرعت**: فوروارد UDP بدون نشست<br>• **پیچ دوبل**: فوروارد همزمان TCP + UDP |
+| **Kernel / Linux** | فاضلاب لینوکس | WireGuard<br>TUN<br>GRE / GRE6<br>IP6IP6<br>VXLAN / VXLAN+IPsec<br>DC6 (ip6gre/sit)<br>Geneve+IPsec | • **موش فاضلاب**: وایرگارد سبک کرنلی<br>• **لوله پولیکا**: کارت شبکه مجازی TUN با لایه 3<br>• **لجن / زباله دونی**: تونل‌های GRE و GRE6<br>• **لوله دوبل**: اتصال مستقیم نقطه‌به‌نقطه IPv6<br>• **کانال آب / کانال لجن**: شبکه L2 محلی با یا بدون IPsec ESP<br>• **کانال سیکیم / منهول سیکیم**: حامل‌های DC6 و Geneve |
+| **Slipstream** | — | `dns` | • **دود سرخپوستی**: تونلینگ دیتا داخل کوئری‌های DNS |
+
 ## Features
 
 - Server inventory, pool creation, node addition and removal, and transport changes.
