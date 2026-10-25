@@ -381,7 +381,6 @@ def create_load_balancer_flow():
         settings = {
             'mode': h_mode,
             'persona': Prompt.ask("Persona (auto/cpanel/directadmin/devops)", default='auto'),
-            'socks_port': Prompt.ask("Iran SOCKS5 port (default: first client port)", default=''),
         }
         if h_mode in ('tun', 'gateway'):
             settings['tun_dns'] = Prompt.ask("Enable :53 DNS forwarder? (y/n)", choices=['y', 'n'], default='n') == 'y'

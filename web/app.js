@@ -1429,7 +1429,6 @@ async function submitCreatePool(e) {
              transport === 'hedioum' ? {
                camouflage: {
                  mode: getSelectedHedioumMode(),
-                 socks_port: document.getElementById('hedioum-socks-port')?.value || '',
                  persona: document.getElementById('hedioum-persona')?.value || 'auto',
                  domain: document.getElementById('hedioum-domain')?.value || '',
                  move_ssh: document.getElementById('hedioum-move-ssh')?.checked || false,
@@ -2775,7 +2774,7 @@ function updateGreCreateFields() {
   if (hedioumDiv) {
     const isHedioum = mode === 'hedioum';
     hedioumDiv.classList.toggle('hidden', !isHedioum);
-    ['hedioum-socks-port', 'hedioum-persona', 'hedioum-domain',
+    ['hedioum-persona', 'hedioum-domain',
      'hedioum-move-ssh', 'hedioum-tun-dns'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.disabled = !isHedioum;
