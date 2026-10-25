@@ -13,7 +13,7 @@
   <link rel="alternate icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
   <link rel="stylesheet" href="font.css">
-  <link rel="stylesheet" href="style.css?v=2.54">
+  <link rel="stylesheet" href="style.css?v=2.55">
 </head>
 <body>
   <a class="skip-link" href="#tab-pools-view">رفتن به محتوای اصلی</a>
@@ -808,6 +808,54 @@
         <button class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('bbr-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
       </div>
       <div class="sheet-content" id="bbr-body"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Pool Rotation Settings -->
+  <div id="pool-rotation-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title">زمان‌بندی چرخش خودکار IP</h4>
+          <p class="sheet-subtitle" id="rotation-pool-subtitle">تنظیم چرخش آی‌پی نودهای سالم روی DNS</p>
+        </div>
+        <button class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('pool-rotation-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content">
+        <form onsubmit="submitPoolRotation(event)">
+          <input type="hidden" id="rotation-pool-name">
+          <div class="input-group">
+            <label class="checkbox-row" style="cursor:pointer; display:flex; align-items:center; gap:10px; padding:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:14px;">
+              <input type="checkbox" id="rotation-enabled" onchange="toggleRotationModeFields()">
+              <span style="font-weight:600; font-size:13px;">فعال‌سازی چرخش خودکار DNS برای این استخر</span>
+            </label>
+          </div>
+          <div id="rotation-settings-body">
+            <div class="input-group">
+              <label class="field-label" for="rotation-mode">نوع زمان‌بندی</label>
+              <select id="rotation-mode" class="field-input select-styled" onchange="toggleRotationModeFields()">
+                <option value="interval">دوره‌ای (هر چند دقیقه)</option>
+                <option value="daily">روزانه در ساعت مشخص</option>
+              </select>
+            </div>
+            <div class="input-group" id="rotation-interval-group">
+              <label class="field-label" for="rotation-interval-val">بازهٔ چرخش (دقیقه)</label>
+              <input type="number" id="rotation-interval-val" class="field-input" min="5" max="10080" step="5" placeholder="60" dir="ltr">
+              <small class="field-hint">حداقل ۵ دقیقه؛ مثلاً ۶۰ یعنی هر یک ساعت یک بار به نود سالم بعدی سوییچ شود.</small>
+            </div>
+            <div class="input-group hidden" id="rotation-daily-group">
+              <label class="field-label" for="rotation-daily-val">ساعت چرخش روزانه (HH:MM)</label>
+              <input type="time" id="rotation-daily-val" class="field-input" value="03:00" dir="ltr">
+              <small class="field-hint">مثلاً 03:00 بامداد به وقت سرور.</small>
+            </div>
+          </div>
+          <div class="diag-actions" style="margin-top:20px;">
+            <button type="submit" class="btn-primary" style="flex:1;">ذخیره تنظیمات</button>
+            <button type="button" class="btn-secondary" style="flex:1;" onclick="closeModal('pool-rotation-modal')">انصراف</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 

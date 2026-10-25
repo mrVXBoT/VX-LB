@@ -1084,21 +1084,79 @@ async function rotatePoolNow(pool, button) {
   finally { if (button) button.disabled = false; }
 }
 
-async function configurePoolRotation(pool) {
-  const current = cachedStatus?.pools?.find(p => p.name === pool)?.rotation || {};
-  const enabled = window.prompt('چرخش فعال باشد؟ (yes/no)', current.enabled ? 'yes' : 'no');
-  if (enabled === null) return;
-  const mode = window.prompt('mode: interval یا daily', current.mode || 'interval');
-  if (mode === null) return;
-  const value = mode === 'daily' ? window.prompt('ساعت روزانه HH:MM', current.daily_time || '03:00') : window.prompt('بازه به دقیقه', String(current.interval_minutes || 60));
-  if (value === null) return;
-  const body = {pool, inherit_global:false, enabled: enabled.toLowerCase() === 'yes', mode};
-  if (mode === 'daily') body.daily_time = value; else body.interval_minutes = Number(value);
+function configurePoolRotation(pool) {
+  const p = cachedStatus?.pools?.find(item => item.name === pool);
+  const current = p?.rotation || {};
+  
+  const modal = document.getElementById('pool-rotation-modal');
+  if (!modal) return;
+
+  document.getElementById('rotation-pool-name').value = pool;
+  const sub = document.getElementById('rotation-pool-subtitle');
+  if (sub) sub.textContent = `تنظیم چرخش آی‌پی نودهای استخر ${pool}`;
+
+  const enabledCb = document.getElementById('rotation-enabled');
+  if (enabledCb) enabledCb.checked = Boolean(current.enabled);
+
+  const modeSel = document.getElementById('rotation-mode');
+  if (modeSel) modeSel.value = current.mode === 'daily' ? 'daily' : 'interval';
+
+  const intInput = document.getElementById('rotation-interval-val');
+  if (intInput) intInput.value = current.interval_minutes || 60;
+
+  const dailyInput = document.getElementById('rotation-daily-val');
+  if (dailyInput) dailyInput.value = current.daily_time || '03:00';
+
+  toggleRotationModeFields();
+  modal.classList.remove('hidden');
+}
+
+function toggleRotationModeFields() {
+  const enabled = document.getElementById('rotation-enabled')?.checked;
+  const mode = document.getElementById('rotation-mode')?.value;
+  const body = document.getElementById('rotation-settings-body');
+  if (body) body.style.opacity = enabled ? '1' : '0.45';
+
+  const intGroup = document.getElementById('rotation-interval-group');
+  const dailyGroup = document.getElementById('rotation-daily-group');
+  if (intGroup && dailyGroup) {
+    if (mode === 'daily') {
+      intGroup.classList.add('hidden');
+      dailyGroup.classList.remove('hidden');
+    } else {
+      intGroup.classList.remove('hidden');
+      dailyGroup.classList.add('hidden');
+    }
+  }
+}
+
+async function submitPoolRotation(e) {
+  e.preventDefault();
+  const pool = document.getElementById('rotation-pool-name')?.value;
+  if (!pool) return;
+
+  const enabled = document.getElementById('rotation-enabled')?.checked;
+  const mode = document.getElementById('rotation-mode')?.value || 'interval';
+  const body = { pool, inherit_global: false, enabled, mode };
+
+  if (mode === 'daily') {
+    body.daily_time = document.getElementById('rotation-daily-val')?.value || '03:00';
+  } else {
+    body.interval_minutes = Number(document.getElementById('rotation-interval-val')?.value || 60);
+  }
+
   try {
-    const res = await apiFetch('/api/rotation/settings', {method:'POST', body});
-    showToast(res.success ? 'زمان‌بندی چرخش ذخیره شد' : (res.error || 'ذخیره ناموفق بود'));
-    await fetchStatus(true);
-  } catch (_) { showToast('خطا در ارتباط با سرور'); }
+    const res = await apiFetch('/api/rotation/settings', { method: 'POST', body });
+    if (res.success) {
+      showToast('زمان‌بندی چرخش با موفقیت ذخیره شد');
+      closeModal('pool-rotation-modal');
+      await fetchStatus(true);
+    } else {
+      showToast(res.error || 'ذخیره ناموفق بود');
+    }
+  } catch (_) {
+    showToast('خطا در ارتباط با سرور');
+  }
 }
 
 
