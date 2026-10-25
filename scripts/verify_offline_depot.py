@@ -12,6 +12,7 @@ from core.nfqws2_profiles import VERSION as NFQWS2_VERSION, ARCHIVE_SHA256 as NF
 DEPOT_ENGINES = (
     "backpack", "waterwall", "slipstream", "slipstream-server",
     "trusttunnel", "backhaul", "frp", "frpc", "rathole", "gost", "hysteria2",
+    "paqet",
 )
 
 # Packet-engine archives that must exist for strict-offline NFQWS2 installs;
@@ -32,6 +33,7 @@ ALIASES = {
     "rathole": ("rathole",),
     "gost": ("gost",),
     "hysteria2": ("hysteria",),
+    "paqet": ("paqet",),
 }
 
 

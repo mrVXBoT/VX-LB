@@ -31,6 +31,8 @@ SUPPORTED_TRANSPORTS = {
     "21": ("gost", "GOST (Shadowsocks/obfs4/gRPC/SSH multi-protocol engine)"),
     "42": ("frp", "FRP (معکوس‌پروکسی سریع — TCP/UDP/Dual)"),
     "43": ("hedioum", "Hedioum Pool Tunnel (SOCKS5/TUN/Gateway — استتار ۱۶‌گانه)"),
+    "44": ("rathole", "Rathole (پراکسی معکوس سبک Rust برای NAT traversal — TCP/UDP)"),
+    "45": ("paqet", "Paqet (حامل بسته خام KCP ضد فیلترینگ — raw packet)"),
     "22": ("geneve_ipsec", "Geneve + IPsec (Experimental kernel tunnel)"),
     "23": ("vxlan", "VXLAN (L2 encapsulation: Point-to-Point / Bridge / FDB — بدون رمزنگاری)"),
     "24": ("wireguard", "WireGuard (Curve25519 + ChaCha20 kernel interface)"),
@@ -55,7 +57,7 @@ SUPPORTED_TRANSPORTS = {
 }
 
 NON_BACKPACK_TRANSPORTS = {
-    "gre", "waterwall", "gost", "frp", "hedioum",
+    "gre", "waterwall", "gost", "frp", "hedioum", "rathole", "paqet",
     "geneve_ipsec", "vxlan", "vxlan_ipsec", "gre6", "ip6ip6", "wireguard", "slipstream",
     "tun", "dc6", "http", "https",
     "fake-sni", "split-tls", "hop-ttl-injection", "tcp-state-desync",

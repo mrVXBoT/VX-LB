@@ -88,17 +88,19 @@ class TestSoftwareEngineAdapters(unittest.TestCase):
         self.assertEqual(conf["engine"], "rathole")
 
         ir_toml = conf["iran_config"]["content"]
-        self.assertIn('[client]', ir_toml)
-        self.assertIn('remote_addr = "198.51.100.2:8443"', ir_toml)
-        self.assertIn('[client.services.p8080]', ir_toml)
+        self.assertIn('[server]', ir_toml)
+        self.assertIn('bind_addr = "0.0.0.0:8443"', ir_toml)
+        self.assertIn('[server.services.8080]', ir_toml)
+        self.assertIn('[server.transport]', ir_toml)
 
         kh_toml = conf["kharej_config"]["content"]
-        self.assertIn('[server]', kh_toml)
-        self.assertIn('bind_addr = "0.0.0.0:8443"', kh_toml)
-        self.assertIn('[server.services.p8080]', kh_toml)
+        self.assertIn('[client]', kh_toml)
+        self.assertIn('remote_addr = "192.0.2.1:8443"', kh_toml)
+        self.assertIn('[client.services.8080]', kh_toml)
+        self.assertIn('[client.transport]', kh_toml)
 
-        self.assertIn("--client", conf["iran_config"]["unit"])
-        self.assertIn("--server", conf["kharej_config"]["unit"])
+        self.assertIn("--server", conf["iran_config"]["unit"])
+        self.assertIn("--client", conf["kharej_config"]["unit"])
 
     def test_gost_configuration_generation(self):
         adapter = get_adapter("gost")

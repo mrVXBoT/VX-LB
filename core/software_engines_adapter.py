@@ -340,31 +340,15 @@ class RatholeAdapter(SoftwareEngineBaseAdapter):
         port = int(pool_config.get("tunnel_port", 2333))
         client_ports = [int(p) for p in pool_config.get("client_ports", [2222])]
         token = pool_config.get("token") or secrets.token_hex(16)
-        kh_ip = kharej_server["ip"]
+        transport = pool_config.get("transport", "tcp")
+        proto = pool_config.get("proto", "tcp")
+        settings = pool_config.get("settings", {})
 
-        server_srv_blocks = []
-        client_srv_blocks = []
-        for p in client_ports:
-            server_srv_blocks.append(f"""[server.services.p{p}]
-type = "tcp"
-bind_addr = "0.0.0.0:{p}"
-""")
-            client_srv_blocks.append(f"""[client.services.p{p}]
-type = "tcp"
-local_addr = "127.0.0.1:{p}"
-""")
+        ir_ip = iran_node["ip"]
 
-        server_toml = f"""[server]
-bind_addr = "0.0.0.0:{port}"
-default_token = "{token}"
-
-{"".join(server_srv_blocks)}"""
-
-        client_toml = f"""[client]
-remote_addr = "{kh_ip}:{port}"
-default_token = "{token}"
-
-{"".join(client_srv_blocks)}"""
+        from core.rathole_engine import _server_config, _client_config
+        server_toml = _server_config(port, token, transport, proto, client_ports, settings)
+        client_toml = _client_config(ir_ip, port, token, transport, proto, client_ports, settings)
 
         svc = f"vxlb-rathole-{clean_name}.service"
         cfg_path = f"/etc/rathole/{clean_name}.toml"
@@ -375,15 +359,15 @@ default_token = "{token}"
             "tunnel_port": port,
             "client_ports": client_ports,
             "iran_config": {
-                "content": client_toml,
-                "path": cfg_path,
-                "unit": _build_daemon_systemd_unit(svc, "/usr/local/bin/rathole", cfg_path, "Rathole Client", extra_flags="--client"),
-                "unit_path": f"/etc/systemd/system/{svc}",
-            },
-            "kharej_config": {
                 "content": server_toml,
                 "path": cfg_path,
                 "unit": _build_daemon_systemd_unit(svc, "/usr/local/bin/rathole", cfg_path, "Rathole Server", extra_flags="--server"),
+                "unit_path": f"/etc/systemd/system/{svc}",
+            },
+            "kharej_config": {
+                "content": client_toml,
+                "path": cfg_path,
+                "unit": _build_daemon_systemd_unit(svc, "/usr/local/bin/rathole", cfg_path, "Rathole Client", extra_flags="--client"),
                 "unit_path": f"/etc/systemd/system/{svc}",
             },
         }

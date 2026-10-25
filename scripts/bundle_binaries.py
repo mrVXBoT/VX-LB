@@ -58,6 +58,43 @@ TARGETS = [
         "sha256": "505f1809bc9feb682d2eb5716232c5aed0fcd34344ea1194b684629f1b7cbab8",
         "dest": "slipstream-server",
     },
+    {
+        "name": "rathole",
+        "arch": "x86_64",
+        "url": "https://github.com/rathole-org/rathole/releases/download/v0.5.0/rathole-x86_64-unknown-linux-gnu.zip",
+        "is_zip": True,
+        "zip_member": "rathole",
+        "sha256": "d2202f2aa3a432135bddbe1c6104600c6577cd4507a70e77c08741c7ad879926",
+        "dest": "rathole",
+    },
+    {
+        "name": "rathole",
+        "arch": "aarch64",
+        "url": "https://github.com/rathole-org/rathole/releases/download/v0.5.0/rathole-aarch64-unknown-linux-musl.zip",
+        "is_zip": True,
+        "zip_member": "rathole",
+        "sha256": "c95474d2ecdc031b3bb20c495595a0d6c6440c1ff7748f594d7ecd5315d36e8f",
+        "dest": "rathole",
+    },
+    {
+        "name": "paqet",
+        "arch": "x86_64",
+        "url": "https://github.com/hanselime/paqet/releases/download/v1.0.0-alpha.21/paqet-linux-amd64-v1.0.0-alpha.21.tar.gz",
+        "is_tar": True,
+        "tar_member": "paqet_linux_amd64",
+        "archive_sha256": "4f2f69e0493746726598485ef18df43372470a1514f8021594137e522f0f4fc7",
+        "sha256": "edb5d928443b3d47e5c7c86ae394dbac117826e7ddb7c27355fbd2cdd9ee1791",
+        "dest": "paqet",
+    },
+    {
+        "name": "paqet",
+        "arch": "aarch64",
+        "url": "https://github.com/hanselime/paqet/releases/download/v1.0.0-alpha.21/paqet-linux-arm64-v1.0.0-alpha.21.tar.gz",
+        "is_tar": True,
+        "tar_member": "paqet_linux_arm64",
+        "sha256": "f6db279a57a772a250efffe4bb0a79b112495331568ccc0f6e5f4398bbe962e3",
+        "dest": "paqet",
+    },
 ]
 
 def sha256_file(stream):

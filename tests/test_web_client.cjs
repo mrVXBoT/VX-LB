@@ -79,6 +79,7 @@ const originalApiFetch = context.apiFetch;
   assert.match(element('servers-container').innerHTML, /آماده تخصیص/);
   assert.doesNotMatch(element('servers-container').innerHTML, /\p{Extended_Pictographic}|\p{Regional_Indicator}/u);
   // Failed refresh keeps a previously authorized snapshot and exposes stale state.
+  run('authToken = "1"'); // session auth is cookie-based; flag an authenticated session
   const snapshot = {pools: []};
   context.snapshot = snapshot;
   run('cachedStatus = snapshot');

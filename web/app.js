@@ -3,7 +3,9 @@
    Full-Feature Parity with Core Script
    ========================================================================== */
 
-let authToken = localStorage.getItem("vx_lb_token") || "";
+// Session auth is carried in an HttpOnly, SameSite=Lax cookie set by the
+// server (not readable by JS), so the token can't be exfiltrated via XSS.
+let authToken = "";
 let pollTimer = null;
 let currentTab = localStorage.getItem("vx_lb_tab") || "pools";
 let nodeFilter = "ALL";
@@ -168,12 +170,19 @@ document.addEventListener("DOMContentLoaded", () => {
   if (poolProtoSelect) {
     poolProtoSelect.addEventListener("change", onPoolTransportChanged);
   }
-  if (authToken) {
-    showAppView();
-    startPolling();
-  } else {
-    showLoginView();
-  }
+  // The session token lives in an HttpOnly cookie (server-set), so we probe
+  // once to learn whether a valid session already exists, then show the app.
+  fetch("/api/status", { cache: "no-store" })
+    .then(r => {
+      if (r.ok) {
+        authToken = "1";
+        showAppView();
+        startPolling();
+      } else {
+        showLoginView();
+      }
+    })
+    .catch(() => showLoginView());
 });
 
 function showLoginView() {
@@ -251,7 +260,6 @@ async function apiFetch(endpoint, options = {}) {
 
 async function requestJson(endpoint, options = {}) {
   options.headers = options.headers || {};
-  options.headers["Authorization"] = `Bearer ${authToken}`;
   if (options.body && typeof options.body === "object") {
     options.headers["Content-Type"] = "application/json";
     options.body = JSON.stringify(options.body);
@@ -259,7 +267,6 @@ async function requestJson(endpoint, options = {}) {
 
   const res = await fetch(endpoint, options);
   if (res.status === 401) {
-    localStorage.removeItem("vx_lb_token");
     authToken = "";
     showLoginView();
     throw new Error("Unauthorized");
@@ -293,8 +300,7 @@ async function handleLogin(e) {
     });
     const data = await res.json();
     if (res.ok && data.success) {
-      authToken = data.token;
-      localStorage.setItem("vx_lb_token", authToken);
+      authToken = "1";
       showAppView();
       startPolling();
       showToast("ورود با موفقیت انجام شد");
@@ -340,14 +346,9 @@ async function restartPanel(btn) {
 }
 
 function handleLogout() {
-  // Invalidate the server-side token too (it otherwise lives 7 days).
   try {
-    fetch("/api/logout", {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + authToken }
-    }).catch(() => {});
+    fetch("/api/logout", { method: "POST" }).catch(() => {});
   } catch (e) {}
-  localStorage.removeItem("vx_lb_token");
   authToken = "";
   showLoginView();
   showToast("از حساب خارج شدید");
@@ -716,6 +717,12 @@ function getTransportTagLabel(p) {
     if (mode === "tun") return "Hedioum TUN";
     return "Hedioum SOCKS5";
   }
+  if (eng === "rathole" || tr === "rathole") {
+    const rtr = p.rathole_transport || p.camouflage?.transport || "tcp";
+    const rpr = (p.rathole_proto || p.camouflage?.proto || "tcp").toUpperCase();
+    const map = { noise: "Noise (x25519)", tcp: "TCP", tls: "TLS", websocket: "WebSocket" };
+    return `Rathole · ${map[rtr] || rtr.toUpperCase()} / ${rpr}`;
+  }
   if (tr === "ws") return "سولاخ کلودفلر";
   if (tr === "http") return "پیک موتوری";
   if (tr === "https") return "رمزی ممزی";
@@ -725,34 +732,121 @@ function getTransportTagLabel(p) {
   return tr;
 }
 
-function getEngineBadge(engine, transport) {
+function getPoolProtoTag(p) {
+  const eng = (p.engine || "").toLowerCase();
+  const tr = (p.transport || "tcp").toLowerCase();
+
+  if (eng === "rathole" || tr === "rathole") {
+    const rTr = (p.rathole_transport || p.camouflage?.transport || "tcp").toUpperCase();
+    const rPr = (p.rathole_proto || p.camouflage?.proto || "tcp").toUpperCase();
+    return `${rTr} / ${rPr}`;
+  }
+  if (eng === "waterwall" || tr === "waterwall") {
+    const wm = (p.waterwall_mode || p.camouflage?.mode || p.nodes?.[0]?.waterwall?.profile?.mode || "trojan").toUpperCase();
+    return `WATERWALL / ${wm}`;
+  }
+  if (eng === "gost" || tr === "gost") {
+    const prof = (p.gost_profile || p.camouflage?.profile || p.nodes?.[0]?.gost?.profile || "shadowsocks-tcp").toUpperCase();
+    return `GOST / ${prof}`;
+  }
+  if (eng === "frp" || tr === "frp") {
+    const fm = (p.frp_mode || p.camouflage?.mode || p.nodes?.[0]?.frp?.mode || "tcp").toUpperCase();
+    return `FRP / ${fm}`;
+  }
+  if (eng === "hedioum" || tr === "hedioum") {
+    const hm = (p.hedioum_mode || p.camouflage?.mode || p.nodes?.[0]?.hedioum?.mode || "socks").toUpperCase();
+    return `HEDIOUM / ${hm}`;
+  }
+  if (eng === "dc6" || tr === "dc6") {
+    const carrier = (p.carrier_type || p.carrier || p.nodes?.[0]?.dc6?.carrier_type || "ip6gre").toUpperCase();
+    return `DC6 / ${carrier}`;
+  }
+  if (eng === "tun" || tr === "tun") {
+    return "TUN / NOISE";
+  }
+  if (eng === "slipstream" || tr === "slipstream") {
+    return "SLIPSTREAM / DNS";
+  }
+  if (eng === "spoof" || MANAGED_PACKET_TRANSPORTS.includes(tr) || tr.startsWith("spoof")) {
+    return `DPI / ${tr.toUpperCase()}`;
+  }
+  if (eng === "vxlan" || tr === "vxlan") {
+    return `VXLAN / ${(p.vxlan_method || "P2P").toUpperCase()}`;
+  }
+  if (eng === "vxlan_ipsec" || tr === "vxlan_ipsec") {
+    return "VXLAN / IPSEC";
+  }
+  if (eng === "geneve" || eng === "geneve_ipsec" || tr === "geneve_ipsec") {
+    return "GENEVE / IPSEC";
+  }
+  if (tr === "wireguard" || eng === "wireguard") {
+    return "WIREGUARD";
+  }
+  if (tr === "http" || tr === "https") {
+    return `${tr.toUpperCase()} / MTLS`;
+  }
+  return tr.toUpperCase();
+}
+
+function getEngineBadge(engine, transport, pool) {
   const eng = (engine || "").toLowerCase();
   const tr = (transport || "").toLowerCase();
   let cls = "engine-other";
   let label = engine || transport || "Unknown";
 
-  if (["ws", "http", "https", "slipstream"].includes(tr) || eng === "slipstream") {
+  if (["ws", "http", "https"].includes(tr)) {
     cls = "engine-other";
-    label = "اتاق بحران";
+    label = (tr === "ws") ? "سولاخ کلودفلر (WS)" : (tr === "http") ? "پیک موتوری (HTTP)" : "رمزی ممزی (HTTPS)";
+  } else if (eng === "slipstream" || tr === "slipstream") {
+    cls = "engine-other";
+    label = "اتاق بحران · Slipstream";
   } else if (eng === "waterwall" || tr === "waterwall" || ["halfduplex", "reverse", "trojan", "bgp4", "reality"].includes(tr)) {
     cls = "engine-waterwall";
-    label = "سد کرج";
+    const wm = pool?.waterwall_mode || pool?.camouflage?.mode || pool?.nodes?.[0]?.waterwall?.profile?.mode;
+    const wmTitle = WATERWALL_MODE_TITLES[wm] || wm;
+    label = wmTitle ? `سد کرج · ${wmTitle}` : "سد کرج";
   } else if (eng === "gost" || tr === "gost") {
     cls = "engine-gost";
-    label = "غول چراغ جادو";
+    const prof = pool?.gost_profile || pool?.camouflage?.profile || pool?.nodes?.[0]?.gost?.profile;
+    const profTitle = GOST_PROFILE_TITLES[prof] || prof;
+    label = profTitle ? `غول چراغ جادو · ${profTitle}` : "غول چراغ جادو";
   } else if (eng === "frp" || tr === "frp") {
     cls = "engine-frp";
-    label = "پیچ شمرون";
+    const fm = pool?.frp_mode || pool?.camouflage?.mode || pool?.nodes?.[0]?.frp?.mode;
+    const fmTitle = fm === "dual" ? "پیچ دوبل" : fm === "udp" ? "پیچ پرسرعت" : fm === "tcp" ? "پیچ تک‌مسیره" : "پیچ شمرون";
+    label = fmTitle ? `پیچ شمرون · ${fmTitle}` : "پیچ شمرون";
   } else if (eng === "hedioum" || tr === "hedioum") {
     cls = "engine-hedioum";
-    label = "Hedioum";
+    const hm = pool?.hedioum_mode || pool?.camouflage?.mode || pool?.nodes?.[0]?.hedioum?.mode || "socks";
+    label = `Hedioum · ${hm.toUpperCase()}`;
+  } else if (eng === "rathole" || tr === "rathole") {
+    cls = "engine-rathole";
+    const rTransport = pool?.rathole_transport || pool?.camouflage?.transport || "tcp";
+    const rProto = (pool?.rathole_proto || pool?.camouflage?.proto || "tcp").toUpperCase();
+    const tMap = {
+      noise: "Noise (x25519)",
+      tcp: "TCP",
+      tls: "TLS",
+      websocket: "WebSocket"
+    };
+    const tName = tMap[rTransport] || rTransport.toUpperCase();
+    label = `Rathole · ${tName} · ${rProto}`;
+  } else if (eng === "spoof" || MANAGED_PACKET_TRANSPORTS.includes(tr) || tr.startsWith("spoof")) {
+    cls = "engine-spoof";
+    label = `پردازش بسته · ${tr}`;
   } else if (["wireguard", "gre", "vxlan", "tun", "dc6", "geneve", "geneve_ipsec", "gre6", "ip6ip6"].includes(eng) ||
              ["wireguard", "gre", "vxlan", "tun", "dc6", "geneve", "geneve_ipsec", "gre6", "ip6ip6"].includes(tr)) {
     cls = "engine-kernel";
-    label = (eng === "wireguard" || tr === "wireguard") ? "موش فاضلاب" : "فاضلاب لینوکس";
+    if (eng === "wireguard" || tr === "wireguard") label = "موش فاضلاب (WireGuard)";
+    else if (eng === "tun" || tr === "tun") label = "لوله پولیکا (TUN)";
+    else if (eng === "dc6" || tr === "dc6") label = `کانال سیکیم (DC6 ${pool?.carrier_type || pool?.carrier || ""})`.trim();
+    else if (tr === "vxlan_ipsec") label = "کانال لجن (VXLAN+IPsec)";
+    else if (tr === "geneve_ipsec") label = "منهول سیکیم (Geneve)";
+    else label = "فاضلاب لینوکس";
   } else if (eng === "backpack" || ["stealth", "pck", "mux", "tcp", "kcp", "wss"].includes(tr)) {
     cls = "engine-backpack";
-    label = "جت پک";
+    const bpTitles = { tcp: "جت پک تخمی", stealth: "جت پک شخمی", pck: "جت پک تخمی تخیلی", kcp: "جت پک طرح گیمینگ", wss: "جت پک خایه افکن", quic: "جت پک سوپر کیری خفن" };
+    label = bpTitles[tr] || `جت پک · ${tr.toUpperCase()}`;
   }
 
   return `<span class="engine-badge ${cls}"><span class="engine-badge-dot"></span><span>${escapeHtml(label)}</span></span>`;
@@ -840,11 +934,15 @@ function renderPools(pools) {
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
               </button>
-              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))} · گواهی اختصاصی` : n.engine === "waterwall" ? `سد کرج (${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "فلکه آب")}) · پورت خارج ${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}` : n.engine === "gost" ? `GOST · ${escapeHtml(p.camouflage?.profile || n.gost?.profile || "shadowsocks-tcp")} · پورت خارج ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 8443))}` : n.engine === "frp" ? `پیچ شمرون (${escapeHtml(p.camouflage?.mode || n.frp?.mode || "tcp")}) · پورت اتصال ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 7000))}` : n.engine === "hedioum" ? `Hedioum (${escapeHtml(p.camouflage?.mode || n.hedioum?.mode || "socks")}) · SOCKS پورت ${escapeHtml(String(n.tunnel_port || p.camouflage?.socks_port || n.hedioum?.socks_port || "-"))}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
+              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))}` : n.engine === "waterwall" ? `سد کرج (${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "فلکه آب")}) · پورت خارج ${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}` : n.engine === "gost" ? `GOST · ${escapeHtml(p.camouflage?.profile || n.gost?.profile || "shadowsocks-tcp")} · پورت خارج ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 8443))}` : n.engine === "frp" ? `پیچ شمرون (${escapeHtml(p.camouflage?.mode || n.frp?.mode || "tcp")}) · پورت اتصال ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 7000))}` : n.engine === "hedioum" ? `Hedioum (${escapeHtml(p.camouflage?.mode || n.hedioum?.mode || "socks")}) · SOCKS پورت ${escapeHtml(String(n.tunnel_port || p.camouflage?.socks_port || n.hedioum?.socks_port || "-"))}` : (n.engine === "rathole" || p.transport === "rathole" || p.engine === "rathole") ? `Rathole (${escapeHtml(String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport || "tcp")).toUpperCase()}) · پورت کنترل ${escapeHtml(String(n.rathole?.port || n.tunnel_port || p.camouflage?.port || 2333))} · فوروارد ${escapeHtml(String(n.rathole?.proto || p.rathole_proto || p.camouflage?.proto || "tcp")).toUpperCase()}${String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport) === "noise" ? " · رمزنگاری ضد فیلتر Noise" : ""}` : (n.engine === "slipstream" || p.transport === "slipstream" || p.engine === "slipstream") ? `Slipstream DNS · دامنه ${escapeHtml(n.slipstream?.domain || p.slipstream?.domain || p.domain || "-")} · QPS ${escapeHtml(String(n.slipstream?.rate_limit || p.rate_limit || 1000))} · پورت ${escapeHtml(String(n.slipstream?.dns_port || p.dns_port || 53))}` : (n.engine === "spoof" || p.engine === "spoof" || MANAGED_PACKET_TRANSPORTS.includes(n.transport || p.transport)) ? `پردازش بسته DPI (${escapeHtml(String(n.transport || p.transport || "").toUpperCase())}) · SNI جعلی ${escapeHtml(String(n.spoof?.fake_sni || p.fake_sni || (p.camouflage || {}).server_name || "shaparak.ir"))}${n.spoof?.ttl_delta || p.auto_ttl_delta ? ` · TTL Delta ${escapeHtml(String(n.spoof?.ttl_delta || p.auto_ttl_delta))}` : ""}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : (n.engine === "backpack" || p.engine === "backpack" || ["stealth", "pck", "mux", "tcp", "kcp", "wss", "quic"].includes(p.transport)) ? `جت پک (${escapeHtml(String(n.transport || p.transport || "tcp").toUpperCase())}) · پورت تونل ${escapeHtml(String(n.tunnel_port || "-"))}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
             </div>
             ${n.gre_https ? `<div class="gre-private-route"><span>GRE داخل HTTPS:</span><bdi dir="ltr">${escapeHtml(n.gre_https.local_private)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre_https.remote_private)}</bdi><span>MTU ${escapeHtml(n.gre_https.mtu)}</span></div>` : ''}
             ${(n.engine === 'tun' || p.transport === 'tun') ? `<div class="gre-private-route"><span>لینک TUN:</span><bdi dir="ltr">${escapeHtml(n.tun?.iran_inner || "10.210.1.1")}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.tun?.kharej_inner || "10.210.1.2")}</bdi><span>(${escapeHtml(n.tun?.interface || "tun")}) · لایه 3 کرنل</span></div>` : ''}
             ${(n.engine === 'dc6' || p.transport === 'dc6') ? `<div class="gre-private-route"><span>حامل DC6:</span><bdi dir="ltr">${escapeHtml(n.dc6?.private_addressing?.iran_ipv4 || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.dc6?.private_addressing?.kharej_ipv4 || p.kharej_ip)}</bdi><span>(${escapeHtml(n.dc6?.interface || "dc6")}) · Dual-Stack</span></div>` : ''}
+            ${(n.engine === 'waterwall' || p.engine === 'waterwall' || p.transport === 'waterwall') ? `<div class="gre-private-route"><span>لینک سد کرج:</span><bdi dir="ltr">${escapeHtml(n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}:${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}</bdi><span>(حالت: ${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "فلکه آب")})</span></div>` : ''}
+            ${(n.engine === 'gost' || p.engine === 'gost' || p.transport === 'gost') ? `<div class="gre-private-route"><span>لینک GOST:</span><bdi dir="ltr">${escapeHtml(n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}:${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 8443))}</bdi><span>(پروفایل: ${escapeHtml(GOST_PROFILE_TITLES[p.camouflage?.profile || n.gost?.profile] || p.camouflage?.profile || n.gost?.profile || "shadowsocks-tcp")})</span></div>` : ''}
+            ${(n.engine === 'frp' || p.engine === 'frp' || p.transport === 'frp') ? `<div class="gre-private-route"><span>لینک FRP:</span><bdi dir="ltr">${escapeHtml(n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}:${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 7000))}</bdi><span>(حالت: ${escapeHtml(p.camouflage?.mode || n.frp?.mode || "tcp")})</span></div>` : ''}
+            ${(n.engine === 'slipstream' || p.engine === 'slipstream' || p.transport === 'slipstream') ? `<div class="gre-private-route"><span>مسیر Slipstream DNS:</span><bdi dir="ltr">${escapeHtml(n.ip)}:53</bdi><span>به دامنهٔ</span><bdi dir="ltr">${escapeHtml(p.slipstream?.domain || p.domain || "-")}</bdi><span>(QPS ${escapeHtml(String(p.slipstream?.rate_limit || p.rate_limit || 1000))})</span></div>` : ''}
             ${n.engine === 'gre' ? `<div class="gre-private-route"><span>لینک خصوصی:</span><bdi dir="ltr">${escapeHtml(n.gre?.local_private)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre?.remote_private)}</bdi></div>` : ''}
             ${(['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec') ? `<div class="gre-private-route"><span>لینک Geneve:</span><bdi dir="ltr">${escapeHtml(n.geneve?.local_private)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.geneve?.remote_private)}</bdi><span>(VNI ${escapeHtml(String(n.geneve?.vni || ""))})</span></div>` : ''}
             ${(n.engine === 'vxlan' || p.transport === 'vxlan') ? `<div class="gre-private-route"><span>لینک VXLAN:</span><bdi dir="ltr">${escapeHtml(n.vxlan?.local_private || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.vxlan?.remote_private || p.kharej_ip)}</bdi><span>(پروفایل: ${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")} · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))}) · <strong style="color:var(--amber, #f59e0b);">بدون رمزنگاری</strong></span></div>` : ''}
@@ -852,6 +950,7 @@ function renderPools(pools) {
             ${(n.engine === 'wireguard' || p.transport === 'wireguard') ? `<div class="gre-private-route"><span>لینک WireGuard:</span><bdi dir="ltr">${escapeHtml(n.wireguard?.local_private || "-")}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.wireguard?.remote_private || "-")}</bdi><span>(${escapeHtml(n.wireguard?.interface || n.node_name || "-")}) · <strong style="color:var(--amber, #f59e0b);">${escapeHtml(n.wireguard?.status_note || "آزمایشی — آزمون واقعی اجرا نشده")}</strong></span></div>` : ''}
             ${(n.engine === 'gre6' || p.transport === 'gre6') ? `<div class="gre-private-route"><span>لینک GRE6:</span><bdi dir="ltr">${escapeHtml(n.gre6?.local_private || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre6?.remote_private || p.kharej_ip)}</bdi><span>(اینترفیس ${escapeHtml(n.gre6?.interface || n.node_name || "-")}) · <strong style="color:var(--amber, #f59e0b);">بدون رمزنگاری (Cleartext)</strong></span></div>` : ''}
             ${(n.engine === 'ip6ip6' || p.transport === 'ip6ip6') ? `<div class="gre-private-route"><span>لینک IP6IP6:</span><bdi dir="ltr">${escapeHtml(n.ip6ip6?.local_private || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.ip6ip6?.remote_private || p.kharej_ip)}</bdi><span>(اینترفیس ${escapeHtml(n.ip6ip6?.interface || n.node_name || "-")} · اختصاصی IPv6) · <strong style="color:var(--amber, #f59e0b);">بدون رمزنگاری (Cleartext)</strong></span></div>` : ''}
+            ${(n.engine === 'rathole' || p.transport === 'rathole' || p.engine === 'rathole') ? `<div class="gre-private-route"><span>مسیر Rathole:</span><bdi dir="ltr">${escapeHtml(n.ip)}:${escapeHtml(String(n.rathole?.port || n.tunnel_port || p.camouflage?.port || 2333))}</bdi><span>(سرور ایران) &larr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}</bdi><span>(کلاینت خارج) · انتقال: <strong style="color:var(--text-main);">${escapeHtml(String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport || "tcp").toUpperCase())}</strong></span></div>` : ''}
             <div class="node-dns-line"><span class="status-badge ${dns.verified ? (dns.ips.includes(n.ip) ? 'healthy' : 'idle') : 'unknown'}">${dns.verified ? (dns.ips.includes(n.ip) ? (p.dns_scope === 'all_subdomains' ? 'آی‌پی در همهٔ ساب‌دامین‌ها ثبت است' : 'آی‌پی در DNS ثبت است') : (p.dns_scope === 'all_subdomains' ? 'آی‌پی در همهٔ ساب‌دامین‌ها ثبت نیست' : 'آی‌پی در DNS نیست')) : 'وضعیت DNS تأیید نشده'}</span><span>${dns.source}</span></div>
             <div class="node-reason-text ${n.status === 'DEGRADED' || n.status === 'CANARY' ? 'has-issue' : (n.status === 'FILTERED' || n.status === 'DOWN') ? 'has-error' : ''}" title="${escapeHtml(n.reason)}">${n.status === 'DEGRADED' || n.status === 'CANARY' ? '<svg class="ui-icon" style="width:13px;height:13px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' : (n.status === 'FILTERED' || n.status === 'DOWN') ? '<svg class="ui-icon" style="width:13px;height:13px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' : ''}<span>${escapeHtml(copy.translateReason(withoutEmoji(n.reason || "در حال بررسی")))}</span></div>
             ${Object.keys(n.port_details || {}).length ? `<details class="node-port-details"><summary><div class="node-port-summary-left"><svg class="ui-icon" style="width:13px;height:13px;color:var(--text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg><span>وضعیت پورت‌ها و آخرین تبادل (${faNumber.format(Object.keys(n.port_details).length)})</span></div><svg class="ui-icon port-chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><div class="node-port-grid">${Object.entries(n.port_details).map(([port, info]) => {
@@ -894,11 +993,11 @@ function renderPools(pools) {
           <div class="pool-title-line">
             <div class="pool-title-left">
               <h4 class="pool-name">${escapeHtml(withoutEmoji(p.name))}</h4>
-              ${getEngineBadge(p.engine, p.transport)}
+              ${getEngineBadge(p.engine, p.transport, p)}
               <span class="status-badge">${p.dns_mode === 'manual' ? 'DNS دستی' : 'DNS خودکار'}</span>
               ${nodesSummaryHtml}
               ${p.dns_mode === 'manual' ? `<button type="button" class="node-log-btn" data-pool="${escapeHtml(p.name)}" onclick="setPoolDnsRoute(this.dataset.pool,'auto','',this)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>بازگشت به خودکار</button>` : ''}
-              <span class="proto-tag">${escapeHtml(p.transport || "tcp")}</span>
+              <span class="proto-tag">${escapeHtml(getPoolProtoTag(p))}</span>
             </div>
             <div class="node-ip-row">
               <span style="font-size: 11px; color: var(--text-sub);">مقصد:</span>
@@ -1028,6 +1127,7 @@ function renderServers(data) {
         <div class="server-title-line">
           <span class="server-loc-pill ${s.role === "iran" ? "loc-iran" : "loc-kharej"}">${uiIcon(s.role === "iran" ? "pin" : "globe")}<span>${s.role === "iran" ? "ایران" : "خارج"}</span></span>
           <strong style="font-size: 13.5px;">${escapeHtml(withoutEmoji(s.name))}</strong>
+          ${s.health === 'ok' ? `<span class="status-badge healthy" style="font-size: 9px;">سالم</span>` : s.health === 'err' ? `<span class="status-badge" style="font-size: 9px; background: var(--red);">قطع</span>` : `<span class="status-badge idle" style="font-size: 9px;">بررسی نشده</span>`}
           ${s.in_use ? `<span class="status-badge healthy" style="font-size: 9px;"><span class="pulse-dot"></span>در استخر فعال</span>` : `<span class="status-badge idle" style="font-size: 9px;">آماده تخصیص</span>`}
         </div>
         <div class="server-ip-line">
@@ -1038,18 +1138,29 @@ function renderServers(data) {
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
           </button>
+          ${s.last_latency_ms ? `<span class="server-spec-chip">تأخیر: ${escapeHtml(faNumber.format(s.last_latency_ms))} ms</span>` : ''}
         </div>
         <div class="server-specs-line">
           <span class="server-spec-chip"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>SSH: ${escapeHtml(String(s.port || 22))} (${escapeHtml(s.username || "root")})</span>
           <span class="server-spec-chip"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>معماری: ${escapeHtml(s.arch || "x86_64")}</span>
         </div>
       </div>
-      <button class="server-del-btn" data-arg0="${escapeHtml(String(s.role))}" data-arg1="${escapeHtml(s.ip)}" onclick="deleteServer(this.dataset.arg0, this.dataset.arg1)" title="حذف سرور">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-      </button>
+      <div class="server-actions">
+        <button class="server-test-btn" data-arg0="${escapeHtml(String(s.role))}" data-arg1="${escapeHtml(s.ip)}" onclick="testServer(this.dataset.arg0, this.dataset.arg1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          تست سلامت
+        </button>
+        <button class="server-test-btn" data-arg0="${escapeHtml(String(s.role))}" data-arg1="${escapeHtml(s.ip)}" onclick="openBbrModal(this.dataset.arg0, this.dataset.arg1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          BBR
+        </button>
+        <button class="server-del-btn" data-arg0="${escapeHtml(String(s.role))}" data-arg1="${escapeHtml(s.ip)}" onclick="deleteServer(this.dataset.arg0, this.dataset.arg1)" title="حذف سرور">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
+      </div>
     </div>
   `).join("");
 }
@@ -1271,6 +1382,100 @@ async function deleteServer(type, ip) {
   }
 }
 
+/* Test Server Health / Connection */
+async function testServer(type, ip, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "در حال تست..."; }
+  try {
+    const res = await apiFetch("/api/servers/test", {
+      method: "POST",
+      body: { type: String(type), ip: String(ip) }
+    });
+    renderServerDiagnostics(res);
+    fetchServers();
+  } catch (e) {
+    showToast("خطا در تست سرور؛ اتصال برقرار نشد");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "تست سلامت"; }
+  }
+}
+
+function renderServerDiagnostics(d) {
+  const modal = document.getElementById('server-diag-modal');
+  if (!modal) return;
+  const body = document.getElementById('server-diag-body');
+  const reachable = d && d.reachable;
+  const rows = [
+    ["وضعیت", reachable ? 'قابل دسترس' : `غیرقابل دسترس${d?.error ? ' — ' + escapeHtml(d.error) : ''}`],
+    ["تأخیر", reachable ? `${faNumber.format(d.latency_ms)} ms` : '—'],
+    ["سیستم‌عامل", (d?.os || '—')],
+    ["هسته", (d?.kernel || '—')],
+    ["معماری", (d?.arch || '—')],
+    ["هسته‌های CPU", (d?.cpu || '—')],
+    ["لود (1/5/15)", (d?.load || '—')],
+    ["حافظه (کل/مصرف/آزاد MB)", (d?.mem || '—')],
+    ["دیسک (کل/مصرف/آزاد/٪)", (d?.disk || '—')],
+  ];
+  body.innerHTML = rows.map(([k, v]) =>
+    `<div class="diag-row"><span class="diag-label">${k}</span><bdi class="diag-value" dir="ltr">${v}</bdi></div>`
+  ).join('');
+  modal.classList.remove('hidden');
+}
+
+let bbrTarget = null;
+async function openBbrModal(type, ip) {
+  bbrTarget = { type: String(type), ip: String(ip) };
+  const modal = document.getElementById('bbr-modal');
+  if (!modal) return;
+  const body = document.getElementById('bbr-body');
+  body.innerHTML = '<p class="empty-hint">در حال دریافت وضعیت...</p>';
+  modal.classList.remove('hidden');
+  await refreshBbrStatus();
+}
+
+async function refreshBbrStatus() {
+  const body = document.getElementById('bbr-body');
+  if (!bbrTarget) return;
+  try {
+    const res = await apiFetch("/api/servers/cc", {
+      method: "POST",
+      body: { type: bbrTarget.type, ip: bbrTarget.ip, action: "status" }
+    });
+    const st = res.status || {};
+    const rows = [
+      ["وضعیت فعال‌سازی", res.enabled ? 'فعال' : 'غیرفعال'],
+      ["الگوریتم فعلی", (st.cc || '—')],
+      ["qdisc پیش‌فرض", (st.default_qdisc || '—')],
+      ["در دسترس بودن BBR", st.bbr_available ? 'بله' : 'خیر'],
+    ];
+    body.innerHTML = rows.map(([k, v]) =>
+      `<div class="diag-row"><span class="diag-label">${k}</span><bdi class="diag-value" dir="ltr">${escapeHtml(v)}</bdi></div>`
+    ).join('') + `
+      <div class="diag-actions">
+        <button class="btn-primary" onclick="bbrAction('enable')" ${res.enabled ? 'disabled' : ''}>فعال‌سازی BBR + fq</button>
+        <button class="btn-secondary" onclick="bbrAction('disable')" ${res.enabled ? '' : 'disabled'}>غیرفعال‌سازی</button>
+      </div>`;
+  } catch (e) {
+    body.innerHTML = '<p class="form-error">خطا در دریافت وضعیت BBR</p>';
+  }
+}
+
+async function bbrAction(action) {
+  if (!bbrTarget) return;
+  const body = document.getElementById('bbr-body');
+  body.innerHTML = '<p class="empty-hint">در حال اعمال...</p>';
+  try {
+    await apiFetch("/api/servers/cc", {
+      method: "POST",
+      body: { type: bbrTarget.type, ip: bbrTarget.ip, action }
+    });
+    showToast(action === 'enable' ? 'BBR فعال شد' : 'BBR غیرفعال شد');
+    fetchServers();
+    await refreshBbrStatus();
+  } catch (e) {
+    body.innerHTML = '<p class="form-error">خطا در اعمال تغییر BBR</p>';
+  }
+}
+
 /* Create Pool */
 async function openCreatePoolModal() {
   const khSelect = document.getElementById("new-pool-kharej");
@@ -1426,15 +1631,40 @@ async function submitCreatePool(e) {
                  token: (document.getElementById('frp-token')?.value || '').trim() || genSecret(16)
                }
              } :
-             transport === 'hedioum' ? {
-               camouflage: {
-                 mode: getSelectedHedioumMode(),
-                 persona: document.getElementById('hedioum-persona')?.value || 'auto',
-                 domain: document.getElementById('hedioum-domain')?.value || '',
-                 move_ssh: document.getElementById('hedioum-move-ssh')?.checked || false,
-                 tun_dns: document.getElementById('hedioum-tun-dns')?.checked || false
-               }
-             } : {})
+              transport === 'hedioum' ? {
+                camouflage: {
+                  mode: getSelectedHedioumMode(),
+                  persona: document.getElementById('hedioum-persona')?.value || 'auto',
+                  domain: document.getElementById('hedioum-domain')?.value || '',
+                  move_ssh: document.getElementById('hedioum-move-ssh')?.checked || false,
+                  tun_dns: document.getElementById('hedioum-tun-dns')?.checked || false
+                }
+              } :
+              transport === 'rathole' ? {
+                engine: 'rathole',
+                camouflage: {
+                  transport: getSelectedRatholeTransport(),
+                  proto: document.getElementById('rathole-proto')?.value || 'tcp',
+                  token: (document.getElementById('rathole-token')?.value || '').trim() || genSecret(16),
+                  port: document.getElementById('rathole-port')?.value || '2333',
+                  pkcs12: document.getElementById('rathole-pkcs12')?.value || '',
+                  pkcs12_password: document.getElementById('rathole-pkcs12-password')?.value || '',
+                  trusted_root: document.getElementById('rathole-trusted-root')?.value || '',
+                  hostname: document.getElementById('rathole-hostname')?.value || '',
+                  ws_tls: document.getElementById('rathole-ws-tls')?.checked || false
+                }
+              } :
+              transport === 'paqet' ? {
+                engine: 'paqet',
+                camouflage: {
+                  mode: 'forward',
+                  port: document.getElementById('paqet-port')?.value || '8888',
+                  key: (document.getElementById('paqet-key')?.value || '').trim() || genSecret(32),
+                  kcp_mode: document.getElementById('paqet-kcp-mode')?.value || 'fast',
+                  conn: document.getElementById('paqet-conn')?.value || '1',
+                  mtu: document.getElementById('paqet-mtu')?.value || '1280'
+                }
+              } : {})
       }
     });
     if (res.success) {
@@ -2109,7 +2339,7 @@ function setupSelectMenus() {
         const button = document.createElement('button'); button.type = 'button'; button.tabIndex = -1;
         button.id = `${list.id}-${i}`; button.className = 'select-option'; button.textContent = withoutEmoji(option.textContent);
         button.setAttribute('role','option'); button.setAttribute('aria-selected',String(option.selected)); button.disabled = option.disabled || (select.required && !option.value);
-        button.addEventListener('click', () => { select.value = option.value; select.dispatchEvent(new Event('change',{bubbles:true})); close(); trigger.focus(); });
+        button.addEventListener('click', () => { select.selectedIndex = i; select.dispatchEvent(new Event('change',{bubbles:true})); close(); trigger.focus(); });
         list.append(button);
       });
     };
@@ -2209,6 +2439,21 @@ const ENGINE_TRANSPORTS = {
       { value: "hedioum", mode: "socks", label: "Hedioum SOCKS5", hint: "SOCKS5 روی پورت مشخص (پیش‌فرض پورت اول کلاینت)" },
       { value: "hedioum", mode: "tun", label: "Hedioum TUN", hint: "اینترفیس TUN + DNS forwarder اختیاری" },
       { value: "hedioum", mode: "gateway", label: "Hedioum Gateway", hint: "گیت‌وی شفاف L3 برای کل LAN" }
+    ]
+  },
+  rathole: {
+    label: "موتور Rathole (پراکسی معکوس سبک Rust)",
+    transports: [
+      { value: "rathole", mode: "tcp", label: "TCP (بدون رمزنگاری)", hint: "روش انتقال tcp — کنترل بدون رمزنگاری (پیش‌فرض)" },
+      { value: "rathole", mode: "tls", label: "TLS (گواهی PKCS#12)", hint: "روش انتقال tls — رمزنگاری با گواهی PKCS#12 روی سرور" },
+      { value: "rathole", mode: "noise", label: "Noise (رمزنگاری بدون گواهی)", hint: "روش انتقال noise — رمزنگاری بدون گواهی؛ کلید X25519 خودکار" },
+      { value: "rathole", mode: "websocket", label: "WebSocket (پشت CDN)", hint: "روش انتقال websocket — انتقال روی WebSocket (TLS اختیاری)" }
+    ]
+  },
+  paqet: {
+    label: "موتور Paqet (حامل بسته خام KCP)",
+    transports: [
+      { value: "paqet", mode: "forward", label: "Port forwarding (X-UI/V2Ray)", hint: "فوروارد پورت‌های کلاینت از ایران به خارج روی KCP خام" }
     ]
   },
   kernel: {
@@ -2338,6 +2583,12 @@ function getSelectedGostProfile() {
 }
 
 function getSelectedFrpMode() {
+  const protoEl = document.getElementById('new-pool-proto');
+  const opt = protoEl && protoEl.selectedOptions && protoEl.selectedOptions[0];
+  return (opt && opt.dataset && opt.dataset.mode) || 'tcp';
+}
+
+function getSelectedRatholeTransport() {
   const protoEl = document.getElementById('new-pool-proto');
   const opt = protoEl && protoEl.selectedOptions && protoEl.selectedOptions[0];
   return (opt && opt.dataset && opt.dataset.mode) || 'tcp';
@@ -2547,6 +2798,27 @@ async function submitTransportChange(event) {
     if (transport === 'slipstream') {
       payload.domain = (document.getElementById('transport-slipstream-domain')?.value || '').trim();
       payload.resolvers = (document.getElementById('transport-slipstream-resolvers')?.value || '').trim();
+    }
+    if (transport === 'rathole') {
+      const targetSel = document.getElementById('transport-target');
+      const opt = targetSel && targetSel.selectedOptions && targetSel.selectedOptions[0];
+      const rMode = (opt && opt.dataset && opt.dataset.mode) || 'tcp';
+      payload.camouflage = {
+        transport: rMode,
+        proto: 'tcp',
+        port: 2333,
+        token: genSecret(16)
+      };
+    }
+    if (transport === 'paqet') {
+      payload.camouflage = {
+        mode: 'forward',
+        port: 8888,
+        key: genSecret(32),
+        kcp_mode: 'fast',
+        conn: 1,
+        mtu: 1280
+      };
     }
 
     const result = await apiFetch('/api/pools/transport', {
@@ -2782,6 +3054,39 @@ function updateGreCreateFields() {
     const hmode = getSelectedHedioumMode();
     const dnsEl = document.getElementById('hedioum-tun-dns');
     if (dnsEl) dnsEl.disabled = !isHedioum || hmode !== 'tun';
+  }
+
+  // Rathole
+  const ratholeDiv = document.getElementById('rathole-create-fields');
+  if (ratholeDiv) {
+    const isRathole = mode === 'rathole';
+    ratholeDiv.classList.toggle('hidden', !isRathole);
+    ['rathole-proto', 'rathole-token', 'rathole-port'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !isRathole;
+    });
+    const rtransport = getSelectedRatholeTransport();
+    const tlsRelated = rtransport === 'tls' || (rtransport === 'websocket' && document.getElementById('rathole-ws-tls')?.checked);
+    ['rathole-pkcs12', 'rathole-pkcs12-password', 'rathole-trusted-root', 'rathole-hostname'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const visible = isRathole && (rtransport === 'tls' ? id === 'rathole-pkcs12' || id === 'rathole-pkcs12-password' || id === 'rathole-trusted-root' || id === 'rathole-hostname' : id === 'rathole-trusted-root' || id === 'rathole-hostname');
+      el.disabled = !(isRathole && visible);
+      el.closest?.('.input-group')?.classList.toggle('hidden', !(isRathole && visible));
+    });
+    const wsEl = document.getElementById('rathole-ws-tls');
+    if (wsEl) wsEl.disabled = !isRathole || rtransport !== 'websocket';
+  }
+
+  // Paqet
+  const paqetDiv = document.getElementById('paqet-create-fields');
+  if (paqetDiv) {
+    const isPaqet = mode === 'paqet';
+    paqetDiv.classList.toggle('hidden', !isPaqet);
+    ['paqet-port', 'paqet-key', 'paqet-kcp-mode', 'paqet-conn', 'paqet-mtu'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !isPaqet;
+    });
   }
 
   // Spoof family (Anti-DPI & Desync)

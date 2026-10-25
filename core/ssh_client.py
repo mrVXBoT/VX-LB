@@ -200,6 +200,79 @@ class SSHManager:
             return True
         return False
 
+    def diagnose(self, timeout: int = 15) -> dict:
+        """Run read-only connectivity/diagnostics checks on the remote host.
+
+        Returns a dict with connectivity status, round-trip latency (connect
+        time), and basic asset/resource facts (OS, arch, CPU, load, memory,
+        disk). Never mutates the remote host.
+        """
+        t0 = time.monotonic()
+        ok, msg = self.connect()
+        latency_ms = round((time.monotonic() - t0) * 1000, 1)
+        if not ok:
+            return {"reachable": False, "latency_ms": latency_ms, "error": msg}
+
+        result = {"reachable": True, "latency_ms": latency_ms}
+        try:
+            checks = {
+                "os": "cat /etc/os-release 2>/dev/null | grep -E '^(PRETTY_NAME)=' | head -1 | cut -d= -f2- | tr -d '\"'",
+                "kernel": "uname -r",
+                "arch": "uname -m",
+                "cpu": "nproc",
+                "load": "cat /proc/loadavg | awk '{print $1, $2, $3}'",
+                "mem": "free -m | awk '/Mem:/{print $2, $3, $4}'",
+                "disk": "df -h / | awk 'NR==2{print $2, $3, $4, $5}'",
+            }
+            for key, cmd in checks.items():
+                try:
+                    code, out, _ = self.execute(cmd, timeout=timeout)
+                    result[key] = out.strip() if code == 0 else ""
+                except Exception:
+                    result[key] = ""
+            cc_status = self.tcp_cc_status(timeout=timeout)
+            result["cc"] = cc_status.get("cc", "")
+            result["default_qdisc"] = cc_status.get("default_qdisc", "")
+            result["bbr_available"] = cc_status.get("bbr_available", False)
+        finally:
+            self.close()
+        return result
+
+    def tcp_cc_status(self, timeout: int = 10) -> dict:
+        """Read current TCP congestion-control algorithm + default qdisc on the host."""
+        cc = ""
+        qdisc = ""
+        bbr_available = False
+        try:
+            code, out, _ = self.execute("cat /proc/sys/net/ipv4/tcp_congestion_control", timeout=timeout)
+            cc = out.strip() if code == 0 else ""
+            code, out, _ = self.execute("cat /proc/sys/net/ipv4/tcp_available_congestion_control", timeout=timeout)
+            bbr_available = code == 0 and "bbr" in out
+            code, out, _ = self.execute("cat /proc/sys/net/core/default_qdisc", timeout=timeout)
+            qdisc = out.strip() if code == 0 else ""
+        except Exception:
+            pass
+        return {"cc": cc, "default_qdisc": qdisc, "bbr_available": bbr_available}
+
+    def set_tcp_cc(self, cc: str, qdisc: str, timeout: int = 20) -> dict:
+        """Enable/apply a TCP congestion-control algorithm + default qdisc and persist."""
+        cc = str(cc).strip()
+        qdisc = str(qdisc).strip() or "pfifo_fast"
+        if cc == "bbr":
+            try:
+                self.execute("modprobe tcp_bbr 2>/dev/null || true", timeout=timeout)
+            except Exception:
+                pass
+        self.execute(f"sysctl -w net.ipv4.tcp_congestion_control={shquote(cc)}", timeout=timeout)
+        self.execute(f"sysctl -w net.core.default_qdisc={shquote(qdisc)}", timeout=timeout)
+        conf = f"net.ipv4.tcp_congestion_control={cc}\nnet.core.default_qdisc={qdisc}\n"
+        self.write_file("/etc/sysctl.d/99-vxlb-bbr.conf", conf)
+        try:
+            self.execute("sysctl --system 2>/dev/null || sysctl -p /etc/sysctl.d/99-vxlb-bbr.conf", timeout=timeout)
+        except Exception:
+            pass
+        return self.tcp_cc_status(timeout=timeout)
+
     def find_free_port(self, start_range: int = 22000, end_range: int = 58000) -> int:
         """Finds a verified free TCP/UDP port on the remote machine."""
         check_script = f"""python3 -c '

@@ -20,6 +20,7 @@ from core.storage import (
     delete_server,
     get_pools,
     load_data,
+    update_server_telemetry,
     LOG_FILE
 )
 from core.ssh_client import SSHManager
@@ -96,9 +97,11 @@ def manage_servers_menu():
         console.print("  [1] ➕ Add & Test New Server")
         console.print("  [2] 📋 View Registered Servers")
         console.print("  [3] 🗑️  Delete a Server")
+        console.print("  [4] 🩺 Test Server Health / Connection")
+        console.print("  [5] ⚡ Manage TCP BBR / Congestion Control")
         console.print("  [0] 🔙 Back to Main Menu\n")
 
-        choice = Prompt.ask("Select an option", choices=["1", "2", "3", "0"], default="1")
+        choice = Prompt.ask("Select an option", choices=["1", "2", "3", "4", "5", "0"], default="1")
 
         if choice == "1":
             add_new_server_flow()
@@ -107,6 +110,10 @@ def manage_servers_menu():
             Prompt.ask("\nPress Enter to return")
         elif choice == "3":
             delete_server_flow()
+        elif choice == "4":
+            test_server_flow()
+        elif choice == "5":
+            manage_server_cc_flow()
         elif choice == "0":
             break
 
@@ -234,6 +241,112 @@ def delete_server_flow():
     else:
         console.print("[bold red]Error: Server not found with this IP address.[/bold red]")
     time.sleep(1.5)
+
+def test_server_flow():
+    list_servers_flow()
+    stype = Prompt.ask("Location of the server to test", choices=["iran", "kharej"])
+    ip = Prompt.ask("Enter IP address of the server to test")
+
+    target = None
+    for s in get_servers(stype):
+        if s.get("ip") == ip:
+            target = s
+            break
+    if not target:
+        console.print("[bold red]Error: Server not found in inventory.[/bold red]")
+        Prompt.ask("\nPress Enter to return")
+        return
+
+    with console.status(f"[bold green]در حال تست اتصال و سلامت {ip}...[/bold green]"):
+        try:
+            diag = SSHManager.from_server(target, timeout=10).diagnose()
+        except Exception as e:
+            diag = {"reachable": False, "latency_ms": 0, "error": str(e)}
+
+    health = "ok" if diag.get("reachable") else "err"
+    update_server_telemetry(stype, ip, {
+        "health": health,
+        "last_seen": int(time.time()),
+        "last_latency_ms": diag.get("latency_ms", 0),
+    })
+
+    console.print("\n[bold cyan]--- Server Diagnostics ---[/bold cyan]")
+    if not diag.get("reachable"):
+        console.print(f"[bold red]❌ Connection failed: {diag.get('error')}[/bold red]")
+    else:
+        console.print(f"[bold green]✅ Reachable — latency: {diag.get('latency_ms')} ms[/bold green]")
+        for key, label in [
+            ("os", "OS"), ("kernel", "Kernel"), ("arch", "Arch"),
+            ("cpu", "CPU cores"), ("load", "Load (1/5/15)"),
+            ("mem", "Memory total/used/free (MB)"), ("disk", "Disk total/used/free/use%"),
+        ]:
+            val = diag.get(key) or "N/A"
+            console.print(f"  • {label}: [yellow]{val}[/yellow]")
+    Prompt.ask("\nPress Enter to return")
+
+def manage_server_cc_flow():
+    list_servers_flow()
+    stype = Prompt.ask("Location of the server", choices=["iran", "kharej"])
+    ip = Prompt.ask("Enter IP address of the server")
+
+    target = None
+    for s in get_servers(stype):
+        if s.get("ip") == ip:
+            target = s
+            break
+    if not target:
+        console.print("[bold red]Error: Server not found in inventory.[/bold red]")
+        Prompt.ask("\nPress Enter to return")
+        return
+
+    ssh = SSHManager.from_server(target, timeout=10)
+    try:
+        status = ssh.tcp_cc_status()
+    except Exception as e:
+        console.print(f"[bold red]Error: {e}[/bold red]")
+        Prompt.ask("\nPress Enter to return")
+        return
+
+    console.print("\n[bold cyan]--- TCP Congestion Control Status ---[/bold cyan]")
+    console.print(f"  • Algorithm: [yellow]{status.get('cc') or 'N/A'}[/yellow]")
+    console.print(f"  • Default qdisc: [yellow]{status.get('default_qdisc') or 'N/A'}[/yellow]")
+    console.print(f"  • BBR available: [yellow]{status.get('bbr_available')}[/yellow]")
+    console.print("\n[bold]Actions:[/bold]")
+    console.print("  [1] Enable BBR + fq (و پایدارسازی)")
+    console.print("  [2] Disable / restore previous CC")
+    console.print("  [0] Return")
+    choice = Prompt.ask("Select action", choices=["1", "2", "0"], default="0")
+
+    try:
+        if choice == "1":
+            with console.status("در حال فعال‌سازی BBR + fq..."):
+                orig = ssh.tcp_cc_status()
+                status = ssh.set_tcp_cc("bbr", "fq")
+            update_server_telemetry(stype, ip, {
+                "cc_before": orig.get("cc"), "qdisc_before": orig.get("default_qdisc"),
+                "cc_enabled": True,
+            })
+            console.print("[bold green]✔️ BBR + fq فعال شد.[/bold green]")
+        elif choice == "2":
+            prev_cc = target.get("cc_before") or "cubic"
+            prev_qd = target.get("qdisc_before") or "pfifo_fast"
+            with console.status("در حال بازگردانی CC..."):
+                ssh.execute("rm -f /etc/sysctl.d/99-vxlb-bbr.conf")
+                ssh.execute(f"sysctl -w net.ipv4.tcp_congestion_control={prev_cc}")
+                ssh.execute(f"sysctl -w net.core.default_qdisc={prev_qd}")
+                ssh.execute("sysctl --system 2>/dev/null || true")
+                status = ssh.tcp_cc_status()
+            update_server_telemetry(stype, ip, {
+                "cc_before": None, "qdisc_before": None, "cc_enabled": False,
+            })
+            console.print(f"[bold green]✔️ CC به {status.get('cc')} بازگردانده شد.[/bold green]")
+        else:
+            return
+    except Exception as e:
+        console.print(f"[bold red]Error: {e}[/bold red]")
+    finally:
+        ssh.close()
+    Prompt.ask("\nPress Enter to return")
 
 @pool_mutation_flow
 def create_load_balancer_flow():
@@ -388,6 +501,55 @@ def create_load_balancer_flow():
         domain = Prompt.ask("Optional domain for real Let's Encrypt cert (empty to skip)", default='')
         if domain:
             settings['domain'] = domain
+        gre_options = {'camouflage': settings}
+    elif selected_transport == 'rathole':
+        import secrets as _secrets_rathole
+        from core.rathole_engine import TRANSPORTS, TRANSPORT_LABELS, SERVICE_PROTOCOLS
+        console.print("[bold cyan]Rathole transport type (روش انتقال):[/bold cyan]")
+        tr_choices = {str(i): t for i, t in enumerate(TRANSPORTS, 1)}
+        for i, t in tr_choices.items():
+            console.print(f"  [{i}] {t} — {TRANSPORT_LABELS[t]}")
+        trchoice = Prompt.ask("Select transport type", choices=list(tr_choices), default="1")
+        transport = tr_choices[trchoice]
+        console.print("\n[bold cyan]Forwarded protocol per port (type سرویس):[/bold cyan]")
+        proto_choices = {str(i): p for i, p in enumerate(SERVICE_PROTOCOLS, 1)}
+        for i, p in proto_choices.items():
+            console.print(f"  [{i}] {p}")
+        pchoice = Prompt.ask("Forwarded protocol", choices=list(proto_choices), default="1")
+        settings = {
+            'transport': transport,
+            'proto': proto_choices[pchoice],
+            'token': Prompt.ask("Rathole auth token (min 8 chars)", default=_secrets_rathole.token_hex(16)),
+            'port': Prompt.ask("Rathole control port (server↔client)", default='2333'),
+        }
+        if transport == 'tls':
+            settings['pkcs12'] = Prompt.ask("Server PKCS#12 path (on Iran)", default='/etc/rathole/identity.pfx')
+            settings['pkcs12_password'] = Prompt.ask("PKCS#12 password", default='')
+            settings['trusted_root'] = Prompt.ask("Client trusted_root CA path (on Kharej)", default='/etc/rathole/rootCA.crt')
+            settings['hostname'] = Prompt.ask("TLS hostname (client validates server)", default='')
+        elif transport == 'websocket':
+            settings['ws_tls'] = Prompt.ask("WebSocket over TLS? (y/n)", choices=['y', 'n'], default='n') == 'y'
+            if settings['ws_tls']:
+                settings['pkcs12'] = Prompt.ask("Server PKCS#12 path (on Iran)", default='/etc/rathole/identity.pfx')
+                settings['pkcs12_password'] = Prompt.ask("PKCS#12 password", default='')
+                settings['trusted_root'] = Prompt.ask("Client trusted_root CA path (on Kharej)", default='/etc/rathole/rootCA.crt')
+        gre_options = {'camouflage': settings}
+    elif selected_transport == 'paqet':
+        import secrets as _secrets_paqet
+        from core.paqet_engine import KCP_MODES, generate_secret
+        console.print("[bold cyan]Paqet KCP mode:[/bold cyan]")
+        k_choices = {str(i): m for i, m in enumerate(KCP_MODES, 1)}
+        for i, m in k_choices.items():
+            console.print(f"  [{i}] {m}")
+        kchoice = Prompt.ask("Select KCP mode", choices=list(k_choices), default="2")
+        settings = {
+            'mode': 'forward',
+            'port': Prompt.ask("Paqet tunnel port (سرور↔کلاینت)", default='8888'),
+            'key': Prompt.ask("Paqet secret key", default=_secrets_paqet.token_urlsafe(24)[:32]),
+            'kcp_mode': k_choices[kchoice],
+            'conn': Prompt.ask("KCP parallel connections", default='1'),
+            'mtu': Prompt.ask("KCP MTU (1280-1500)", default='1280'),
+        }
         gre_options = {'camouflage': settings}
     elif selected_transport == 'geneve_ipsec':
         vni_in = Prompt.ask("VNI (1-16777215, default auto)", default="")

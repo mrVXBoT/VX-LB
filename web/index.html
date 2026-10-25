@@ -781,6 +781,36 @@
     </div>
   </div>
 
+  <!-- Modal: Server Diagnostics -->
+  <div id="server-diag-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title">گزارش سلامت سرور</h4>
+          <p class="sheet-subtitle">تشخیص اتصال و منابع سیستم</p>
+        </div>
+        <button class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('server-diag-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content" id="server-diag-body"></div>
+    </div>
+  </div>
+
+  <!-- Modal: BBR / Congestion Control -->
+  <div id="bbr-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
+    <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <div>
+          <h4 class="sheet-title">مدیریت BBR / Congestion Control</h4>
+          <p class="sheet-subtitle">مشاهده و تغییر الگوریتم کنترل ازدحام سرور</p>
+        </div>
+        <button class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('bbr-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+      </div>
+      <div class="sheet-content" id="bbr-body"></div>
+    </div>
+  </div>
+
   <!-- Modal: Create New Pool -->
   <div id="create-pool-modal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event)">
     <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
@@ -817,9 +847,11 @@
               <option value="waterwall">سد کرج</option>
               <option value="gost">غول چراغ جادو</option>
               <option value="frp">پیچ شمرون</option>
-              <option value="hedioum">Hedioum</option>
-              <option value="kernel">فاضلاب لینوکس</option>
-              <option value="spoof">پردازش بسته (DPI Spoof)</option>
+               <option value="hedioum">Hedioum</option>
+               <option value="rathole">Rathole</option>
+               <option value="paqet">Paqet</option>
+               <option value="kernel">فاضلاب لینو克斯</option>
+               <option value="spoof">پردازش بسته (DPI Spoof)</option>
               <option value="other">اتاق بحران (وب و اضطراری)</option>
             </select>
           </div>
@@ -881,6 +913,23 @@
             <div class="input-group"><label class="field-label" for="hedioum-domain">دامنهٔ اختیاری (Let's Encrypt واقعی)</label><input id="hedioum-domain" class="field-input" placeholder="vpn.example.com" dir="ltr" disabled></div>
             <div class="input-group"><label class="field-label" for="hedioum-move-ssh">جابه‌جایی sshd به پورت decoy (--move-ssh)</label><input id="hedioum-move-ssh" type="checkbox" disabled></div>
             <div class="input-group"><label class="field-label" for="hedioum-tun-dns">DNS forwarder روی :53 (فقط در حالت TUN)</label><input id="hedioum-tun-dns" type="checkbox" disabled></div>
+          </div>
+          <div id="rathole-create-fields" class="input-group hidden">
+            <div class="input-group"><label class="field-label" for="rathole-proto">پروتکل فوروارد هر پورت (type سرویس)</label><select id="rathole-proto" class="field-input select-styled" disabled><option value="tcp" selected>tcp</option><option value="udp">udp</option></select></div>
+            <div class="input-group"><label class="field-label" for="rathole-token">توکن احراز هویت (حداقل ۸ نویسه)</label><input id="rathole-token" class="field-input" type="text" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="rathole-port">پورت کنترل سرور↔کلاینت (پیش‌فرض 2333)</label><input id="rathole-port" class="field-input" value="2333" type="number" min="1" max="65535" dir="ltr" disabled required></div>
+            <div class="input-group"><label class="field-label" for="rathole-ws-tls">WebSocket روی TLS (فقط در روش websocket)</label><input id="rathole-ws-tls" type="checkbox" onchange="updateGreCreateFields()" disabled></div>
+            <div class="input-group"><label class="field-label" for="rathole-pkcs12">مسیر PKCS#12 روی سرور (ایران)</label><input id="rathole-pkcs12" class="field-input" placeholder="/etc/rathole/identity.pfx" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="rathole-pkcs12-password">رمز PKCS#12</label><input id="rathole-pkcs12-password" class="field-input" type="password" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="rathole-trusted-root">گواهی ریشه (trusted_root) روی کلاینت (خارج)</label><input id="rathole-trusted-root" class="field-input" placeholder="/etc/rathole/rootCA.crt" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="rathole-hostname">TLS hostname (اختیاری)</label><input id="rathole-hostname" class="field-input" placeholder="example.com" dir="ltr" disabled></div>
+          </div>
+          <div id="paqet-create-fields" class="input-group hidden">
+            <div class="input-group"><label class="field-label" for="paqet-port">پورت تونل Paqet (سرور↔کلاینت)</label><input id="paqet-port" class="field-input" value="8888" type="number" min="1" max="65535" dir="ltr" disabled required></div>
+            <div class="input-group"><label class="field-label" for="paqet-key">کلید مخفی Paqet</label><input id="paqet-key" class="field-input" type="text" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="paqet-kcp-mode">حالت KCP</label><select id="paqet-kcp-mode" class="field-input select-styled" disabled><option value="normal">normal</option><option value="fast" selected>fast</option><option value="fast2">fast2</option><option value="fast3">fast3</option></select></div>
+            <div class="input-group"><label class="field-label" for="paqet-conn">اتصال‌های موازی KCP</label><input id="paqet-conn" class="field-input" value="1" type="number" min="1" max="64" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="paqet-mtu">MTU کانال KCP (1280-1500)</label><input id="paqet-mtu" class="field-input" value="1280" type="number" min="1280" max="1500" dir="ltr" disabled></div>
           </div>
           <div id="tun-create-fields" class="input-group hidden">
             <p class="field-hint">اینترفیس واقعی TUN لینوکس با حامل UDP/Noise در BackPack L3 و محدودسازی MSS اختصاصی؛ انتقال TCP/UDP پیش از فعال‌شدن بررسی می‌شود.</p>
@@ -1136,6 +1185,8 @@
               <option value="gost">غول چراغ جادو</option>
               <option value="frp">پیچ شمرون</option>
               <option value="hedioum">Hedioum</option>
+              <option value="rathole">Rathole</option>
+              <option value="paqet">Paqet</option>
               <option value="kernel">فاضلاب لینوکس</option>
               <option value="spoof" disabled>پردازش بسته — استخر جداگانه بسازید</option>
               <option value="other">اتاق بحران (وب و اضطراری)</option>

@@ -17,7 +17,7 @@ if BASE_DIR not in sys.path:
 
 from core.storage import (
     load_data, atomic_update, DATA_DIR, LOG_FILE, get_pools, get_servers,
-    add_server, delete_server,
+    add_server, delete_server, update_server_telemetry,
     get_cf_profiles, get_cf_profile, cf_profile_public, save_cf_profile,
     update_cf_profile, delete_cf_profile, set_cf_profile_zones,
     cf_profile_pools, cf_audit, migrate_legacy_cf_profiles
@@ -32,16 +32,34 @@ from core.load_balancer import LoadBalancerManager
 from core.ssh_client import SSHManager
 from core.node_addition import start as start_node_addition, recover as recover_node_additions
 from core.node_removal import start as start_node_removal, recover as recover_node_removals
-from core.validation import validate_pool_name, validate_port, validate_ports, validate_transport
+from core.validation import validate_pool_name, validate_port, validate_ports, validate_transport, shquote, shquote
 from core.domain_manager import get_dashboard_domain_config, apply_nginx_config, issue_letsencrypt_cert
 
 WEB_DIR = os.path.join(BASE_DIR, "web")
 AUTH_TOKENS: Dict[str, float] = {}  # token -> expiry_timestamp
 
+# --- Security headers applied to every response (JSON + static + preflight) ---
+_SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data:; "
+        "connect-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "frame-ancestors 'self'"
+    ),
+    "X-Frame-Options": "SAMEORIGIN",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+}
+
 # --- Security hardening: password hashing, login rate limiting ---
 
 _PBKDF2_ITERATIONS = 200_000
-_LOGIN_ATTEMPTS: Dict[str, list] = {}  # client ip -> [timestamps of failed attempts]
 _LOGIN_WINDOW_S = 300
 _LOGIN_MAX_ATTEMPTS = 10
 
@@ -80,15 +98,38 @@ def _verify_password(password: str, stored: str) -> bool:
     return False
 
 
+def _login_attempts(client_ip: str) -> list:
+    """Return timestamps of recent failed logins for an IP (persisted)."""
+    try:
+        return load_data().get("login_failures", {}).get(client_ip, []) or []
+    except Exception:
+        return []
+
+
 def _login_allowed(client_ip: str) -> bool:
     now = time.time()
-    attempts = [t for t in _LOGIN_ATTEMPTS.get(client_ip, []) if now - t < _LOGIN_WINDOW_S]
-    _LOGIN_ATTEMPTS[client_ip] = attempts
-    return len(attempts) < _LOGIN_MAX_ATTEMPTS
+    records = _login_attempts(client_ip)
+    fresh = [t for t in records if now - t < _LOGIN_WINDOW_S]
+    if len(fresh) != len(records):
+        def _up(d: dict):
+            d.setdefault("login_failures", {})[client_ip] = fresh
+        try:
+            atomic_update(_up)
+        except Exception:
+            pass
+    return len(fresh) < _LOGIN_MAX_ATTEMPTS
 
 
 def _record_failed_login(client_ip: str) -> None:
-    _LOGIN_ATTEMPTS.setdefault(client_ip, []).append(time.time())
+    def _up(d: dict):
+        lf = d.setdefault("login_failures", {})
+        lst = lf.get(client_ip, []) or []
+        lst.append(time.time())
+        lf[client_ip] = lst[-200:]  # bound per-IP memory
+    try:
+        atomic_update(_up)
+    except Exception:
+        pass
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
@@ -111,6 +152,22 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
         # Quiet standard logging to avoid spamming terminal
         pass
 
+    def _cors_headers(self):
+        """Echo the request Origin only when it matches this server's own Host.
+
+        Auth is cookie-based (SameSite=Lax), so cross-origin browsers never
+        attach credentials; we never issue a wildcard origin.
+        """
+        origin = (self.headers.get("Origin") or "").strip()
+        host = (self.headers.get("Host") or "").strip()
+        if origin and host and origin in (f"http://{host}", f"https://{host}"):
+            return {
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+                "Vary": "Origin",
+            }
+        return {}
+
     def _send_json(self, data: dict, status: int = 200, headers: Optional[dict] = None):
         content = json.dumps(data, ensure_ascii=False).encode("utf-8")
         accept_encoding = self.headers.get("Accept-Encoding", "")
@@ -123,9 +180,10 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(content)))
         if use_gzip:
             self.send_header("Content-Encoding", "gzip")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        for k, v in _SECURITY_HEADERS.items():
+            self.send_header(k, v)
+        for k, v in self._cors_headers().items():
+            self.send_header(k, v)
         if headers:
             for k, v in headers.items():
                 self.send_header(k, v)
@@ -149,6 +207,8 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(304)
             self.send_header("ETag", etag)
             self.send_header("Cache-Control", cache_control)
+            for k, v in _SECURITY_HEADERS.items():
+                self.send_header(k, v)
             self.end_headers()
             return
 
@@ -169,6 +229,8 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Cache-Control", cache_control)
         if use_gzip:
             self.send_header("Content-Encoding", "gzip")
+        for k, v in _SECURITY_HEADERS.items():
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(content)
 
@@ -194,11 +256,22 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             return True
         return False
 
+    def _client_ip(self) -> str:
+        """Return the client IP, honoring X-Forwarded-For only when enabled."""
+        if os.environ.get("VX_LB_TRUST_PROXY") == "1":
+            xff = self.headers.get("X-Forwarded-For", "").strip()
+            if xff:
+                return xff.split(",")[0].strip() or "unknown"
+        return self.client_address[0] if self.client_address else "unknown"
+
     def do_OPTIONS(self):
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        for k, v in self._cors_headers().items():
+            self.send_header(k, v)
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        for k, v in _SECURITY_HEADERS.items():
+            self.send_header(k, v)
         self.end_headers()
 
     def do_GET(self):
@@ -260,10 +333,12 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                         "wireguard": {key: n.get("wireguard", {}).get(key) for key in ("interface", "tunnel_port", "mtu", "local_private", "remote_private", "iran_public_key", "kharej_public_key", "ipv4_subnet")} if n.get("engine") == "wireguard" else None,
                         "tun": {key:n.get("tun",{}).get(key) for key in ("interface","mtu","local_private","remote_private")} if n.get("engine") == "tun" else None,
                         "dc6": {key:n.get("dc6",{}).get(key) for key in ("interface","mtu","mss_clamp","carrier_type","local_private","remote_private")} if n.get("engine") == "dc6" else None,
-                        "spoof": {"profile":n.get("transport"),"wire_verified":n.get("spoof",{}).get("wire_evidence",{}).get("passed") is True,"fake_sni":n.get("spoof",{}).get("fake_sni") if n.get("transport") in ("fake-sni","hop-ttl-injection") else None,"ttl_delta":n.get("spoof",{}).get("ttl_delta") if n.get("transport")=="hop-ttl-injection" else None} if n.get("engine")=="spoof" and n.get("spoof") else None,
+                        "spoof": {"profile": n.get("transport") or p_val.get("transport"), "wire_verified": n.get("spoof",{}).get("wire_evidence",{}).get("passed") is True, "fake_sni": n.get("fake_sni") or (n.get("spoof") or {}).get("fake_sni") or p_val.get("fake_sni") or (p_val.get("camouflage") or {}).get("server_name"), "ttl_delta": n.get("ttl_delta") or (n.get("spoof") or {}).get("ttl_delta") or p_val.get("auto_ttl_delta")} if (n.get("engine") == "spoof" or p_val.get("engine") == "spoof") else None,
+                        "slipstream": {"domain": p_val.get("domain") or (p_val.get("slipstream") or {}).get("domain"), "rate_limit": p_val.get("rate_limit") or (p_val.get("slipstream") or {}).get("rate_limit", 1000), "dns_port": p_val.get("dns_port") or (p_val.get("slipstream") or {}).get("dns_port", 53)} if (n.get("engine") == "slipstream" or p_val.get("engine") == "slipstream") else None,
                         "http_connect": {"public_port":n.get("http_connect",{}).get("public_port"),"mode":n.get("transport"),"mutual_tls":True} if n.get("engine") in ("http","https") else None,
                         "status_note": n.get("status_note") or p_val.get("status_note") if n.get("engine") == "wireguard" else None,
                         "waterwall": {"uuid_tcp": n.get("waterwall", {}).get("uuid_tcp"), "outer_port": n.get("waterwall", {}).get("outer_port"), "server_name": n.get("waterwall", {}).get("profile", {}).get("server_name") or n.get("waterwall", {}).get("server_name"), "profile": n.get("waterwall", {}).get("profile")} if n.get("engine") == "waterwall" else None,
+                        "rathole": {"transport": n.get("rathole", {}).get("transport") or p_val.get("rathole_transport") or (p_val.get("camouflage") or {}).get("transport", "tcp"), "proto": n.get("rathole", {}).get("proto") or (p_val.get("camouflage") or {}).get("proto", "tcp"), "port": n.get("rathole", {}).get("port") or n.get("tunnel_port") or (p_val.get("camouflage") or {}).get("port", 2333)} if (n.get("engine") == "rathole" or p_val.get("engine") == "rathole" or p_val.get("transport") == "rathole") else None,
                         "transport": n.get("transport", p_val.get("transport", "tcp")),
                         "status": "PROVISIONING" if n.get("creation_pending") else "DOWN" if n.get("provisioning") else telem.get("status", "IDLE"),
                         "reason": p_val.get("creation_job", {}).get("message", "در انتظار راه‌اندازی") if n.get("creation_pending") else "راه‌اندازی نود کامل نشده؛ منابع آن را بررسی یا پاک‌سازی کنید" if n.get("provisioning") else telem.get("reason", "Awaiting checks"),
@@ -296,7 +371,9 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "wireguard_port": p_val.get("wireguard_port") or p_val.get("tunnel_port"),
                     "status_note": p_val.get("status_note"),
                     "vni": p_val.get("vni"),
-                     "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name","profile","persona")} if p_val.get("engine") in ("waterwall", "gost", "frp", "hedioum") else None,
+                    "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name","profile","persona","transport","proto","port")} if (p_val.get("engine") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet") or p_val.get("transport") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet")) else None,
+                    "rathole_transport": p_val.get("rathole_transport") or (p_val.get("camouflage") or {}).get("transport"),
+                    "rathole_proto": (p_val.get("camouflage") or {}).get("proto", "tcp"),
                     "operation_task": p_val.get("operation_task"),
                     "creation_job": p_val.get("creation_job"),
                     "creation_placeholder": p_val.get("creation_placeholder", False),
@@ -362,6 +439,10 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "port": srv.get("port", 22),
                     "username": srv.get("username", "root"),
                     "arch": srv.get("arch", "unknown"),
+                    "ipv6": srv.get("ipv6", ""),
+                    "health": srv.get("health", "unknown"),
+                    "last_seen": srv.get("last_seen"),
+                    "last_latency_ms": srv.get("last_latency_ms"),
                     "in_use": srv["ip"] in (used_iran_ips if is_iran else used_kharej_ips)
                 }
 
@@ -543,45 +624,42 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 return self._send_json({"error": f"SSH connection failed: {msg}"}, 502)
 
             eng = target_node.get('engine', 'backpack')
+            node_name = target_node.get("node_name", "")
+            nnq = shquote(node_name) if node_name else ""
             if eng == 'waterwall':
-                node_name = target_node.get("node_name", "")
-                svc = f"{node_name}.service" if node_name else "ldw*.service"
-                alt_svc = f"vxlb-waterwall-{node_name}.service" if node_name else "vxlb-waterwall*.service"
+                svc = f"{nnq}.service" if node_name else "ldw*.service"
+                alt_svc = f"vxlb-waterwall-{nnq}.service" if node_name else "vxlb-waterwall*.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {alt_svc} 2>/dev/null || journalctl --no-pager -n 80 | grep -i waterwall")
             elif eng in ('gre', 'gre_ipv4'):
-                node_name = target_node.get("node_name", "")
-                svc = f"vxlb-gre-{node_name}.service" if node_name else "vxlb-gre*.service"
+                svc = f"vxlb-gre-{nnq}.service" if node_name else "vxlb-gre*.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc}")
             elif eng in ('geneve', 'geneve_ipsec'):
-                node_name = target_node.get("node_name", "")
-                svc = f"vxlb-geneve-{node_name}.service" if node_name else "vxlb-geneve*.service"
-                relay_svc = f"vxlb-geneve-{node_name}-relay.service" if node_name else "vxlb-geneve*-relay.service"
+                svc = f"vxlb-geneve-{nnq}.service" if node_name else "vxlb-geneve*.service"
+                relay_svc = f"vxlb-geneve-{nnq}-relay.service" if node_name else "vxlb-geneve*-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
             elif eng == 'gre6':
-                node_name = target_node.get("node_name", "")
-                svc = f"vxlb-gre6-{node_name}.service" if node_name else "vxlb-gre6*.service"
-                relay_svc = f"vxlb-gre6-{node_name}-relay.service" if node_name else "vxlb-gre6*-relay.service"
+                svc = f"vxlb-gre6-{nnq}.service" if node_name else "vxlb-gre6*.service"
+                relay_svc = f"vxlb-gre6-{nnq}-relay.service" if node_name else "vxlb-gre6*-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
             elif eng == 'ip6ip6':
-                node_name = target_node.get("node_name", "")
-                svc = f"vxlb-ip6ip6-{node_name}.service" if node_name else "vxlb-ip6ip6*.service"
-                relay_svc = f"vxlb-ip6ip6-{node_name}-relay.service" if node_name else "vxlb-ip6ip6*-relay.service"
+                svc = f"vxlb-ip6ip6-{nnq}.service" if node_name else "vxlb-ip6ip6*.service"
+                relay_svc = f"vxlb-ip6ip6-{nnq}-relay.service" if node_name else "vxlb-ip6ip6*-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
             elif eng == 'wireguard':
-                node_name = target_node.get("node_name", "")
-                iface = target_node.get("wireguard", {}).get("interface") or f"wg-{node_name}"
+                iface_raw = target_node.get("wireguard", {}).get("interface") or (f"wg-{node_name}" if node_name else "")
+                iface = shquote(iface_raw) if iface_raw else ""
                 svc = f"wg-quick@{iface}.service"
                 relay_svc = f"vxlb-wg-{iface}-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
             elif eng == 'vxlan':
-                node_name = target_node.get("node_name", "")
-                iface = target_node.get("vxlan", {}).get("iface") or f"vx-{node_name}"
+                iface_raw = target_node.get("vxlan", {}).get("iface") or (f"vx-{node_name}" if node_name else "")
+                iface = shquote(iface_raw) if iface_raw else ""
                 svc = f"vxlb-vxlan-{iface}.service"
                 relay_svc = f"vxlb-{iface}-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
             elif eng == 'vxlan_ipsec':
-                node_name = target_node.get("node_name", "")
-                iface = (target_node.get("vxsec", {}).get("configs") or [{}])[0].get("interface") or node_name
+                iface_raw = (target_node.get("vxsec", {}).get("configs") or [{}])[0].get("interface") or node_name
+                iface = shquote(iface_raw) if iface_raw else ""
                 svc = f"vxlb-vxsec-{iface}.service"
                 relay_svc = f"vxlb-vxsec-{iface}-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
@@ -675,7 +753,11 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 return self._send_json({"error": "Unauthorized"}, 401)
             from core.reconfig_bot import ReconfigBot
             query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            limit = int(query.get("limit", [50])[0])
+            try:
+                limit = int(query.get("limit", [50])[0])
+            except (ValueError, TypeError, IndexError):
+                limit = 50
+            limit = max(0, min(limit, 500))
             return self._send_json({"logs": ReconfigBot.get_audit_logs(limit)})
 
         self.send_error(404, "Not Found")
@@ -718,7 +800,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
         # 1. Login endpoint (open to unauthenticated)
         if path == "/api/login":
             password_input = body.get("password", "")
-            client_ip = self.client_address[0] if self.client_address else "unknown"
+            client_ip = self._client_ip()
             if not _login_allowed(client_ip):
                 return self._send_json({"error": "تلاش‌های ناموفق زیاد؛ ۵ دقیقه صبر کنید"}, 429)
             data = load_data()
@@ -744,19 +826,27 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             if _verify_password(password_input, stored_pass):
                 token = secrets.token_hex(24)
                 AUTH_TOKENS[token] = time.time() + 86400  # 24 hours
-                return self._send_json({"success": True, "token": token})
+                secure = " Secure" if os.environ.get("VX_LB_WEB_SECURE_COOKIE") == "1" else ""
+                set_cookie = (
+                    f"ld_token={token}; HttpOnly; SameSite=Lax; Path=/; "
+                    f"Max-Age=86400{secure}"
+                )
+                # The session token lives in an HttpOnly cookie (not readable by
+                # JS), which keeps it out of localStorage and out of XSS reach.
+                return self._send_json({"success": True}, 200, {"Set-Cookie": set_cookie})
             else:
                 _record_failed_login(client_ip)
                 # Small constant delay to slow credential stuffing.
                 time.sleep(0.5)
                 return self._send_json({"error": "رمز عبور نادرست است"}, 401)
 
-        # Logout: invalidate the caller's token
+        # Logout: invalidate the caller's token and clear the session cookie
         if path == "/api/logout":
             token = self._get_auth_token()
             if token and token in AUTH_TOKENS:
                 del AUTH_TOKENS[token]
-            return self._send_json({"success": True})
+            clear_cookie = "ld_token=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0"
+            return self._send_json({"success": True}, 200, {"Set-Cookie": clear_cookie})
 
         # Protected endpoints below
         if not self._is_authenticated():
@@ -886,6 +976,81 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             else:
                 return self._send_json({"error": "سرور در مخزن یافت نشد"}, 404)
 
+        elif path == "/api/servers/test":
+            stype = body.get("type", "iran").lower()
+            ip = body.get("ip", "").strip()
+            if not ip:
+                return self._send_json({"error": "آدرس IP ارسال نشده است"}, 400)
+            target = None
+            for s in get_servers(stype):
+                if s.get("ip") == ip:
+                    target = s
+                    break
+            if not target:
+                return self._send_json({"error": "سرور در مخزن یافت نشد"}, 404)
+
+            try:
+                ssh = SSHManager.from_server(target, timeout=10)
+                diag = ssh.diagnose()
+            except Exception as e:
+                diag = {"reachable": False, "latency_ms": 0, "error": str(e)}
+
+            health = "ok" if diag.get("reachable") else "err"
+            update_server_telemetry(stype, ip, {
+                "health": health,
+                "last_seen": int(time.time()),
+                "last_latency_ms": diag.get("latency_ms", 0),
+            })
+            diag["health"] = health
+            diag["ip"] = ip
+            return self._send_json(diag)
+
+        elif path == "/api/servers/cc":
+            stype = body.get("type", "iran").lower()
+            ip = body.get("ip", "").strip()
+            action = (body.get("action", "status") or "status").lower()
+            if not ip:
+                return self._send_json({"error": "آدرس IP ارسال نشده است"}, 400)
+            target = None
+            for s in get_servers(stype):
+                if s.get("ip") == ip:
+                    target = s
+                    break
+            if not target:
+                return self._send_json({"error": "سرور در مخزن یافت نشد"}, 404)
+            try:
+                ssh = SSHManager.from_server(target, timeout=10)
+                if action == "enable":
+                    orig = ssh.tcp_cc_status()
+                    status = ssh.set_tcp_cc("bbr", "fq")
+                    update_server_telemetry(stype, ip, {
+                        "cc_before": orig.get("cc"), "qdisc_before": orig.get("default_qdisc"),
+                        "cc_enabled": True,
+                    })
+                elif action == "disable":
+                    prev_cc = target.get("cc_before") or "cubic"
+                    prev_qd = target.get("qdisc_before") or "pfifo_fast"
+                    ssh.execute("rm -f /etc/sysctl.d/99-vxlb-bbr.conf", timeout=20)
+                    ssh.execute(f"sysctl -w net.ipv4.tcp_congestion_control={shquote(prev_cc)}", timeout=20)
+                    ssh.execute(f"sysctl -w net.core.default_qdisc={shquote(prev_qd)}", timeout=20)
+                    ssh.execute("sysctl --system 2>/dev/null || true", timeout=20)
+                    status = ssh.tcp_cc_status()
+                    update_server_telemetry(stype, ip, {
+                        "cc_before": None, "qdisc_before": None, "cc_enabled": False,
+                    })
+                else:
+                    status = ssh.tcp_cc_status()
+                ssh.close()
+            except Exception as e:
+                return self._send_json({"error": f"خطا در مدیریت CC: {e}"}, 502)
+
+            enabled = bool(target.get("cc_enabled"))
+            if action == "enable":
+                enabled = True
+            elif action == "disable":
+                enabled = False
+            return self._send_json({"ip": ip, "enabled": enabled, "status": status})
+
         elif path == "/api/pools/create":
             pool_name = body.get("name", "").strip()
             kharej_ip = body.get("kharej_ip", "").strip()
@@ -952,7 +1117,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "dns_port": body.get("dns_port", 53),
                     "rate_limit": body.get("rate_limit", 1000)
                 })
-            elif transport in ("xhttp", "xhttps", "gre_xhttp", "reality", "nova", "waterwall", "gost", "frp", "hedioum"):
+            elif transport in ("xhttp", "xhttps", "gre_xhttp", "reality", "nova", "waterwall", "gost", "frp", "hedioum", "rathole", "paqet"):
                 extra_args["camouflage"] = body.get("camouflage", {})
             elif transport == "tun":
                 extra_args["mtu"] = body.get("tun_mtu") or body.get("mtu", 1280)

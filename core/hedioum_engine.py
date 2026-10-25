@@ -96,7 +96,7 @@ def setup_foreign(ssh, persona='auto', domain=None, move_ssh=False, mimics=None)
     return m.group(1).strip()
 
 
-def setup_iran(ssh, alias, token, socks_port, mode, tun_dns=False):
+def _command(mode, alias, token, socks_port, tun_dns=False):
     cmd = (f'mkdir -p /etc/hedioum && cd /etc/hedioum && {BINARY} setup-iran --alias {shlex.quote(alias)} '
            f'--token {shlex.quote(token)} '
            f'--socks-port {int(socks_port)} --socks-bind 0.0.0.0')
@@ -106,7 +106,28 @@ def setup_iran(ssh, alias, token, socks_port, mode, tun_dns=False):
             cmd += ' --dns'
     elif mode == 'gateway':
         cmd += ' --tun --dns --gateway'
-    execute(ssh, cmd, timeout=120)
+    return cmd
+
+
+def setup_iran(ssh, alias, token, socks_port, mode, tun_dns=False):
+    """Provision an Iran hub node.
+
+    A node that was previously used as an egress/foreign (Kharej) endpoint
+    still carries a Hedioum config with role "foreign"; the binary refuses to
+    overwrite it (``existing config role is "foreign", not iran``). In that
+    case we wipe the stale config on THIS node only via the binary's standalone
+    ``--reset`` (removes /etc/hedioum/hedioum.json and stops the service) and
+    retry once. The reset never touches the Kharej side, which owns the token.
+    """
+    try:
+        execute(ssh, _command(mode, alias, token, socks_port, tun_dns=tun_dns), timeout=120)
+    except Exception as error:
+        text = str(error)
+        if 'not iran' in text or 'config role' in text:
+            execute(ssh, f'cd /etc/hedioum && {BINARY} --reset', timeout=60)
+            execute(ssh, _command(mode, alias, token, socks_port, tun_dns=tun_dns), timeout=120)
+            return
+        raise
 
 
 def _alias(node):

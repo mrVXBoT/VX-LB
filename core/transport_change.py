@@ -257,6 +257,10 @@ def get_engine_for_transport(transport: str) -> str:
         return 'frp'
     if t == 'hedioum':
         return 'hedioum'
+    if t == 'rathole':
+        return 'rathole'
+    if t == 'paqet':
+        return 'paqet'
     if t == 'wireguard':
         return 'wireguard'
     if t in {'geneve', 'geneve_ipsec'}:
@@ -321,6 +325,8 @@ def _engine_module(engine):
         'gost': 'core.gost_engine',
         'frp': 'core.frp_engine',
         'hedioum': 'core.hedioum_engine',
+        'rathole': 'core.rathole_engine',
+        'paqet': 'core.paqet_engine',
         'slipstream': 'core.slipstream_adapter',
         'spoof': 'core.spoof_adapter',
         'http': 'core.http_transport',
@@ -420,6 +426,24 @@ def teardown_pool_runtime(pool):
             try:
                 if pool_name:
                     hedioum_remove(pool_name, node['ip'])
+            except Exception: pass
+
+    elif engine == 'rathole':
+        from core.rathole_engine import remove as rathole_remove
+        pool_name = pool.get('name')
+        for node in nodes:
+            try:
+                if pool_name:
+                    rathole_remove(pool_name, node['ip'])
+            except Exception: pass
+
+    elif engine == 'paqet':
+        from core.paqet_engine import remove as paqet_remove
+        pool_name = pool.get('name')
+        for node in nodes:
+            try:
+                if pool_name:
+                    paqet_remove(pool_name, node['ip'])
             except Exception: pass
 
     elif engine == 'wireguard':

@@ -725,7 +725,7 @@
 </div>
 
 <script>
-let authToken = localStorage.getItem("vx_lb_token") || "";
+let authToken = ""; // session auth is cookie-based (HttpOnly); flag to gate UI
 document.documentElement.dataset.theme = localStorage.getItem("vx_lb_theme") || "dark";
 let poolsData = [];
 let privateLinks = {};
@@ -752,7 +752,7 @@ const STATUS_FA = {
 };
 
 async function apiFetch(path) {
-  const res = await fetch(path, { headers: { "Authorization": "Bearer " + authToken } });
+  const res = await fetch(path, { credentials: "same-origin" });
   if (res.status === 401) { location.href = "/"; return null; }
   if (!res.ok) throw new Error("HTTP " + res.status);
   return res.json();

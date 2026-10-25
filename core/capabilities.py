@@ -196,6 +196,27 @@ CAPABILITIES_CATALOG: Dict[str, EngineCapabilities] = {
         supports_port_forwarding=True,
         supports_raw_link=False,
     ),
+    # Paqet
+    "paqet": EngineCapabilities(
+        engine_id="paqet",
+        display_name="Paqet",
+        description="Raw TCP packet carrier using KCP over raw frames with interface/MAC binding",
+        supported_protocols=["tcp", "udp"],
+        address_families=["ipv4"],
+        layer="L3",
+        directionality="bidirectional",
+        supported_topologies=["1:1", "N:1"],
+        requires_encryption=True,
+        encryption_type="noise",
+        kernel_requirements=["raw_socket", "bpf"],
+        support_status="experimental",
+        status_reason="Raw-packet KCP engine (hanselime/paqet); awaiting operational validation on live endpoints",
+        default_mtu=1280,
+        overhead_bytes=84,
+        supports_port_forwarding=True,
+        supports_raw_link=True,
+        requires_external_domain=False,
+    ),
     # GOST
     "gost": EngineCapabilities(
         engine_id="gost",

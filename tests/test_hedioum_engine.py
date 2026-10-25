@@ -66,6 +66,33 @@ eyJ2IjoyLCJpcCI6IjE0My4yNDYuMTM4LjI0NSIsImF1dGgiOiJhZTBmMDI2N2ViMmZmNjllMmJlZWZi
             else:
                 self.assertNotIn("--tun", cmd)
 
+    def test_setup_iran_recovers_stale_foreign_config(self):
+        # A node previously provisioned as egress/foreign refuses setup-iran with
+        # "existing config role is \"foreign\", not iran". Recovery runs the binary's
+        # standalone `--reset` (config wipe) then retries setup-iran without --reset.
+        ssh = MagicMock()
+        ssh.execute.side_effect = [
+            (1, "", 'existing config role is "foreign", not iran'),
+            (0, "", ""),   # hedioum-tunnel --reset  (standalone)
+            (0, "", ""),   # setup-iran retry
+        ]
+        h.setup_iran(ssh, "alias1", "tok", 2255, "socks")
+        commands = [call_args[0][0] for call_args in ssh.execute.call_args_list]
+        self.assertEqual(len(commands), 3)
+        reset_cmds = [c for c in commands if "--reset" in c]
+        self.assertEqual(len(reset_cmds), 1)
+        self.assertNotIn("setup-iran", reset_cmds[0])  # reset is NOT a setup-iran flag
+        setup_cmds = [c for c in commands if "setup-iran" in c]
+        self.assertTrue(all("--reset" not in c for c in setup_cmds))
+
+    def test_setup_iran_propagates_other_errors(self):
+        ssh = MagicMock()
+        ssh.execute.return_value = (1, "", "some unrelated failure")
+        with self.assertRaises(RuntimeError):
+            h.setup_iran(ssh, "alias1", "tok", 2255, "socks")
+        self.assertFalse(any("--reset" in c[0][0] for c in ssh.execute.call_args_list))
+
+
     def test_create_validation(self):
         with patch.object(h, "get_pools", return_value={}):
             ok, msg, _ = h.create("p1", {"ip": "198.51.100.1"}, [{"ip": "192.0.2.1"}],

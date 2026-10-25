@@ -302,6 +302,20 @@ def get_servers(server_type: str) -> List[dict]:
     key = "iran_servers" if server_type.lower() == "iran" else "kharej_servers"
     return data.get(key, [])
 
+
+def update_server_telemetry(server_type: str, ip: str, fields: dict) -> bool:
+    """Merge health/telemetry fields into a saved server record. Returns True if found."""
+    done = [False]
+    def _up(d: dict):
+        key = "iran_servers" if server_type.lower() == "iran" else "kharej_servers"
+        for s in d.get(key, []):
+            if s.get("ip") == ip:
+                s.update(fields)
+                done[0] = True
+                break
+    atomic_update(_up)
+    return done[0]
+
 def get_pools() -> Dict[str, dict]:
     data = load_data()
     return data.get("pools", {})
