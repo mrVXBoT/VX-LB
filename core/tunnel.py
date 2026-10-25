@@ -31,7 +31,7 @@ SUPPORTED_TRANSPORTS = {
     "21": ("gost", "GOST (Shadowsocks/obfs4/gRPC/SSH multi-protocol engine)"),
     "42": ("frp", "FRP (معکوس‌پروکسی سریع — TCP/UDP/Dual)"),
     "22": ("geneve_ipsec", "Geneve + IPsec (Experimental kernel tunnel)"),
-    "23": ("vxlan", "VXLAN (L2 encapsulation: Point-to-Point / Bridge / FDB)"),
+    "23": ("vxlan", "VXLAN (L2 encapsulation: Point-to-Point / Bridge / FDB — بدون رمزنگاری)"),
     "24": ("wireguard", "WireGuard (Curve25519 + ChaCha20 kernel interface)"),
     "25": ("gre6", "GRE6 (Native IPv6 GRE encapsulation)"),
     "26": ("ip6ip6", "IP6IP6 (Native IPv6 in IPv6 encapsulation)"),

@@ -253,6 +253,8 @@ def get_engine_for_transport(transport: str) -> str:
         return 'waterwall'
     if t == 'gost':
         return 'gost'
+    if t == 'frp':
+        return 'frp'
     if t == 'wireguard':
         return 'wireguard'
     if t in {'geneve', 'geneve_ipsec'}:
@@ -315,6 +317,7 @@ def _engine_module(engine):
         'geneve_ipsec': 'core.geneve',
         'waterwall': 'core.waterwall',
         'gost': 'core.gost_engine',
+        'frp': 'core.frp_engine',
         'slipstream': 'core.slipstream_adapter',
         'spoof': 'core.spoof_adapter',
         'http': 'core.http_transport',
@@ -396,6 +399,15 @@ def teardown_pool_runtime(pool):
             try:
                 if pool_name:
                     gost_remove(pool_name, node['ip'])
+            except Exception: pass
+
+    elif engine == 'frp':
+        from core.frp_engine import remove as frp_remove
+        pool_name = pool.get('name')
+        for node in nodes:
+            try:
+                if pool_name:
+                    frp_remove(pool_name, node['ip'])
             except Exception: pass
 
     elif engine == 'wireguard':

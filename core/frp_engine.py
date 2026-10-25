@@ -40,23 +40,35 @@ def normalize_mode(mode):
 
 
 def install_frp(ssh, role):
-    binary = SERVER_BIN if role == 'kharej' else CLIENT_BIN
+    binary = SERVER_BIN if role == 'iran' else CLIENT_BIN
     code, _, err = ssh.execute(f'test "$(id -u)" = 0 && test -x {shlex.quote(binary)} && command -v python3 && command -v systemctl')
-    if code != 0:
+    if code == 0:
+        return True, 'FRP binary verified'
+    try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         _, arch_raw, _ = ssh.execute('uname -m')
         remote_arch = arch_raw.strip().lower()
         arch_dir = 'x86_64' if remote_arch in ('x86_64', 'amd64') else 'aarch64' if remote_arch in ('aarch64', 'arm64') else remote_arch
-        file_name = 'frps' if role == 'kharej' else 'frpc'
+        file_name = 'frps' if role == 'iran' else 'frpc'
         candidate = os.path.join(base_dir, 'bin', arch_dir, file_name)
         from core.dependency_manifest import get_dependency_manifest, verify_file_sha256
-        manifest = get_dependency_manifest('frp')
+        manifest = get_dependency_manifest(file_name)
         expected = (manifest.architectures.get(arch_dir, {}) if manifest else {}).get('sha256')
-        if os.path.isfile(candidate) and expected and verify_file_sha256(candidate, expected) and hasattr(ssh, 'upload_binary'):
-            if ssh.upload_binary(candidate, binary, mode=0o755):
-                code, out, err = ssh.execute(f'test -x {shlex.quote(binary)} && command -v python3 && command -v systemctl')
+        if not os.path.isfile(candidate):
+            return False, f'FRP binary not in offline depot: {candidate}'
+        if not expected:
+            return False, f'FRP manifest missing checksum for {file_name}/{arch_dir}'
+        if not verify_file_sha256(candidate, expected):
+            return False, f'FRP binary checksum mismatch for {candidate}'
+        if not hasattr(ssh, 'upload_binary'):
+            return False, 'SSH manager has no upload_binary support'
+        if not ssh.upload_binary(candidate, binary, mode=0o755):
+            return False, 'Failed to upload FRP binary to server'
+        code, out, err = ssh.execute(f'test -x {shlex.quote(binary)} && command -v python3 && command -v systemctl')
         if code != 0:
-            return False, f'FRP install check failed: root, binary ({binary}), or system tools missing: {err or out}'
+            return False, f'FRP post-install check failed: {err or out}'
+    except Exception as e:
+        return False, f'FRP install error: {e}'
     return True, 'FRP binary verified'
 
 
@@ -185,19 +197,21 @@ def add(name, server, callback=None):
             data['pools'][name]['nodes'].append(node)
         atomic_update(reserve)
 
+        # frps (server) lives on Iran and exposes the client ports; frpc (client)
+        # lives on Kharej and tunnels traffic back to Iran. Users connect to Iran.
         server_cfg = _server_config(port, token)
-        client_cfg = _client_config(pool['kharej_server']['ip'], port, token, mode, pool['client_ports'])
-        ir_svc = _service_name(node, 'c')
-        kh_svc = _service_name(node, 's')
-        ir_cfg = f'{DIRECTORY}/frpc-{node["node_name"]}.toml'
-        kh_cfg = f'{DIRECTORY}/frps-{node["node_name"]}.toml'
+        client_cfg = _client_config(node['ip'], port, token, mode, pool['client_ports'])
+        ir_svc = _service_name(node, 's')
+        kh_svc = _service_name(node, 'c')
+        ir_cfg = f'{DIRECTORY}/frps-{node["node_name"]}.toml'
+        kh_cfg = f'{DIRECTORY}/frpc-{node["node_name"]}.toml'
 
         execute(iran, f'mkdir -p {DIRECTORY}')
         execute(kharej, f'mkdir -p {DIRECTORY}')
-        write(iran, ir_cfg, client_cfg)
-        write(kharej, kh_cfg, server_cfg)
-        write(iran, f'/etc/systemd/system/{ir_svc}', _unit(CLIENT_BIN, ir_cfg))
-        write(kharej, f'/etc/systemd/system/{kh_svc}', _unit(SERVER_BIN, kh_cfg))
+        write(iran, ir_cfg, server_cfg)
+        write(kharej, kh_cfg, client_cfg)
+        write(iran, f'/etc/systemd/system/{ir_svc}', _unit(SERVER_BIN, ir_cfg))
+        write(kharej, f'/etc/systemd/system/{kh_svc}', _unit(CLIENT_BIN, kh_cfg))
         execute(iran, f'systemctl daemon-reload && systemctl enable --now {shlex.quote(ir_svc)}')
         execute(kharej, f'systemctl daemon-reload && systemctl enable --now {shlex.quote(kh_svc)}')
 
@@ -239,9 +253,9 @@ def remove(name, ip, callback=None):
         return False, 'نود یافت نشد'
     sessions = []
     try:
-        for server, role in ((node, 'c'), (pool['kharej_server'], 's')):
+        for server, role in ((node, 's'), (pool['kharej_server'], 'c')):
             sessions.append(connect(server))
-        for ssh, role in zip(sessions, ('c', 's')):
+        for ssh, role in zip(sessions, ('s', 'c')):
             svc = _service_name(node, role)
             execute(ssh, f'systemctl disable --now {shlex.quote(svc)} 2>/dev/null || true')
             execute(ssh, f'rm -f {DIRECTORY}/frp*-{node["node_name"]}.toml /etc/systemd/system/{svc}')
@@ -272,10 +286,10 @@ def health(name, node, ports):
     try:
         pool = get_pools()[name]
         sessions = []
-        for server, role in ((node, 'c'), (pool['kharej_server'], 's')):
+        for server, role in ((node, 's'), (pool['kharej_server'], 'c')):
             sessions.append(connect(server))
         ok = True
-        for ssh, role in zip(sessions, ('c', 's')):
+        for ssh, role in zip(sessions, ('s', 'c')):
             svc = _service_name(node, role)
             code, _, _ = ssh.execute(f'systemctl is-active --quiet {shlex.quote(svc)}')
             ok = ok and code == 0
@@ -301,12 +315,12 @@ def change_ports(name, ports, recovery=False):
             ir_ssh = connect(node)
             kh_ssh = connect(pool['kharej_server'])
             sessions.append((ir_ssh, kh_ssh))
-            client_cfg = _client_config(pool['kharej_server']['ip'], node['frp']['port'],
+            client_cfg = _client_config(node['ip'], node['frp']['port'],
                                         node['frp']['token'], node['frp']['mode'], ports)
-            ir_cfg = f'{DIRECTORY}/frpc-{node["node_name"]}.toml'
-            ir_svc = _service_name(node, 'c')
-            write(ir_ssh, ir_cfg, client_cfg)
-            execute(ir_ssh, f'systemctl restart {shlex.quote(ir_svc)}')
+            kh_cfg = f'{DIRECTORY}/frpc-{node["node_name"]}.toml'
+            kh_svc = _service_name(node, 'c')
+            write(kh_ssh, kh_cfg, client_cfg)
+            execute(kh_ssh, f'systemctl restart {shlex.quote(kh_svc)}')
         def commit(data):
             data['pools'][name]['client_ports'] = ports
         atomic_update(commit)

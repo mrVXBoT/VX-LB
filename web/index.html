@@ -407,7 +407,21 @@
       <!-- Profile cards -->
       <div id="cf-profiles-list" class="cf-profiles-grid"></div>
       <div id="cf-profiles-empty" class="empty-state hidden">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97 7 7 0 0 0-13.62-1.7A5 5 0 0 0 6 19z"/></svg>
+        <svg width="76" height="76" viewBox="0 0 80 80" fill="none" class="empty-cf-svg">
+          <circle cx="40" cy="40" r="36" fill="url(#cfGlow)" fill-opacity="0.12"></circle>
+          <circle cx="40" cy="40" r="32" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 5" stroke-opacity="0.3"></circle>
+          <circle cx="16" cy="28" r="3" fill="#38bdf8"></circle>
+          <path d="M54 50H26a11 11 0 0 1-1.5-21.9A14 14 0 0 1 52 24.5a10 10 0 0 1 5.5 8.5A8.5 8.5 0 0 1 54 50z" fill="rgba(56, 189, 248, 0.08)" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"></path>
+          <rect x="30" y="38" width="20" height="20" rx="6" fill="var(--bg-elevated, #172426)" stroke="currentColor" stroke-width="2"></rect>
+          <circle cx="40" cy="45" r="2.5" stroke="currentColor" stroke-width="1.8"></circle>
+          <path d="M40 47.5V53m0-2h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          <defs>
+            <radialGradient id="cfGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(40 40) rotate(90) scale(36)">
+              <stop stop-color="#38bdf8"></stop>
+              <stop offset="1" stop-color="#38bdf8" stop-opacity="0"></stop>
+            </radialGradient>
+          </defs>
+        </svg>
         <h4>توکنی ثبت نشده</h4>
         <p>یک API Token کلودفلر با دسترسی Zone Read + DNS Edit اضافه کنید.</p>
         <button type="button" class="btn-primary sm" onclick="openCfProfileModal()"><span>افزودن اولین توکن</span></button>
@@ -579,10 +593,9 @@
       <button type="button" class="nav-tab-btn active" id="nav-tab-pools" onclick="switchTab('pools')">
         <span class="nav-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-            <line x1="6" y1="6" x2="6.01" y2="6"></line>
-            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
           </svg>
         </span>
         <span>استخرها</span>
@@ -591,9 +604,12 @@
       <button type="button" class="nav-tab-btn" id="nav-tab-servers" onclick="switchTab('servers')">
         <span class="nav-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2"></rect>
-            <line x1="8" y1="21" x2="16" y2="21"></line>
-            <line x1="12" y1="17" x2="12" y2="21"></line>
+            <rect x="2" y="4" width="20" height="6" rx="2"></rect>
+            <rect x="2" y="14" width="20" height="6" rx="2"></rect>
+            <circle cx="6" cy="7" r="1" fill="currentColor"></circle>
+            <circle cx="6" cy="17" r="1" fill="currentColor"></circle>
+            <line x1="14" y1="7" x2="18" y2="7"></line>
+            <line x1="14" y1="17" x2="18" y2="17"></line>
           </svg>
         </span>
         <span>سرورها</span>
@@ -603,6 +619,7 @@
         <span class="nav-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <path d="M9 12h1.5l1.5-3 2 6 1.5-3H17"></path>
           </svg>
         </span>
         <span>واچ‌داگ</span>
@@ -611,8 +628,8 @@
       <button type="button" class="nav-tab-btn" id="nav-tab-cloudflare" onclick="switchTab('cloudflare')">
         <span class="nav-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97 7 7 0 0 0-13.62-1.7A5 5 0 0 0 6 19z"/>
-            <path d="M9 12h6M9 16h4"/>
+            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"></path>
+            <path d="M12 11l-2 4h4l-2 4"></path>
           </svg>
         </span>
         <span>کلودفلر</span>
@@ -621,8 +638,15 @@
       <button type="button" class="nav-tab-btn" id="nav-tab-settings" onclick="switchTab('settings')">
         <span class="nav-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            <line x1="4" y1="21" x2="4" y2="14"></line>
+            <line x1="4" y1="10" x2="4" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12" y2="3"></line>
+            <line x1="20" y1="21" x2="20" y2="16"></line>
+            <line x1="20" y1="12" x2="20" y2="3"></line>
+            <line x1="1" y1="14" x2="7" y2="14"></line>
+            <line x1="9" y1="8" x2="15" y2="8"></line>
+            <line x1="17" y1="16" x2="23" y2="16"></line>
           </svg>
         </span>
         <span>تنظیمات</span>
@@ -792,6 +816,7 @@
               <option value="backpack" selected>موتور جت پک</option>
               <option value="waterwall">سد کرج</option>
               <option value="gost">غول چراغ جادو</option>
+              <option value="frp">پیچ شمرون</option>
               <option value="kernel">فاضلاب لینوکس</option>
               <option value="spoof">پردازش بسته (DPI Spoof)</option>
               <option value="other">اتاق بحران (وب و اضطراری)</option>
@@ -1089,6 +1114,8 @@
             <select id="transport-change-engine" class="field-input select-styled" onchange="onTransportChangeEngineChanged()">
               <option value="backpack">موتور جت پک</option>
               <option value="waterwall">سد کرج</option>
+              <option value="gost">غول چراغ جادو</option>
+              <option value="frp">پیچ شمرون</option>
               <option value="kernel">فاضلاب لینوکس</option>
               <option value="spoof" disabled>پردازش بسته — استخر جداگانه بسازید</option>
               <option value="other">اتاق بحران (وب و اضطراری)</option>

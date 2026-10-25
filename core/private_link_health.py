@@ -20,9 +20,13 @@ print(port,flush=True)
 clients=[];deadline=time.monotonic()+120
 try:
  while time.monotonic()<deadline:
-  ready,_,_=select.select([server,udp,*clients],[],[],0.2)
+  watch=[server,udp,*clients]
+  if not sys.stdin.closed:watch.append(sys.stdin)
+  ready,_,_=select.select(watch,[],[],0.2)
   for item in ready:
-   if item is server:
+   if item is sys.stdin:
+    if not sys.stdin.read(1):deadline=0;break
+   elif item is server:
     client,_=server.accept();client.settimeout(2);clients.append(client)
    elif item is udp:
     data,addr=udp.recvfrom(1500);udp.sendto(data,addr)

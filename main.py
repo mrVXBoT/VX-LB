@@ -356,6 +356,20 @@ def create_load_balancer_flow():
             'binary': Prompt.ask("GOST binary path on both servers", default='/usr/local/bin/gost'),
         }
         gre_options = {'camouflage': settings}
+    elif selected_transport == 'frp':
+        import secrets as _secrets_frp
+        from core.frp_engine import MODES, MODE_LABELS
+        console.print("[bold cyan]FRP mode:[/bold cyan]")
+        frp_choices = {str(i): m for i, m in enumerate(MODES, 1)}
+        for i, m in frp_choices.items():
+            console.print(f"  [{i}] {MODE_LABELS[m]}")
+        fchoice = Prompt.ask("Select FRP mode", choices=list(frp_choices), default="1")
+        settings = {
+            'mode': frp_choices[fchoice],
+            'token': Prompt.ask("FRP auth token (min 8 chars)", default=_secrets_frp.token_hex(16)),
+            'port': Prompt.ask("FRP bind port (frpc↔frps)", default='7000'),
+        }
+        gre_options = {'camouflage': settings}
     elif selected_transport == 'geneve_ipsec':
         vni_in = Prompt.ask("VNI (1-16777215, default auto)", default="")
         mtu_in = Prompt.ask("Geneve MTU (576-1420)", default="1400")
