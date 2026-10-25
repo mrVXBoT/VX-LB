@@ -30,6 +30,7 @@ SUPPORTED_TRANSPORTS = {
     "20": ("waterwall", "WaterWall (Official Engine: HalfDuplex, Reverse, Trojan, Bgp4, Reality)"),
     "21": ("gost", "GOST (Shadowsocks/obfs4/gRPC/SSH multi-protocol engine)"),
     "42": ("frp", "FRP (معکوس‌پروکسی سریع — TCP/UDP/Dual)"),
+    "43": ("hedioum", "Hedioum Pool Tunnel (SOCKS5/TUN/Gateway — استتار ۱۶‌گانه)"),
     "22": ("geneve_ipsec", "Geneve + IPsec (Experimental kernel tunnel)"),
     "23": ("vxlan", "VXLAN (L2 encapsulation: Point-to-Point / Bridge / FDB — بدون رمزنگاری)"),
     "24": ("wireguard", "WireGuard (Curve25519 + ChaCha20 kernel interface)"),
@@ -54,7 +55,7 @@ SUPPORTED_TRANSPORTS = {
 }
 
 NON_BACKPACK_TRANSPORTS = {
-    "gre", "waterwall", "gost", "frp",
+    "gre", "waterwall", "gost", "frp", "hedioum",
     "geneve_ipsec", "vxlan", "vxlan_ipsec", "gre6", "ip6ip6", "wireguard", "slipstream",
     "tun", "dc6", "http", "https",
     "fake-sni", "split-tls", "hop-ttl-injection", "tcp-state-desync",

@@ -710,6 +710,12 @@ function getTransportTagLabel(p) {
     if (mode === "tcp") return "پیچ تک‌مسیره";
     return "پیچ شمرون";
   }
+  if (eng === "hedioum" || tr === "hedioum") {
+    const mode = p.hedioum_mode || p.camouflage?.mode || p.nodes?.[0]?.hedioum?.mode || "socks";
+    if (mode === "gateway") return "Hedioum Gateway";
+    if (mode === "tun") return "Hedioum TUN";
+    return "Hedioum SOCKS5";
+  }
   if (tr === "ws") return "سولاخ کلودفلر";
   if (tr === "http") return "پیک موتوری";
   if (tr === "https") return "رمزی ممزی";
@@ -737,6 +743,9 @@ function getEngineBadge(engine, transport) {
   } else if (eng === "frp" || tr === "frp") {
     cls = "engine-frp";
     label = "پیچ شمرون";
+  } else if (eng === "hedioum" || tr === "hedioum") {
+    cls = "engine-hedioum";
+    label = "Hedioum";
   } else if (["wireguard", "gre", "vxlan", "tun", "dc6", "geneve", "geneve_ipsec", "gre6", "ip6ip6"].includes(eng) ||
              ["wireguard", "gre", "vxlan", "tun", "dc6", "geneve", "geneve_ipsec", "gre6", "ip6ip6"].includes(tr)) {
     cls = "engine-kernel";
@@ -831,7 +840,7 @@ function renderPools(pools) {
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
               </button>
-              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))} · گواهی اختصاصی` : n.engine === "waterwall" ? `سد کرج (${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "فلکه آب")}) · پورت خارج ${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}` : n.engine === "gost" ? `GOST · ${escapeHtml(p.camouflage?.profile || n.gost?.profile || "shadowsocks-tcp")} · پورت خارج ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 8443))}` : n.engine === "frp" ? `پیچ شمرون (${escapeHtml(p.camouflage?.mode || n.frp?.mode || "tcp")}) · پورت اتصال ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 7000))}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
+              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))} · گواهی اختصاصی` : n.engine === "waterwall" ? `سد کرج (${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "فلکه آب")}) · پورت خارج ${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}` : n.engine === "gost" ? `GOST · ${escapeHtml(p.camouflage?.profile || n.gost?.profile || "shadowsocks-tcp")} · پورت خارج ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 8443))}` : n.engine === "frp" ? `پیچ شمرون (${escapeHtml(p.camouflage?.mode || n.frp?.mode || "tcp")}) · پورت اتصال ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 7000))}` : n.engine === "hedioum" ? `Hedioum (${escapeHtml(p.camouflage?.mode || n.hedioum?.mode || "socks")}) · SOCKS پورت ${escapeHtml(String(n.tunnel_port || p.camouflage?.socks_port || n.hedioum?.socks_port || "-"))}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
             </div>
             ${n.gre_https ? `<div class="gre-private-route"><span>GRE داخل HTTPS:</span><bdi dir="ltr">${escapeHtml(n.gre_https.local_private)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre_https.remote_private)}</bdi><span>MTU ${escapeHtml(n.gre_https.mtu)}</span></div>` : ''}
             ${(n.engine === 'tun' || p.transport === 'tun') ? `<div class="gre-private-route"><span>لینک TUN:</span><bdi dir="ltr">${escapeHtml(n.tun?.iran_inner || "10.210.1.1")}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.tun?.kharej_inner || "10.210.1.2")}</bdi><span>(${escapeHtml(n.tun?.interface || "tun")}) · لایه 3 کرنل</span></div>` : ''}
@@ -1415,6 +1424,16 @@ async function submitCreatePool(e) {
                  mode: getSelectedFrpMode(),
                  port: document.getElementById('frp-port')?.value || '7000',
                  token: (document.getElementById('frp-token')?.value || '').trim() || genSecret(16)
+               }
+             } :
+             transport === 'hedioum' ? {
+               camouflage: {
+                 mode: getSelectedHedioumMode(),
+                 socks_port: document.getElementById('hedioum-socks-port')?.value || '',
+                 persona: document.getElementById('hedioum-persona')?.value || 'auto',
+                 domain: document.getElementById('hedioum-domain')?.value || '',
+                 move_ssh: document.getElementById('hedioum-move-ssh')?.checked || false,
+                 tun_dns: document.getElementById('hedioum-tun-dns')?.checked || false
                }
              } : {})
       }
@@ -2185,6 +2204,14 @@ const ENGINE_TRANSPORTS = {
       { value: "frp", mode: "dual", label: "پیچ دوبل (TCP+UDP)", hint: "فوروارد همزمان TCP و UDP برای هر پورت" }
     ]
   },
+  hedioum: {
+    label: "موتور Hedioum (استتار ۱۶‌گانه)",
+    transports: [
+      { value: "hedioum", mode: "socks", label: "Hedioum SOCKS5", hint: "SOCKS5 روی پورت مشخص (پیش‌فرض پورت اول کلاینت)" },
+      { value: "hedioum", mode: "tun", label: "Hedioum TUN", hint: "اینترفیس TUN + DNS forwarder اختیاری" },
+      { value: "hedioum", mode: "gateway", label: "Hedioum Gateway", hint: "گیت‌وی شفاف L3 برای کل LAN" }
+    ]
+  },
   kernel: {
     label: "فاضلاب لینوکس",
     transports: [
@@ -2315,6 +2342,12 @@ function getSelectedFrpMode() {
   const protoEl = document.getElementById('new-pool-proto');
   const opt = protoEl && protoEl.selectedOptions && protoEl.selectedOptions[0];
   return (opt && opt.dataset && opt.dataset.mode) || 'tcp';
+}
+
+function getSelectedHedioumMode() {
+  const protoEl = document.getElementById('new-pool-proto');
+  const opt = protoEl && protoEl.selectedOptions && protoEl.selectedOptions[0];
+  return (opt && opt.dataset && opt.dataset.mode) || 'socks';
 }
 
 function onWaterwallModeChanged() {
@@ -2735,6 +2768,21 @@ function updateGreCreateFields() {
       const el = document.getElementById(id);
       if (el) el.disabled = !isFrp;
     });
+  }
+
+  // Hedioum
+  const hedioumDiv = document.getElementById('hedioum-create-fields');
+  if (hedioumDiv) {
+    const isHedioum = mode === 'hedioum';
+    hedioumDiv.classList.toggle('hidden', !isHedioum);
+    ['hedioum-socks-port', 'hedioum-persona', 'hedioum-domain',
+     'hedioum-move-ssh', 'hedioum-tun-dns'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !isHedioum;
+    });
+    const hmode = getSelectedHedioumMode();
+    const dnsEl = document.getElementById('hedioum-tun-dns');
+    if (dnsEl) dnsEl.disabled = !isHedioum || hmode !== 'tun';
   }
 
   // Spoof family (Anti-DPI & Desync)

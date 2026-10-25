@@ -156,6 +156,26 @@ CAPABILITIES_CATALOG: Dict[str, EngineCapabilities] = {
         supports_port_forwarding=True,
         supports_raw_link=False,
     ),
+    # Hedioum
+    "hedioum": EngineCapabilities(
+        engine_id="hedioum",
+        display_name="Hedioum Pool Tunnel",
+        description="Dynamic multi-mimic pool tunnel with SOCKS5, TUN, and L3 gateway modes",
+        supported_protocols=["tcp", "udp"],
+        address_families=["ipv4", "ipv6"],
+        layer="L4",
+        directionality="bidirectional",
+        supported_topologies=["1:1", "N:1", "1:M", "N:M"],
+        requires_encryption=True,
+        encryption_type="tls",
+        kernel_requirements=[],
+        support_status="experimental",
+        status_reason="Self-sufficient multi-protocol mimicry pool multiplexer",
+        default_mtu=1400,
+        overhead_bytes=60,
+        supports_port_forwarding=True,
+        supports_raw_link=False,
+    ),
     # Rathole
     "rathole": EngineCapabilities(
         engine_id="rathole",

@@ -817,6 +817,7 @@
               <option value="waterwall">سد کرج</option>
               <option value="gost">غول چراغ جادو</option>
               <option value="frp">پیچ شمرون</option>
+              <option value="hedioum">Hedioum</option>
               <option value="kernel">فاضلاب لینوکس</option>
               <option value="spoof">پردازش بسته (DPI Spoof)</option>
               <option value="other">اتاق بحران (وب و اضطراری)</option>
@@ -862,6 +863,25 @@
             <div class="input-group"><label class="field-label" for="gost-password">رمز عبور مشترک (حداقل ۸ نویسه)</label><input id="gost-password" class="field-input" type="text" dir="ltr" disabled></div>
             <div class="input-group"><label class="field-label" for="gost-outer-port">پورت ترجیحی اتصال به سرور خارج</label><input id="gost-outer-port" class="field-input" value="8443" type="number" min="1" max="65535" dir="ltr" disabled required></div>
             <div class="input-group"><label class="field-label" for="gost-binary">مسیر GOST روی هر دو سرور</label><input id="gost-binary" class="field-input" value="/usr/local/bin/gost" dir="ltr" disabled></div>
+          </div>
+          <div id="frp-create-fields" class="input-group hidden">
+            <div class="input-group"><label class="field-label" for="frp-token">توکن احراز هویت (حداقل ۸ نویسه)</label><input id="frp-token" class="field-input" type="text" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="frp-port">پورت اتصال frpc↔frps (پیش‌فرض 7000)</label><input id="frp-port" class="field-input" value="7000" type="number" min="1" max="65535" dir="ltr" disabled required></div>
+          </div>
+          <div id="hedioum-create-fields" class="input-group hidden">
+            <div class="input-group"><label class="field-label" for="hedioum-socks-port">پورت SOCKS5 روی ایران (پیش‌فرض: پورت اول کلاینت)</label><input id="hedioum-socks-port" class="field-input" value="" type="number" min="1" max="65535" dir="ltr" disabled></div>
+            <div class="input-group">
+              <label class="field-label" for="hedioum-persona">Persona (هویت استتار)</label>
+              <select id="hedioum-persona" class="field-input select-styled">
+                <option value="auto" selected>auto</option>
+                <option value="cpanel">cpanel</option>
+                <option value="directadmin">directadmin</option>
+                <option value="devops">devops</option>
+              </select>
+            </div>
+            <div class="input-group"><label class="field-label" for="hedioum-domain">دامنهٔ اختیاری (Let's Encrypt واقعی)</label><input id="hedioum-domain" class="field-input" placeholder="vpn.example.com" dir="ltr" disabled></div>
+            <div class="input-group"><label class="field-label" for="hedioum-move-ssh">جابه‌جایی sshd به پورت decoy (--move-ssh)</label><input id="hedioum-move-ssh" type="checkbox" disabled></div>
+            <div class="input-group"><label class="field-label" for="hedioum-tun-dns">DNS forwarder روی :53 (فقط در حالت TUN)</label><input id="hedioum-tun-dns" type="checkbox" disabled></div>
           </div>
           <div id="tun-create-fields" class="input-group hidden">
             <p class="field-hint">اینترفیس واقعی TUN لینوکس با حامل UDP/Noise در BackPack L3 و محدودسازی MSS اختصاصی؛ انتقال TCP/UDP پیش از فعال‌شدن بررسی می‌شود.</p>
@@ -1116,6 +1136,7 @@
               <option value="waterwall">سد کرج</option>
               <option value="gost">غول چراغ جادو</option>
               <option value="frp">پیچ شمرون</option>
+              <option value="hedioum">Hedioum</option>
               <option value="kernel">فاضلاب لینوکس</option>
               <option value="spoof" disabled>پردازش بسته — استخر جداگانه بسازید</option>
               <option value="other">اتاق بحران (وب و اضطراری)</option>

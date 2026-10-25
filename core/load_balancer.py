@@ -129,6 +129,9 @@ class LoadBalancerManager:
         if transport == 'frp':
             from core.frp_engine import create
             return create(pool_name, kharej_server, iran_servers, client_ports, camouflage, callback)
+        if transport == 'hedioum':
+            from core.hedioum_engine import create
+            return create(pool_name, kharej_server, iran_servers, client_ports, camouflage, callback)
         if transport == 'vxlan_ipsec':
             from core.vxlan_ipsec import create
             return create(
@@ -394,6 +397,9 @@ class LoadBalancerManager:
         if pool.get('engine') == 'frp':
             from core.frp_engine import add
             return add(pool_name, new_iran_server, callback)
+        if pool.get('engine') == 'hedioum':
+            from core.hedioum_engine import add
+            return add(pool_name, new_iran_server, callback)
         if pool.get('transport') == 'gre':
             from core.gre import add
             return add(pool_name, new_iran_server, callback)
@@ -580,6 +586,9 @@ class LoadBalancerManager:
         if pool.get('engine') == 'frp':
             from core.frp_engine import remove
             return remove(pool_name, iran_ip, callback)
+        if pool.get('engine') == 'hedioum':
+            from core.hedioum_engine import remove
+            return remove(pool_name, iran_ip, callback)
         if pool.get('transport') == 'gre':
             from core.gre import remove
             return remove(pool_name, iran_ip, callback)
@@ -682,6 +691,9 @@ class LoadBalancerManager:
             return remove_pool(pool_name, callback)
         if pool.get('engine') == 'frp':
             from core.frp_engine import remove_pool
+            return remove_pool(pool_name, callback)
+        if pool.get('engine') == 'hedioum':
+            from core.hedioum_engine import remove_pool
             return remove_pool(pool_name, callback)
         if pool.get('transport') == 'gre':
             from core.gre import remove_pool
@@ -793,13 +805,15 @@ class LoadBalancerManager:
             if set(map(str, ports)) == set(map(str, pool.get('client_ports', []))):
                 return False, 'No port change was requested'
             return change_ports(pool_name, ports)
-        if pool.get('transport') == 'gre' or pool.get('engine') in ('waterwall', 'gost', 'frp'):
+        if pool.get('transport') == 'gre' or pool.get('engine') in ('waterwall', 'gost', 'frp', 'hedioum'):
             if pool.get('engine') == 'waterwall':
                 from core.waterwall import change_ports
             elif pool.get('engine') == 'gost':
                 from core.gost_engine import change_ports
             elif pool.get('engine') == 'frp':
                 from core.frp_engine import change_ports
+            elif pool.get('engine') == 'hedioum':
+                from core.hedioum_engine import change_ports
             else:
                 from core.gre import change_ports
             try: ports = [*pool.get('client_ports', []), *validate_ports(new_ports)]
@@ -962,13 +976,15 @@ class LoadBalancerManager:
             if set(map(str, ports)) == set(map(str, pool.get('client_ports', []))):
                 return False, 'No port change was requested'
             return change_ports(pool_name, ports)
-        if pool.get('transport') == 'gre' or pool.get('engine') in ('waterwall', 'gost', 'frp'):
+        if pool.get('transport') == 'gre' or pool.get('engine') in ('waterwall', 'gost', 'frp', 'hedioum'):
             if pool.get('engine') == 'waterwall':
                 from core.waterwall import change_ports
             elif pool.get('engine') == 'gost':
                 from core.gost_engine import change_ports
             elif pool.get('engine') == 'frp':
                 from core.frp_engine import change_ports
+            elif pool.get('engine') == 'hedioum':
+                from core.hedioum_engine import change_ports
             else:
                 from core.gre import change_ports
             try: ports = [p for p in pool.get('client_ports', []) if str(p) != validate_port(port_to_remove)]

@@ -173,6 +173,26 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
             }
         }
     ),
+    "hedioum": BinaryManifest(
+        name="Hedioum Pool Tunnel",
+        engine_id="hedioum",
+        pinned_version="v0.11.0",
+        license_spdx="GPL-3.0",
+        executable_name="hedioum-tunnel",
+        required_capabilities=["cap_net_admin", "cap_net_raw"],
+        architectures={
+            "x86_64": {
+                "sha256": "7af88df6f59bd2f92ab257925e0b0857c68745cd380d96f9095c5d64036b3b07",
+                "source_url": "https://github.com/hedioum/Hedioum-Pool-Tunnel",
+                "is_verified": True
+            },
+            "aarch64": {
+                "sha256": "8f1f3b6086db2ff5ad3c1038751c4192e4562e9ce92dbc50c26979862dc26b57",
+                "source_url": "https://github.com/hedioum/Hedioum-Pool-Tunnel",
+                "is_verified": True
+            }
+        }
+    ),
     "rathole": BinaryManifest(
         name="Rathole",
         engine_id="rathole",

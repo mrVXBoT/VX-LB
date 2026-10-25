@@ -370,6 +370,26 @@ def create_load_balancer_flow():
             'port': Prompt.ask("FRP bind port (frpc↔frps)", default='7000'),
         }
         gre_options = {'camouflage': settings}
+    elif selected_transport == 'hedioum':
+        from core.hedioum_engine import MODES, MODE_LABELS, PERSONAS
+        console.print("[bold cyan]Hedioum mode:[/bold cyan]")
+        h_choices = {str(i): m for i, m in enumerate(MODES, 1)}
+        for i, m in h_choices.items():
+            console.print(f"  [{i}] {MODE_LABELS[m]}")
+        hchoice = Prompt.ask("Select Hedioum mode", choices=list(h_choices), default="1")
+        h_mode = h_choices[hchoice]
+        settings = {
+            'mode': h_mode,
+            'persona': Prompt.ask("Persona (auto/cpanel/directadmin/devops)", default='auto'),
+            'socks_port': Prompt.ask("Iran SOCKS5 port (default: first client port)", default=''),
+        }
+        if h_mode in ('tun', 'gateway'):
+            settings['tun_dns'] = Prompt.ask("Enable :53 DNS forwarder? (y/n)", choices=['y', 'n'], default='n') == 'y'
+        settings['move_ssh'] = Prompt.ask("Move sshd to decoy port? (y/n)", choices=['y', 'n'], default='n') == 'y'
+        domain = Prompt.ask("Optional domain for real Let's Encrypt cert (empty to skip)", default='')
+        if domain:
+            settings['domain'] = domain
+        gre_options = {'camouflage': settings}
     elif selected_transport == 'geneve_ipsec':
         vni_in = Prompt.ask("VNI (1-16777215, default auto)", default="")
         mtu_in = Prompt.ask("Geneve MTU (576-1420)", default="1400")

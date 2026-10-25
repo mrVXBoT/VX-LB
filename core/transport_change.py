@@ -255,6 +255,8 @@ def get_engine_for_transport(transport: str) -> str:
         return 'gost'
     if t == 'frp':
         return 'frp'
+    if t == 'hedioum':
+        return 'hedioum'
     if t == 'wireguard':
         return 'wireguard'
     if t in {'geneve', 'geneve_ipsec'}:
@@ -318,6 +320,7 @@ def _engine_module(engine):
         'waterwall': 'core.waterwall',
         'gost': 'core.gost_engine',
         'frp': 'core.frp_engine',
+        'hedioum': 'core.hedioum_engine',
         'slipstream': 'core.slipstream_adapter',
         'spoof': 'core.spoof_adapter',
         'http': 'core.http_transport',
@@ -408,6 +411,15 @@ def teardown_pool_runtime(pool):
             try:
                 if pool_name:
                     frp_remove(pool_name, node['ip'])
+            except Exception: pass
+
+    elif engine == 'hedioum':
+        from core.hedioum_engine import remove as hedioum_remove
+        pool_name = pool.get('name')
+        for node in nodes:
+            try:
+                if pool_name:
+                    hedioum_remove(pool_name, node['ip'])
             except Exception: pass
 
     elif engine == 'wireguard':

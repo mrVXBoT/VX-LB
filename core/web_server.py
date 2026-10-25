@@ -296,7 +296,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "wireguard_port": p_val.get("wireguard_port") or p_val.get("tunnel_port"),
                     "status_note": p_val.get("status_note"),
                     "vni": p_val.get("vni"),
-                     "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name","profile")} if p_val.get("engine") in ("waterwall", "gost", "frp") else None,
+                     "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name","profile","persona")} if p_val.get("engine") in ("waterwall", "gost", "frp", "hedioum") else None,
                     "operation_task": p_val.get("operation_task"),
                     "creation_job": p_val.get("creation_job"),
                     "creation_placeholder": p_val.get("creation_placeholder", False),
@@ -952,7 +952,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "dns_port": body.get("dns_port", 53),
                     "rate_limit": body.get("rate_limit", 1000)
                 })
-            elif transport in ("xhttp", "xhttps", "gre_xhttp", "reality", "nova", "waterwall", "gost", "frp"):
+            elif transport in ("xhttp", "xhttps", "gre_xhttp", "reality", "nova", "waterwall", "gost", "frp", "hedioum"):
                 extra_args["camouflage"] = body.get("camouflage", {})
             elif transport == "tun":
                 extra_args["mtu"] = body.get("tun_mtu") or body.get("mtu", 1280)
