@@ -1964,12 +1964,27 @@ def run_web_server(host: str = None, port: int = 8088):
     if host == "0.0.0.0":
         print("[!] WARNING: web dashboard bound to 0.0.0.0 -- ensure the dashboard password is set and the port is firewalled.")
     
-    # Save PID and Port
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(PID_FILE, "w") as f:
-        f.write(str(os.getpid()))
-    with open(PORT_FILE, "w") as f:
-        f.write(str(port))
+    server = None
+    def _cleanup_and_exit(sig=None, frame=None):
+        try:
+            if os.path.exists(PID_FILE):
+                os.remove(PID_FILE)
+        except Exception:
+            pass
+        if server is not None:
+            try:
+                # The signal handler runs on the serve_forever thread; shutdown()
+                # would wait for this same thread and deadlock. Closing is enough
+                # because SystemExit below unwinds serve_forever.
+                server.server_close()
+            except Exception:
+                pass
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _cleanup_and_exit)
+    signal.signal(signal.SIGINT, _cleanup_and_exit)
+
+    server = ThreadedHTTPServer((host, port), LDWebRequestHandler)
 
     from core.link_tasks import recover as recover_link_tasks
     recover_link_tasks()
@@ -1982,26 +1997,14 @@ def run_web_server(host: str = None, port: int = 8088):
     from core.gre import recover_interrupted
     recover_interrupted()
     recover_changes()
-    server = ThreadedHTTPServer((host, port), LDWebRequestHandler)
-    print(f"[*] VX-LB Mobile Web Dashboard running on http://{host}:{port} (PID: {os.getpid()})")
-    
-    def _cleanup_and_exit(sig=None, frame=None):
-        try:
-            if os.path.exists(PID_FILE):
-                os.remove(PID_FILE)
-        except Exception:
-            pass
-        try:
-            # The signal handler runs on the serve_forever thread; shutdown()
-            # would wait for this same thread and deadlock. Closing is enough
-            # because SystemExit below unwinds serve_forever.
-            server.server_close()
-        except Exception:
-            pass
-        sys.exit(0)
 
-    signal.signal(signal.SIGTERM, _cleanup_and_exit)
-    signal.signal(signal.SIGINT, _cleanup_and_exit)
+    # Save PID and Port only after server is ready
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(PID_FILE, "w") as f:
+        f.write(str(os.getpid()))
+    with open(PORT_FILE, "w") as f:
+        f.write(str(port))
+    print(f"[*] VX-LB Mobile Web Dashboard running on http://{host}:{port} (PID: {os.getpid()})")
 
     try:
         server.serve_forever()
