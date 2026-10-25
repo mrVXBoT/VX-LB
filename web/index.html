@@ -13,7 +13,7 @@
   <link rel="alternate icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
   <link rel="stylesheet" href="font.css">
-  <link rel="stylesheet" href="style.css?v=2.42">
+  <link rel="stylesheet" href="style.css?v=2.54">
 </head>
 <body>
   <a class="skip-link" href="#tab-pools-view">رفتن به محتوای اصلی</a>
@@ -189,7 +189,7 @@
         <small class="metric-sub" id="hero-node-sub-val">در استخرها</small>
       </div>
       <div class="metric-box">
-        <span class="metric-label" id="hero-kharej-label">سرورهای خارج (مقاصد تونل)</span>
+        <span class="metric-label" id="hero-kharej-label">سرورهای خارج</span>
         <div class="metric-ip-row">
           <strong class="metric-val-ip" id="hero-kharej-ip-val">-</strong>
           <button class="copy-micro-btn" id="hero-kharej-copy-btn" onclick="copyKharejIps()" title="کپی آی‌پی‌های خارج">
@@ -345,7 +345,7 @@
       </div>
 
       <!-- Watchdog Status Card -->
-      <div class="card-panel">
+      <div class="card-panel watchdog-status-card">
         <div class="card-panel-head">
           <h4>کنترل دیمن خودکار (Background Daemon)</h4>
           <span class="badge-pill" id="watchdog-daemon-status-badge">-</span>
@@ -357,10 +357,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
             </svg>
-            <span>ارزیابی فوری و هماهنگی DNS</span>
+            <span>ارزیابی DNS</span>
           </button>
           <button class="btn-secondary sm" id="watchdog-toggle-daemon-btn" onclick="toggleDaemonState()">
-            <span>تغییر وضعیت دیمن</span>
+            <span>شروع دیمن</span>
           </button>
         </div>
       </div>
@@ -847,10 +847,10 @@
               <option value="waterwall">سد کرج</option>
               <option value="gost">غول چراغ جادو</option>
               <option value="frp">پیچ شمرون</option>
-               <option value="hedioum">Hedioum</option>
-               <option value="rathole">Rathole</option>
-               <option value="paqet">Paqet</option>
-               <option value="kernel">فاضلاب لینوکس</option>
+              <option value="hedioum">هدیوم</option>
+              <option value="rathole">لانه موش</option>
+              <option value="paqet">بستهبندی قاچاق</option>
+              <option value="kernel">فاضلاب لینوکس</option>
                <option value="spoof">پردازش بسته (DPI Spoof)</option>
               <option value="other">اتاق بحران (وب و اضطراری)</option>
             </select>
@@ -1184,9 +1184,9 @@
               <option value="waterwall">سد کرج</option>
               <option value="gost">غول چراغ جادو</option>
               <option value="frp">پیچ شمرون</option>
-              <option value="hedioum">Hedioum</option>
-              <option value="rathole">Rathole</option>
-              <option value="paqet">Paqet</option>
+              <option value="hedioum">هدیوم</option>
+              <option value="rathole">لانه موش</option>
+              <option value="paqet">بستهبندی قاچاق</option>
               <option value="kernel">فاضلاب لینوکس</option>
               <option value="spoof" disabled>پردازش بسته — استخر جداگانه بسازید</option>
               <option value="other">اتاق بحران (وب و اضطراری)</option>

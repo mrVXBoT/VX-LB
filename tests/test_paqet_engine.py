@@ -64,8 +64,14 @@ class PaqetConfigTests(unittest.TestCase):
     def test_unit_file(self):
         unit = paqet.unit_file("server", "/etc/vxlb/paqet/server.yaml", "/etc/vxlb/paqet/firewall-server.sh")
         self.assertIn("paqet run -c /etc/vxlb/paqet/server.yaml", unit)
-        self.assertIn("ExecStartPre=/etc/vxlb/paqet/firewall-server.sh", unit)
+        self.assertIn("ExecStartPre=/bin/sh /etc/vxlb/paqet/firewall-server.sh", unit)
         self.assertIn("CAP_NET_RAW", unit)
+
+    def test_teardown_lines(self):
+        srv = paqet._teardown_lines("server", "198.51.100.9", 8888)
+        self.assertTrue(any("dport 8888" in l and "NOTRACK" in l for l in srv))
+        cli = paqet._teardown_lines("client", "198.51.100.9", 8888)
+        self.assertTrue(any("-d 198.51.100.9" in l and "NOTRACK" in l for l in cli))
 
     def test_create_validation(self):
         with patch.object(paqet, "get_pools", return_value={}):

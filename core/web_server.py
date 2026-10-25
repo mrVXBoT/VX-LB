@@ -663,6 +663,21 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 svc = f"vxlb-vxsec-{iface}.service"
                 relay_svc = f"vxlb-vxsec-{iface}-relay.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {relay_svc} 2>/dev/null")
+            elif eng == 'paqet':
+                svc = f"vxlb-paqetc-{nnq}.service" if node_name else "vxlb-paqetc*.service"
+                srv_svc = "vxlb-paqet-server.service"
+                _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} -u {srv_svc} 2>/dev/null")
+            elif eng == 'hedioum':
+                _, log_text, _ = ssh.execute("journalctl --no-pager -n 80 -u hedioum.service 2>/dev/null")
+            elif eng == 'gost':
+                svc = f"vxlb-gost-{nnq}.service" if node_name else "vxlb-gost*.service"
+                _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} 2>/dev/null")
+            elif eng == 'frp':
+                svc = f"vxlb-frpc-{nnq}.service" if node_name else "vxlb-frp*.service"
+                _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} 2>/dev/null")
+            elif eng == 'rathole':
+                svc = f"vxlb-ratholec-{nnq}.service" if node_name else "vxlb-rathole*.service"
+                _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} 2>/dev/null")
             else:
                 _, log_text, _ = ssh.execute("tail -n 60 /var/log/vxlb-user-connections.log 2>/dev/null || echo 'No connection logs yet.'")
             ssh.close()

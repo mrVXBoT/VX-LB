@@ -90,6 +90,11 @@ def detect_network(ssh):
         ).strip()
     except Exception:
         pass
+    if not local_ip:
+        try:
+            local_ip = execute(ssh, "hostname -I 2>/dev/null | awk '{print $1}'").strip()
+        except Exception:
+            pass
     gateway_mac = ''
     try:
         gw = execute(ssh, "ip route | grep default | awk '{print $3}' | head -1").strip()
@@ -98,6 +103,10 @@ def detect_network(ssh):
             gateway_mac = execute(
                 ssh, f"ip neigh show {shquote(gw)} 2>/dev/null | grep -oE '([0-9a-fA-F]{{2}}:){{5}}[0-9a-fA-F]{{2}}' | head -1"
             ).strip()
+            if not gateway_mac:
+                gateway_mac = execute(
+                    ssh, f"arp -n {shquote(gw)} 2>/dev/null | grep -oE '([0-9a-fA-F]{{2}}:){{5}}[0-9a-fA-F]{{2}}' | head -1"
+                ).strip()
     except Exception:
         pass
     return {"interface": validate_interface(iface), "local_ip": local_ip,
@@ -285,7 +294,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-ExecStartPre={hook_path}
+ExecStartPre=/bin/sh {hook_path}
 ExecStart={BINARY} run -c {cfg_path}
 Restart=always
 RestartSec=5
@@ -416,12 +425,15 @@ def add(name, server, callback=None):
         if not pool.get('paqet_server_deployed'):
             progress('پیکربندی سرور Paqet روی سرور خارج')
             kh_net = detect_network(kharej)
+            if not kh_net.get('gateway_mac') or not kh_net.get('local_ip'):
+                raise RuntimeError(f"نمی‌توان IP محلی ({kh_net.get('local_ip')}) یا مک‌آدرس روتر ({kh_net.get('gateway_mac')}) را در سرور خارج تشخیص داد.")
             server_cfg = build_server_config(tunnel_port, secret, kh_net, kcp_mode, conn, mtu)
             srv_cfg_path = f'{DIRECTORY}/server.yaml'
             hook_path = f'{DIRECTORY}/firewall-server.sh'
             execute(kharej, f'mkdir -p {DIRECTORY}')
             write(kharej, srv_cfg_path, server_cfg)
             write(kharej, hook_path, firewall_hook_script('server', kh_ip, tunnel_port))
+            execute(kharej, f'chmod 0755 {shquote(hook_path)}')
             setup_iptables(kharej, 'server', kh_ip, tunnel_port)
             srv_svc = 'vxlb-paqet-server.service'
             write(kharej, f'/etc/systemd/system/{srv_svc}', unit_file('server', srv_cfg_path, hook_path))
@@ -441,6 +453,8 @@ def add(name, server, callback=None):
         # Deploy a client on Iran for this node.
         progress('پیکربندی کلاینت Paqet روی سرور ایران')
         ir_net = detect_network(iran)
+        if not ir_net.get('gateway_mac') or not ir_net.get('local_ip'):
+            raise RuntimeError(f"نمی‌توان IP محلی ({ir_net.get('local_ip')}) یا مک‌آدرس روتر ({ir_net.get('gateway_mac')}) را در سرور ایران تشخیص داد.")
         client_cfg = build_client_config(kh_ip, tunnel_port, secret, pool['client_ports'],
                                          ir_net, kcp_mode, conn, mtu)
         cli_cfg_path = f'{DIRECTORY}/client-{node["node_name"]}.yaml'
@@ -448,6 +462,7 @@ def add(name, server, callback=None):
         execute(iran, f'mkdir -p {DIRECTORY}')
         write(iran, cli_cfg_path, client_cfg)
         write(iran, hook_path, firewall_hook_script('client', kh_ip, tunnel_port))
+        execute(iran, f'chmod 0755 {shquote(hook_path)}')
         setup_iptables(iran, 'client', kh_ip, tunnel_port)
         cli_svc = service_name(node, 'c')
         write(iran, f'/etc/systemd/system/{cli_svc}', unit_file('client', cli_cfg_path, hook_path))
@@ -494,8 +509,17 @@ def remove(name, ip, callback=None):
         iran = connect(node)
         sessions.append(iran)
         cli_svc = service_name(node, 'c')
+        hook_path = f'{DIRECTORY}/firewall-client-{node["node_name"]}.sh'
         execute(iran, f'systemctl disable --now {shquote(cli_svc)} 2>/dev/null || true')
-        execute(iran, f'rm -f {DIRECTORY}/client-{node["node_name"]}.yaml /etc/systemd/system/{cli_svc}')
+        kh_ip = pool.get('kharej_server', {}).get('ip')
+        tunnel_port = node.get('paqet', {}).get('port') or node.get('tunnel_port') or pool.get('paqet_port', 8888)
+        if kh_ip and tunnel_port:
+            for line in _teardown_lines('client', kh_ip, tunnel_port):
+                try:
+                    execute(iran, line, timeout=10)
+                except Exception:
+                    pass
+        execute(iran, f'rm -f {DIRECTORY}/client-{node["node_name"]}.yaml {shquote(hook_path)} /etc/systemd/system/{cli_svc}')
         execute(iran, 'systemctl daemon-reload')
         def discard(data):
             data['pools'][name]['nodes'] = [n for n in data['pools'][name]['nodes'] if n['node_name'] != node['node_name']]
@@ -519,7 +543,15 @@ def remove_pool(name, callback=None):
             kh = connect(pool['kharej_server'])
             try:
                 execute(kh, 'systemctl disable --now vxlb-paqet-server.service 2>/dev/null || true')
-                execute(kh, f'rm -f {DIRECTORY}/server.yaml /etc/systemd/system/vxlb-paqet-server.service')
+                tunnel_port = pool.get('paqet_port') or pool.get('camouflage', {}).get('port', 8888)
+                kh_ip = pool.get('kharej_server', {}).get('ip')
+                if kh_ip and tunnel_port:
+                    for line in _teardown_lines('server', kh_ip, tunnel_port):
+                        try:
+                            execute(kh, line, timeout=10)
+                        except Exception:
+                            pass
+                execute(kh, f'rm -f {DIRECTORY}/server.yaml {DIRECTORY}/firewall-server.sh /etc/systemd/system/vxlb-paqet-server.service')
                 execute(kh, 'systemctl daemon-reload')
             finally:
                 kh.close()

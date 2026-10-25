@@ -714,19 +714,20 @@ function getTransportTagLabel(p) {
   }
   if (eng === "hedioum" || tr === "hedioum") {
     const mode = p.hedioum_mode || p.camouflage?.mode || p.nodes?.[0]?.hedioum?.mode || "socks";
-    if (mode === "gateway") return "Hedioum Gateway";
-    if (mode === "tun") return "Hedioum TUN";
-    return "Hedioum SOCKS5";
+    if (mode === "gateway") return "عوارضی";
+    if (mode === "tun") return "مترو";
+    return "جوراب";
   }
   if (eng === "rathole" || tr === "rathole") {
     const rtr = p.rathole_transport || p.camouflage?.transport || "tcp";
-    const rpr = (p.rathole_proto || p.camouflage?.proto || "tcp").toUpperCase();
-    const map = { noise: "Noise (x25519)", tcp: "TCP", tls: "TLS", websocket: "WebSocket" };
-    return `Rathole · ${map[rtr] || rtr.toUpperCase()} / ${rpr}`;
+    const map = { noise: "نویز", tcp: "دودی", tls: "مجلسی", websocket: "خاله زنک" };
+    return map[rtr] || rtr.toUpperCase();
   }
   if (eng === "paqet" || tr === "paqet") {
     const km = p.paqet_kcp_mode || p.camouflage?.kcp_mode || "fast";
-    return `Paqet · KCP ${km}`;
+    if (km === "fast3") return "سوپر شارژ";
+    if (km === "normal") return "لاکپشت فلج";
+    return "انتحاری";
   }
   if (tr === "ws") return "سولاخ کلودفلر";
   if (tr === "http") return "پیک موتوری";
@@ -1191,11 +1192,11 @@ function updateWatchdogTabUI(data) {
     if (data.daemon_running) {
       badge.className = "status-badge healthy";
       badge.textContent = `فعال (PID: ${data.daemon_pid || "?"})`;
-      if (toggleBtn) toggleBtn.querySelector("span").textContent = "توقف دیمن خودکار";
+      if (toggleBtn) toggleBtn.querySelector("span").textContent = "توقف دیمن";
     } else {
       badge.className = "status-badge canary";
       badge.textContent = "متوقف";
-      if (toggleBtn) toggleBtn.querySelector("span").textContent = "شروع به کار دیمن (هر 30 ثانیه)";
+      if (toggleBtn) toggleBtn.querySelector("span").textContent = "شروع دیمن";
     }
   }
 
@@ -2468,26 +2469,26 @@ const ENGINE_TRANSPORTS = {
     ]
   },
   hedioum: {
-    label: "موتور Hedioum (استتار ۱۶‌گانه)",
+    label: "هدیوم",
     transports: [
-      { value: "hedioum", mode: "socks", label: "Hedioum SOCKS5", hint: "SOCKS5 روی پورت مشخص (پیش‌فرض پورت اول کلاینت)" },
-      { value: "hedioum", mode: "tun", label: "Hedioum TUN", hint: "اینترفیس TUN + DNS forwarder اختیاری" },
-      { value: "hedioum", mode: "gateway", label: "Hedioum Gateway", hint: "گیت‌وی شفاف L3 برای کل LAN" }
+      { value: "hedioum", mode: "socks", label: "جوراب", hint: "SOCKS5 روی پورت مشخص (پیش‌فرض پورت اول کلاینت)" },
+      { value: "hedioum", mode: "tun", label: "مترو", hint: "اینترفیس TUN + DNS forwarder اختیاری" },
+      { value: "hedioum", mode: "gateway", label: "عوارضی", hint: "گیت‌وی شفاف L3 برای کل LAN" }
     ]
   },
   rathole: {
-    label: "موتور Rathole (پراکسی معکوس سبک Rust)",
+    label: "لانه موش",
     transports: [
-      { value: "rathole", mode: "tcp", label: "TCP (بدون رمزنگاری)", hint: "روش انتقال tcp — کنترل بدون رمزنگاری (پیش‌فرض)" },
-      { value: "rathole", mode: "tls", label: "TLS (گواهی PKCS#12)", hint: "روش انتقال tls — رمزنگاری با گواهی PKCS#12 روی سرور" },
-      { value: "rathole", mode: "noise", label: "Noise (رمزنگاری بدون گواهی)", hint: "روش انتقال noise — رمزنگاری بدون گواهی؛ کلید X25519 خودکار" },
-      { value: "rathole", mode: "websocket", label: "WebSocket (پشت CDN)", hint: "روش انتقال websocket — انتقال روی WebSocket (TLS اختیاری)" }
+      { value: "rathole", mode: "tcp", label: "دودی", hint: "روش انتقال tcp — کنترل بدون رمزنگاری (پیش‌فرض)" },
+      { value: "rathole", mode: "tls", label: "مجلسی", hint: "روش انتقال tls — رمزنگاری با گواهی PKCS#12 روی سرور" },
+      { value: "rathole", mode: "noise", label: "نویز", hint: "روش انتقال noise — رمزنگاری بدون گواهی؛ کلید X25519 خودکار" },
+      { value: "rathole", mode: "websocket", label: "خاله زنک", hint: "روش انتقال websocket — انتقال روی WebSocket (TLS اختیاری)" }
     ]
   },
   paqet: {
-    label: "موتور Paqet (حامل بسته خام KCP)",
+    label: "بستهبندی قاچاق",
     transports: [
-      { value: "paqet", mode: "forward", label: "Port forwarding (X-UI/V2Ray)", hint: "فوروارد پورت‌های کلاینت از ایران به خارج روی KCP خام" }
+      { value: "paqet", mode: "forward", label: "انتحاری", hint: "فوروارد پورت‌های کلاینت از ایران به خارج روی KCP خام" }
     ]
   },
   kernel: {
