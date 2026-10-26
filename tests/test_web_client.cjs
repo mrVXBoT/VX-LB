@@ -487,6 +487,50 @@ console.log('PASS: topology details and single zoom handler after refresh');
   context.showToast = savedCfToast;
   console.log('PASS: Cloudflare profiles, zones and DNS records render through the request flow');
 
+  // Selected modes/profiles must reach migration admission unchanged.
+  const savedMigrationApi = context.apiFetch;
+  let migrationPayload;
+  context.apiFetch = async (url, options) => { migrationPayload = options.body; return {success:false,error:'fixture-only'}; };
+  run("poolForTransport = 'profile-pool'");
+  for (const [transport, engine, dataset, field, expected] of [
+    ['waterwall','waterwall',{mode:'reverse'},'mode','reverse'],
+    ['gost','gost',{profile:'grpc-tls'},'profile','grpc-tls'],
+    ['frp','frp',{mode:'dual'},'mode','dual'],
+    ['hedioum','hedioum',{mode:'tun'},'mode','tun'],
+    ['rathole','rathole',{mode:'noise'},'transport','noise']
+  ]) {
+    element('transport-target').value = transport;
+    element('transport-target').selectedOptions = [{dataset}];
+    element('transport-change-engine').value = engine;
+    await context.submitTransportChange({preventDefault(){}});
+    assert.equal(migrationPayload.camouflage[field], expected);
+  }
+  element('transport-target').value = 'slipstream';
+  element('transport-change-engine').value = 'other';
+  element('transport-slipstream-domain').value = 'dns.example.com';
+  element('transport-slipstream-resolvers').value = '1.1.1.1:53, 8.8.8.8:53';
+  await context.submitTransportChange({preventDefault(){}});
+  assert.equal(JSON.stringify(migrationPayload.resolvers), JSON.stringify(['1.1.1.1:53','8.8.8.8:53']));
+  element('transport-target').value = 'vxlan_ipsec';
+  element('transport-change-engine').value = 'kernel';
+  element('transport-overlay-vni').value = '42';
+  element('transport-overlay-port').value = '14789';
+  element('transport-mtu-input').value = '1280';
+  await context.submitTransportChange({preventDefault(){}});
+  assert.equal(migrationPayload.vni,42);
+  assert.equal(migrationPayload.dst_port,14789);
+  assert.equal(migrationPayload.mtu,1280);
+  element('transport-target').value = 'rathole';
+  element('transport-target').selectedOptions = [{dataset:{mode:'tls'}}];
+  element('transport-change-engine').value = 'rathole';
+  element('transport-rathole-pkcs12').value = '/etc/rathole/identity.pfx';
+  element('transport-rathole-password').value = 'fixture-only-password';
+  await context.submitTransportChange({preventDefault(){}});
+  assert.equal(migrationPayload.camouflage.pkcs12,'/etc/rathole/identity.pfx');
+  assert.equal(migrationPayload.camouflage.pkcs12_password,'fixture-only-password');
+  context.apiFetch = savedMigrationApi;
+  console.log('PASS: migration profiles, resolver arrays, overlay options and TLS credentials reach the request boundary');
+
   // 7.12: app.js user-facing strings contain no pictographic emoji.
   const appSrc = fs.readFileSync(path.join(root,'web/app.js'),'utf8');
   const emojiRe = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;

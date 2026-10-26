@@ -1,7 +1,7 @@
 import time
 import copy
 import uuid
-from typing import Dict, List, Tuple, Callable, Optional
+from typing import List, Tuple, Callable, Optional
 from core.ssh_client import SSHManager
 from core.tunnel import (
     generate_token,
@@ -18,6 +18,7 @@ from core.validation import (
     shquote,
 )
 from core.storage import load_data, atomic_update, save_pool, get_pools, delete_pool as storage_delete_pool
+from core.pool_workflow import normalize_creation, validate_engine_target, serialized_creation, pool_ready
 
 class LoadBalancerManager:
     @staticmethod
@@ -74,6 +75,7 @@ class LoadBalancerManager:
         return True, f"Cloudflare DNS for pool '{pool_name}' set to '{subdomain}'"
 
     @staticmethod
+    @serialized_creation
     def create_pool(
         pool_name: str,
         kharej_server: dict,
@@ -97,6 +99,20 @@ class LoadBalancerManager:
         ok_gate, gate_msg = validate_production_readiness(engine, is_production=is_prod, allow_experimental=allow_exp)
         if not ok_gate:
             return False, gate_msg, {}
+        try:
+            validate_engine_target(transport, engine)
+            normalized = normalize_creation(dict(pool_name=pool_name, kharej_server=kharej_server,
+                iran_servers=iran_servers, transport=transport, client_ports=client_ports,
+                camouflage=camouflage, gre_mtu=gre_mtu, **kwargs))
+            pool_name, client_ports = normalized['pool_name'], normalized['client_ports']
+            transport = normalized['transport']
+        except (ValueError, TypeError) as error:
+            return False, str(error), {}
+        from core.transport_change import busy, _mutation_local
+        if getattr(_mutation_local, 'job_id', None) is None and busy():
+            return False, 'عملیات دیگری در حال اجراست؛ ساخت استخر متوقف شد', {}
+        if pool_name in get_pools():
+            return False, 'استخری با این نام وجود دارد؛ ساخت دوباره مجاز نیست', {}
 
         if transport in {'http', 'https'}:
             from core.http_transport import create
@@ -353,7 +369,9 @@ class LoadBalancerManager:
         }
 
         save_pool(pool_name, pool_data)
-        return True, "Load balancer pool created successfully", pool_data
+        complete = pool_ready(pool_data, iran_servers)
+        return complete, ("Load balancer pool created successfully" if complete else
+                          "Pool creation is incomplete; inspect node status. " + "; ".join(failures)), pool_data
 
     @staticmethod
     def add_node(pool_name: str, new_iran_server: dict, callback: Optional[Callable[[str], None]] = None) -> Tuple[bool, str]:
@@ -973,7 +991,7 @@ class LoadBalancerManager:
 
         save_pool(pool_name, pool)
         if nodes_updated == 0:
-            return False, f"Failed to update port configuration across load balancer nodes."
+            return False, "Failed to update port configuration across load balancer nodes."
         return True, f"Port(s) {', '.join(added)} added and verified active on {nodes_updated}/{len(pool.get('nodes', []))} nodes"
 
     @staticmethod

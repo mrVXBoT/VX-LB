@@ -26,7 +26,7 @@ from core.storage import (
 from core.ssh_client import SSHManager
 from core.tunnel import SUPPORTED_TRANSPORTS
 from core.load_balancer import LoadBalancerManager
-from core.transport_change import mutation_lock, busy as transport_busy, start_change, run_change, update_job
+from core.transport_change import mutation_lock, busy as transport_busy, start_change, run_change
 from core.cloudflare import CloudflareManager
 from core.watchdog import TelemetryWatchdog
 from core.web_server import (
@@ -965,7 +965,7 @@ def manage_pools_menu():
                             console.print("[bold green]" + msg2 + "[/bold green]" if ok2 else "[bold red]" + msg2 + "[/bold red]")
                     time.sleep(1.5)
 
-def change_pool_transport_flow(pool_name: str):
+def manage_kernel_pool_settings_flow(pool_name: str):
     pool = get_pools().get(pool_name)
     if not pool:
         console.print("Pool no longer exists.")
@@ -1069,47 +1069,93 @@ def change_pool_transport_flow(pool_name: str):
                 ok, message = change_mtu(pool_name, int(mtu))
             console.print(message, markup=False)
         return
-    job = pool.get("transport_change") or {}
-    if job.get("status") == "rollback_failed":
-        console.print("Previous rollback is incomplete; new changes remain locked.")
-        if Confirm.ask("Retry restoring the original configurations on both sides?", default=False):
-            with mutation_lock():
-                current = (get_pools().get(pool_name) or {}).get("transport_change") or {}
-                if current.get("status") != "rollback_failed":
-                    console.print("Rollback is already running or no longer needed.")
-                    return
-                update_job(pool_name, status="rolling_back", message="Retrying restoration from terminal")
-            with console.status("Restoring original tunnel configurations..."):
-                run_change(pool_name, recovering=True)
-        else:
+
+
+def migration_options_prompt(target):
+    options = {}
+    modules = {'waterwall': ('core.waterwall_modes', 'MODES', 'mode'),
+               'gost': ('core.gost_engine', 'PROFILES', 'profile'),
+               'frp': ('core.frp_engine', 'MODES', 'mode'),
+               'hedioum': ('core.hedioum_engine', 'MODES', 'mode'),
+               'rathole': ('core.rathole_engine', 'TRANSPORTS', 'transport')}
+    if target in modules:
+        import importlib
+        module, attribute, field = modules[target]
+        values = list(getattr(importlib.import_module(module), attribute))
+        value = Prompt.ask('Target profile / mode', choices=values, default=values[0])
+        options['camouflage'] = {field: value}
+        if target == 'rathole' and value == 'tls':
+            options['camouflage'].update(pkcs12=Prompt.ask('PKCS#12 path on Iran server'),
+                pkcs12_password=Prompt.ask('PKCS#12 password', password=True),
+                trusted_root=Prompt.ask('Trusted root path on Kharej server'))
+    if target == 'slipstream':
+        options['domain'] = Prompt.ask('Delegated DNS domain')
+        options['resolvers'] = [value.strip() for value in Prompt.ask('DNS resolvers (comma separated)').split(',') if value.strip()]
+    if target in {'gre', 'gre6', 'ip6ip6', 'tun', 'dc6', 'wireguard', 'vxlan', 'vxlan_ipsec', 'geneve_ipsec'}:
+        options['mtu'] = Prompt.ask('Target MTU', default='1280')
+        if target == 'dc6':
+            options['carrier'] = Prompt.ask('IPv6 carrier', choices=['sit', 'ip6gre', 'ip6ip6'], default='sit')
+    return options
+
+
+def change_pool_transport_flow(pool_name: str):
+    from core.transport_change import get_engine_for_transport, KERNEL_ENGINES
+    from core.spoof_adapter import SPOOF_TRANSPORTS
+    pool = get_pools().get(pool_name)
+    if not pool:
+        console.print('Pool no longer exists.')
+        return
+    job = pool.get('transport_change') or {}
+    if job.get('status') == 'rollback_failed':
+        if not Confirm.ask('Retry restoring the original pool?', default=False):
             return
+        run_change(pool_name, recovering=True)
     else:
-        console.print(f"Current transport: {pool.get('transport')} | Nodes: {len(pool.get('nodes', []))}", markup=False)
-        choices = {key: value for key, value in SUPPORTED_TRANSPORTS.items() if value[0] != pool.get('transport') and value[0] not in {"gre","waterwall","geneve_ipsec","vxlan","gre6","ip6ip6","wireguard"}}
+        if pool.get('engine') == 'spoof':
+            console.print('Create a separate pool to change packet profiles.')
+            return
+        current = pool.get('transport')
+        profiled = {'waterwall', 'gost', 'frp', 'hedioum', 'rathole'}
+        choices = {key: value for key, value in SUPPORTED_TRANSPORTS.items()
+                   if value[0] not in SPOOF_TRANSPORTS
+                   and (value[0] != current or current in profiled)
+                   and ((value[0] in {'http', 'https'}) == (current in {'http', 'https'}))
+                   and (current != 'gre' or get_engine_for_transport(value[0]) in KERNEL_ENGINES)}
         for key, (_, label) in choices.items():
-            console.print(f"  [{key}] {label}", markup=False)
-        console.print("  [0] Return", markup=False)
-        selected = Prompt.ask("New tunnel transport", choices=[*choices, "0"])
-        if selected == "0":
+            console.print(f'  [{key}] {label}', markup=False)
+        extras = ['0']
+        if current in {'gre', 'geneve_ipsec', 'vxlan', 'gre6', 'ip6ip6', 'wireguard'}:
+            console.print('  [s] Interface status / MTU settings')
+            extras.append('s')
+        selected = Prompt.ask('New tunnel transport', choices=[*choices, *extras])
+        if selected == '0':
             return
-        console.print("Nodes change one at a time. Existing connections may disconnect during restart.\n"
-                      "A private round-trip probe verifies forwarding; no active user is required.\n"
-                      "On failure, all changed nodes revert. Members, tokens, ports and DNS settings are preserved.\n"
-                      "Pool operations are locked and DNS synchronization for this domain pauses during the change.")
-        if not Confirm.ask("Start the rolling transport change?", default=False):
+        if selected == 's':
+            manage_kernel_pool_settings_flow(pool_name)
             return
-        with mutation_lock():
-            ok, message = start_change(pool_name, choices[selected][0], background=False)
+        console.print('Changing engines can temporarily interrupt all members. Ports and DNS settings are preserved. '
+                      'Incomplete deployment triggers rollback; incomplete rollback keeps operations locked.')
+        if not Confirm.ask('Start the transport change?', default=False):
+            return
+        target = choices[selected][0]
+        if current in {'http', 'https'}:
+            from core.pool_tasks import start
+            ok, result = start(pool_name, 'http_transport', target)
+            console.print(result, markup=False)
+            return
+        options = migration_options_prompt(target)
+        ok, message = start_change(pool_name, target, background=False, **options)
         if not ok:
             console.print(message, markup=False)
             return
-        with console.status("Changing tunnel transport and verifying fresh traffic..."):
+        with console.status('Changing the tunnel and verifying every member...'):
             run_change(pool_name)
-    result = (get_pools().get(pool_name) or {}).get("transport_change") or {}
+    result = (get_pools().get(pool_name) or {}).get('transport_change') or {}
     console.print(f"Status: {result.get('status')} — {result.get('message', '')}", markup=False)
-    if result.get("error"):
-        console.print(result["error"], markup=False)
-    Prompt.ask("\nPress Enter to continue")
+    if result.get('error'):
+        console.print(result['error'], markup=False)
+    Prompt.ask('\nPress Enter to continue')
+
 
 @pool_mutation_flow
 def manage_pool_ports_flow(pool_name: str):

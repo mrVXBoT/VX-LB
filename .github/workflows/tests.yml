@@ -1,0 +1,45 @@
+name: Pool and transport regression tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt pytest ruff
+      - name: Check workflow code
+        run: >-
+          ruff check --select F core/pool_workflow.py core/pool_creation.py
+          core/transport_change.py core/load_balancer.py core/web_server.py main.py
+          tests/test_pool_workflow_lifecycle.py
+      - name: Run complete Python suite
+        run: python -m pytest -q --junitxml=test-results.xml
+      - name: Check browser request and presentation flows
+        if: always()
+        run: node --check web/app.js && node --test tests/test_web_client.cjs
+      - name: Upload Python test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-test-results
+          path: test-results.xml

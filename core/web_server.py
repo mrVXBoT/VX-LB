@@ -30,6 +30,7 @@ from core.dns_scheduler import pool_rotation_status, save_global_schedule, save_
 from core.transport_change import mutation_lock, busy as transport_busy, start_change, run_change, recover_changes, force_clear_change
 from core.load_balancer import LoadBalancerManager
 from core.ssh_client import SSHManager
+from core.pool_workflow import operation_options, public_change_job
 from core.node_addition import start as start_node_addition, recover as recover_node_additions
 from core.node_removal import start as start_node_removal, recover as recover_node_removals
 from core.validation import validate_pool_name, validate_port, validate_ports, validate_transport, validate_server_type, shquote
@@ -378,7 +379,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "creation_job": p_val.get("creation_job"),
                     "creation_placeholder": p_val.get("creation_placeholder", False),
                     "gre_update": p_val.get("gre_update"),
-                    "transport_change": p_val.get("transport_change"),
+                    "transport_change": public_change_job(p_val.get("transport_change"), data),
                     "node_removals": p_val.get("node_removals", {}),
                     "node_additions": p_val.get("node_additions", {}),
                     "client_ports": p_val.get("client_ports", []),
@@ -1077,10 +1078,17 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             return self._send_json({"ip": ip, "enabled": enabled, "status": status})
 
         elif path == "/api/pools/create":
+            if any(not isinstance(body.get(key, default), str) for key, default in
+                   (("name", ""), ("kharej_ip", ""), ("transport", "pck"))):
+                return self._send_json({"error": "Pool name, destination and transport must be strings"}, 400)
             pool_name = body.get("name", "").strip()
             kharej_ip = body.get("kharej_ip", "").strip()
             iran_ips = body.get("iran_ips", [])
             transport = body.get("transport", "pck").strip()
+            if not isinstance(iran_ips, list) or any(not isinstance(ip, str) for ip in iran_ips):
+                return self._send_json({"error": "iran_ips must be a list of server addresses"}, 400)
+            if len(set(iran_ips)) != len(iran_ips):
+                return self._send_json({"error": "Iran servers must be unique"}, 400)
 
             if not pool_name or not kharej_ip or not iran_ips:
                 return self._send_json({"error": "نام استخر، سرور خارج و حداقل یک سرور ایران الزامی است"}, 400)
@@ -1103,65 +1111,10 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             if not ir_srvs or {s["ip"] for s in ir_srvs} != set(iran_ips):
                 return self._send_json({"error": "هیچ‌کدام از سرورهای ایران انتخاب‌شده در مخزن یافت نشد"}, 400)
 
-            extra_args = {}
-            if transport == "gre":
-                extra_args["gre_mtu"] = body.get("gre_mtu", 1280)
-            elif transport == "gre6":
-                extra_args["gre6_mtu"] = body.get("gre6_mtu", 1280)
-            elif transport == "ip6ip6":
-                extra_args["ip6ip6_mtu"] = body.get("ip6ip6_mtu", 1280)
-            elif transport in ("geneve", "geneve_ipsec"):
-                extra_args["geneve_mtu"] = body.get("geneve_mtu", 1280)
-                extra_args["vni"] = body.get("vni")
-            elif transport == "vxlan_ipsec":
-                extra_args.update({
-                    "vni": body.get("vni"),
-                    "dst_port": body.get("dst_port", 4789),
-                    "vxsec_mtu": body.get("vxsec_mtu") or body.get("mtu") or 1280,
-                })
-            elif transport == "vxlan":
-                extra_args.update({
-                    "vni": body.get("vni"),
-                    "vxlan_method": body.get("vxlan_method", "p2p"),
-                    "dst_port": body.get("dst_port", 4789),
-                    "vxlan_mtu": body.get("vxlan_mtu", 1280),
-                    "bridge_name": body.get("bridge_name"),
-                    "underlay_dev": body.get("underlay_dev")
-                })
-            elif transport == "wireguard":
-                extra_args.update({
-                    "tunnel_port": body.get("tunnel_port") or body.get("wireguard_port", 51820),
-                    "mtu": body.get("mtu") or body.get("wireguard_mtu", 1280),
-                    "enable_psk": body.get("enable_psk", False)
-                })
-            elif transport == "slipstream":
-                extra_args.update({
-                    "domain": body.get("domain"),
-                    "resolvers": body.get("resolvers"),
-                    "dns_port": body.get("dns_port", 53),
-                    "rate_limit": body.get("rate_limit", 1000)
-                })
-            elif transport in ("xhttp", "xhttps", "gre_xhttp", "reality", "nova", "waterwall", "gost", "frp", "hedioum", "rathole", "paqet"):
-                extra_args["camouflage"] = body.get("camouflage", {})
-            elif transport == "tun":
-                extra_args["mtu"] = body.get("tun_mtu") or body.get("mtu", 1280)
-            elif transport == "dc6":
-                extra_args["mtu"] = body.get("dc6_mtu") or body.get("mtu", 1280)
-                extra_args["carrier"] = body.get("carrier") or body.get("carrier_type", "ip6gre")
-            from core.spoof_adapter import SPOOF_TRANSPORTS as _SPOOF_TRANSPORTS
-            if transport in _SPOOF_TRANSPORTS or body.get("engine") == "spoof":
-                extra_args["engine"] = "spoof"
-                extra_args["fake_sni"] = body.get("fake_sni") or (body.get("camouflage") or {}).get("server_name") or "www.shaparak.ir"
-                extra_args["auto_ttl_delta"] = body.get("auto_ttl_delta", 3)
-                extra_args["camouflage"] = body.get("camouflage", {})
-                for k in ("spoof_ips", "peer_spoof_ip", "dns_resolvers", "send_domains", "fake_send_ip", "fake_send_port", "info_encryption_pass", "knock_key", "mode"):
-                    if body.get(k):
-                        extra_args[k] = body.get(k)
-
-            if "is_production" in body:
-                extra_args["is_production"] = bool(body["is_production"])
-            if "allow_experimental" in body:
-                extra_args["allow_experimental"] = bool(body["allow_experimental"])
+            try:
+                extra_args = operation_options(body, transport)
+            except (ValueError, TypeError) as error:
+                return self._send_json({"error": str(error)}, 400)
 
             from core.pool_creation import start as start_creation
             ok, result = start_creation(dict(
@@ -1399,44 +1352,10 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 from core.pool_tasks import start as start_task
                 ok,result=start_task(pool_name,'http_transport',transport)
                 return self._send_json({"success":ok,"accepted":ok,**({"job":result} if ok else {"error":result})},202 if ok else 409)
-            extra_args = {}
-            if "engine" in body and body["engine"]:
-                extra_args["engine"] = str(body.get("engine", "")).strip()
-            if "camouflage" in body and isinstance(body.get("camouflage"), dict):
-                extra_args["camouflage"] = dict(body["camouflage"])
-            if "server_name" in body and body["server_name"]:
-                extra_args.setdefault("camouflage", {})["server_name"] = str(body["server_name"]).strip()
-            if "port" in body and body["port"] is not None:
-                extra_args.setdefault("camouflage", {})["port"] = body["port"]
-            if "mtu" in body and body["mtu"]:
-                try: extra_args["mtu"] = int(body["mtu"])
-                except (ValueError, TypeError): pass
-            if "tunnel_port" in body and body["tunnel_port"]:
-                try: extra_args["tunnel_port"] = int(body["tunnel_port"])
-                except (ValueError, TypeError): pass
-            if "fec_datashard" in body and body["fec_datashard"]:
-                try: extra_args["fec_datashard"] = int(body["fec_datashard"])
-                except (ValueError, TypeError): pass
-            if "fec_parityshard" in body and body["fec_parityshard"]:
-                try: extra_args["fec_parityshard"] = int(body["fec_parityshard"])
-                except (ValueError, TypeError): pass
-            if "domain" in body and body["domain"]:
-                extra_args["domain"] = str(body["domain"]).strip()
-            if "resolvers" in body and body["resolvers"]:
-                extra_args["resolvers"] = str(body["resolvers"]).strip()
-            if "fake_sni" in body and body["fake_sni"]:
-                extra_args["fake_sni"] = str(body["fake_sni"]).strip()
-            if "auto_ttl_delta" in body and body["auto_ttl_delta"]:
-                try: extra_args["auto_ttl_delta"] = int(body["auto_ttl_delta"])
-                except (ValueError, TypeError): pass
-            for k in ("spoof_ips", "peer_spoof_ip", "dns_resolvers", "send_domains", "fake_send_ip", "fake_send_port", "info_encryption_pass", "knock_key", "mode", "carrier", "carrier_type", "dc6_mtu"):
-                if body.get(k):
-                    extra_args[k] = body.get(k)
-
-            if "is_production" in body:
-                extra_args["is_production"] = bool(body["is_production"])
-            if "allow_experimental" in body:
-                extra_args["allow_experimental"] = bool(body["allow_experimental"])
+            try:
+                extra_args = operation_options(body, transport)
+            except (ValueError, TypeError) as error:
+                return self._send_json({"error": str(error)}, 400)
 
             ok, message = start_change(pool_name, transport, **extra_args)
             return self._send_json({"success": ok, "message": message}, 202 if ok else 409)

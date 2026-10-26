@@ -10,12 +10,14 @@ import time
 import uuid
 import json
 import subprocess
+import secrets
 from contextlib import contextmanager
 from core.storage import DATA_DIR, load_data, atomic_update
 from core.ssh_client import SSHManager
 from core.tunnel import SUPPORTED_TRANSPORTS
 from core.dns_routing import routing_lock
 from core.tunnel_probe import TunnelProbe, add_probe_route
+from core.pool_workflow import validate_options, pool_ready, creation_options, preserve_settings, validate_engine_target
 
 ACTIVE = {'queued', 'preflight', 'changing', 'validating', 'rolling_back', 'rollback_failed'}
 _lock = threading.RLock()
@@ -54,15 +56,20 @@ def busy(data=None):
         return True
     if any(job.get('status') in {'queued','running'} and job.get('id') != getattr(_mutation_local, 'job_id', None) for job in data.get('pool_tasks', {}).values()):
         return True
-    if any(job.get('status') in {'queued', 'running'} for job in data.get('pool_creations', {}).values()):
+    if any(job.get('status') in {'queued', 'running'} and job.get('id') != getattr(_mutation_local, 'job_id', None) for job in data.get('pool_creations', {}).values()):
+        return True
+    if any((pool.get('transport_change') or {}).get('status') in ACTIVE for pool in data.get('pool_backups', {}).values()):
         return True
     return any((pool.get('gre_update') or {}).get('status') in {'running','rollback_failed'} or (pool.get('transport_change') or {}).get('status') in ACTIVE or any(job.get('status') in {'queued', 'running'} for job in list(pool.get('node_removals', {}).values()) + list(pool.get('node_additions', {}).values())) for pool in (data if data is not None else load_data()).get('pools', {}).values())
 
 def update_job(name, **fields):
     def update(data):
-        pool = data.get('pools', {}).get(name)
+        pool = data.get('pools', {}).get(name) or data.get('pool_backups', {}).get(name)
         if pool is None: raise RuntimeError('استخر حذف شده است')
         pool['transport_change'].update(fields, updated_at=time.strftime('%Y-%m-%d %H:%M:%S'))
+        backup = data.get('pool_backups', {}).get(name)
+        if backup and (backup.get('transport_change') or {}).get('id') == pool['transport_change'].get('id'):
+            backup['transport_change'].update(copy.deepcopy(fields))
     atomic_update(update)
 
 
@@ -96,6 +103,10 @@ def force_clear_change(name: str) -> tuple:
             'job': {k: job.get(k) for k in ('target', 'status', 'message')},
         })
         p.pop('transport_change', None)
+        backup = data.get('pool_backups', {}).pop(name, None)
+        if backup:
+            backup.pop('transport_change', None)
+            data.setdefault('abandoned_pool_backups', {})[name] = backup
 
     atomic_update(_clear)
     return True, f'قفل transport استخر {name} رها شد ({len(failed)} نود ناموفق در تاریخچه ثبت شد)'
@@ -249,6 +260,8 @@ def get_engine_for_transport(transport: str) -> str:
     if not transport:
         return 'backpack'
     t = str(transport).strip().lower()
+    if t in {'http', 'https'}:
+        return t
     if t == 'waterwall':
         return 'waterwall'
     if t == 'gost':
@@ -302,11 +315,9 @@ def _coerce_engine(engine_id, transport):
     concrete engine implied by the transport whenever the provided id is not
     itself registered.
     """
-    eid = (engine_id or '').lower().strip()
+    eid = str(engine_id or '').lower().strip()
     if eid and eid not in ('kernel', 'other'):
-        from core.capabilities import get_capability
-        if get_capability(eid) is not None:
-            return eid
+        return {'gre_ipv4': 'gre', 'geneve_ipsec': 'geneve'}.get(eid, eid)
     return get_engine_for_transport(transport)
 
 def _engine_module(engine):
@@ -348,10 +359,12 @@ def _remove_node_engine(name, node, engine, pool):
             if node_name:
                 kh = connect(pool['kharej_server'])
                 sessions.append(kh)
-                stop_and_remove_tunnel(kh, node_name)
+                kh_removed = stop_and_remove_tunnel(kh, node_name)
                 ir = connect(node)
                 sessions.append(ir)
-                stop_and_remove_tunnel(ir, node_name)
+                ir_removed = stop_and_remove_tunnel(ir, node_name)
+                if not kh_removed or not ir_removed:
+                    return False, 'حذف سرویس BackPack در یکی از دو سمت تأیید نشد'
         finally:
             for s in sessions:
                 s.close()
@@ -382,225 +395,19 @@ def _resolve_server(server_dict, server_type):
     return dict(server_dict)
 
 def teardown_pool_runtime(pool):
-    engine = pool.get('engine') or get_engine_for_transport(pool.get('transport', 'tcp'))
-    nodes = list(pool.get('nodes', []))
-    kharej = pool.get('kharej_server')
-    ports = pool.get('client_ports', [])
+    """Remove owned links and report failures instead of discarding them."""
+    engine = pool.get('engine') or get_engine_for_transport(pool.get('transport'))
+    failures = []
+    for node in list(pool.get('nodes', [])):
+        try:
+            ok, message = _remove_node_engine(pool['name'], node, engine, pool)
+            if not ok:
+                failures.append(f"{node.get('ip')}: {message}")
+        except Exception as error:
+            failures.append(f"{node.get('ip')}: {error}")
+    if failures:
+        raise RuntimeError('; '.join(failures))
 
-    if engine == 'waterwall':
-        from core.waterwall import clean
-        for node in nodes:
-            try:
-                ir_ssh = connect(node)
-                clean(ir_ssh, node, True)
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                clean(kh_ssh, node, False)
-                kh_ssh.close()
-            except Exception: pass
-
-    elif engine == 'gost':
-        from core.gost_engine import remove as gost_remove
-        pool_name = pool.get('name')
-        for node in nodes:
-            try:
-                if pool_name:
-                    gost_remove(pool_name, node['ip'])
-            except Exception: pass
-
-    elif engine == 'frp':
-        from core.frp_engine import remove as frp_remove
-        pool_name = pool.get('name')
-        for node in nodes:
-            try:
-                if pool_name:
-                    frp_remove(pool_name, node['ip'])
-            except Exception: pass
-
-    elif engine == 'hedioum':
-        from core.hedioum_engine import remove as hedioum_remove
-        pool_name = pool.get('name')
-        for node in nodes:
-            try:
-                if pool_name:
-                    hedioum_remove(pool_name, node['ip'])
-            except Exception: pass
-
-    elif engine == 'rathole':
-        from core.rathole_engine import remove as rathole_remove
-        pool_name = pool.get('name')
-        for node in nodes:
-            try:
-                if pool_name:
-                    rathole_remove(pool_name, node['ip'])
-            except Exception: pass
-
-    elif engine == 'paqet':
-        from core.paqet_engine import remove as paqet_remove
-        pool_name = pool.get('name')
-        for node in nodes:
-            try:
-                if pool_name:
-                    paqet_remove(pool_name, node['ip'])
-            except Exception: pass
-
-    elif engine == 'wireguard':
-        from core.wireguard_adapter import WireGuardAdapter
-        adapter = WireGuardAdapter()
-        for node in nodes:
-            iface = node.get("wireguard", {}).get("interface") or f"wg-{node.get('node_name', 'node')}"
-            try:
-                ir_ssh = connect(node)
-                adapter.clean(ir_ssh, iface)
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                adapter.clean(kh_ssh, iface)
-                kh_ssh.close()
-            except Exception: pass
-
-    elif engine == 'vxlan':
-        from core.vxlan_adapter import VXLANAdapter
-        adapter = VXLANAdapter()
-        for node in nodes:
-            iface = node.get("vxlan", {}).get("interface") or f"vx-{node.get('node_name', 'node')}"
-            try:
-                ir_ssh = connect(node)
-                adapter.clean(ir_ssh, iface)
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                adapter.clean(kh_ssh, iface)
-                kh_ssh.close()
-            except Exception: pass
-
-    elif engine in ('geneve', 'geneve_ipsec'):
-        from core.geneve import GeneveAdapter
-        adapter = GeneveAdapter()
-        for node in nodes:
-            iface = node.get("geneve", {}).get("interface") or f"gnv-{node.get('node_name', 'node')}"
-            try:
-                ir_ssh = connect(node)
-                adapter.clean(ir_ssh, iface)
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                adapter.clean(kh_ssh, iface)
-                kh_ssh.close()
-            except Exception: pass
-
-    elif engine == 'gre6':
-        from core.gre6 import GRE6Adapter
-        adapter = GRE6Adapter()
-        for node in nodes:
-            iface = node.get("gre6", {}).get("interface") or f"gre6-{node.get('node_name', 'node')}"
-            try:
-                ir_ssh = connect(node)
-                adapter.clean(ir_ssh, iface)
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                adapter.clean(kh_ssh, iface)
-                kh_ssh.close()
-            except Exception: pass
-
-    elif engine == 'ip6ip6':
-        from core.ip6ip6 import IP6IP6Adapter
-        adapter = IP6IP6Adapter()
-        for node in nodes:
-            iface = node.get("ip6ip6", {}).get("interface") or f"ip6-{node.get('node_name', 'node')}"
-            try:
-                ir_ssh = connect(node)
-                adapter.clean(ir_ssh, iface)
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                adapter.clean(kh_ssh, iface)
-                kh_ssh.close()
-            except Exception: pass
-
-    elif engine == 'gre':
-        from core.gre import cleanup_endpoint
-        for node in nodes:
-            try:
-                ir_ssh = connect(node)
-                cleanup_endpoint(ir_ssh, node, True)
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                cleanup_endpoint(kh_ssh, node, False)
-                kh_ssh.close()
-            except Exception: pass
-
-    elif engine == 'dc6':
-        from core.adapter_registry import get_adapter
-        from core.native_ipv6_lifecycle import cleanup_endpoint
-        adapter = get_adapter("dc6")
-        for node in nodes:
-            iface = node.get("node_name") or node.get("dc6", {}).get("interface", "")
-            try:
-                ir_ssh = connect(node)
-                cleanup_endpoint(ir_ssh, adapter, iface, "dc6")
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                cleanup_endpoint(kh_ssh, adapter, iface, "dc6")
-                kh_ssh.close()
-            except Exception: pass
-
-    elif engine == 'slipstream':
-        from core.slipstream_adapter import clean
-        for node in nodes:
-            try:
-                ir_ssh = connect(node)
-                clean(ir_ssh, node)
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                clean(kh_ssh, node)
-                kh_ssh.close()
-            except Exception: pass
-
-    elif engine == 'spoof':
-        from core.spoof_adapter import clean as spoof_clean
-        for node in nodes:
-            try:
-                ir_ssh = connect(node)
-                spoof_clean(ir_ssh, pool, node, True)
-                ir_ssh.close()
-            except Exception: pass
-            try:
-                kh_ssh = connect(kharej)
-                spoof_clean(kh_ssh, pool, node, False)
-                kh_ssh.close()
-            except Exception: pass
-
-    else:
-        # Default BackPack
-        from core.load_balancer import stop_and_remove_tunnel
-        for node in nodes:
-            node_name = node.get('node_name')
-            if node_name:
-                try:
-                    kh_ssh = connect(kharej)
-                    stop_and_remove_tunnel(kh_ssh, node_name)
-                    kh_ssh.close()
-                except Exception: pass
-                try:
-                    ir_ssh = connect(node)
-                    stop_and_remove_tunnel(ir_ssh, node_name)
-                    ir_ssh.close()
-                except Exception: pass
 
 def _run_backpack_rolling_change(name, pool, job, recovering):
     if recovering:
@@ -657,215 +464,165 @@ def _run_backpack_rolling_change(name, pool, job, recovering):
         for ssh in sessions:
             ssh.close()
 
+def _finish_universal(name, original, job, deployed, status, error=''):
+    def commit(data):
+        pool = copy.deepcopy(deployed)
+        preserve_settings(pool, original)
+        pool['transport_change'] = dict(job, status=status, error=error,
+            completed=len(pool.get('nodes', [])), total=len(original['nodes']),
+            message='تونل جدید روی همهٔ نودها راه‌اندازی شد' if status == 'succeeded' else 'تونل قبلی روی همهٔ نودها بازگردانده شد')
+        data.setdefault('pools', {})[name] = pool
+        data.get('pool_backups', {}).pop(name, None)
+    atomic_update(commit)
+
+
+def _universal_failed(name, original, job, error):
+    def record(data):
+        pool = data.setdefault('pools', {}).setdefault(name, copy.deepcopy(original))
+        pool['transport_change'] = dict(job, status='rollback_failed', error=str(error),
+            message='بازگردانی کامل نشد؛ نسخهٔ پشتیبان حفظ شده و عملیات قفل است')
+        for node in pool.get('nodes', []):
+            node.update(provisioning=True, status='FAILED', reason='نیازمند بازیابی تونل')
+    atomic_update(record)
+
+
+def _restore_universal(name, original, job, error):
+    from core.load_balancer import LoadBalancerManager
+    try:
+        partial = load_data().get('pools', {}).get(name)
+        if partial:
+            teardown_pool_runtime(partial)
+        # The source remains durable in pool_backups throughout reconstruction.
+        atomic_update(lambda data: data.setdefault('pools', {}).pop(name, None))
+        kharej = _resolve_server(original['kharej_server'], 'kharej')
+        servers = [_resolve_server(node, 'iran') for node in original['nodes']]
+        ok, message, restored = LoadBalancerManager.create_pool(
+            pool_name=name, kharej_server=kharej, iran_servers=servers,
+            transport=original['transport'], client_ports=original['client_ports'],
+            **creation_options(original))
+        restored = load_data().get('pools', {}).get(name) or restored
+        if not ok or not pool_ready(restored, servers):
+            raise RuntimeError(message or 'بازگردانی همهٔ نودها تأیید نشد')
+        _finish_universal(name, original, job, restored, 'rolled_back', str(error))
+    except Exception as rollback_error:
+        _universal_failed(name, original, job, str(error) + '; rollback: ' + str(rollback_error))
+
+
 def _run_universal_engine_change(name, pool, job, recovering=False):
-    args = job.get('arguments', {})
-    target = job['to']
-    to_engine = job.get('to_engine') or get_engine_for_transport(target)
-
+    from core.load_balancer import LoadBalancerManager
+    original = copy.deepcopy(load_data().get('pool_backups', {}).get(name) or pool)
     if recovering:
-        update_job(name, status='rolling_back', message='در حال بازگردانی به تنظیمات استخر قبلی')
-        # Rollback logic handled below
+        _restore_universal(name, original, job, job.get('error', 'Interrupted migration'))
         return
-
-    update_job(name, status='preflight', message='آماده‌سازی تغییر تونل و راستی‌آزمایی ارتباط با سرورها')
-
-    # 1. Resolve full server credentials from inventory
-    kharej_srv = _resolve_server(pool['kharej_server'], 'kharej')
-    iran_srvs = [_resolve_server(n, 'iran') for n in pool['nodes']]
-
-    # Preflight check SSH to all servers
     sessions = []
     try:
-        kh_ssh = connect(kharej_srv); sessions.append(kh_ssh)
-        for srv in iran_srvs:
-            ir_ssh = connect(srv); sessions.append(ir_ssh)
-    except Exception as e:
-        update_job(name, status='failed', message=f'بررسی پیش‌پرواز ناموفق: {e}')
+        options = dict(job.get('arguments') or {})
+        if job.get('from_engine') == job.get('to_engine') and original.get('camouflage'):
+            options['camouflage'] = dict(original['camouflage'], **(options.get('camouflage') or {}))
+        if job['to'] == 'waterwall':
+            from core.waterwall import profile
+            settings = dict(options.get('camouflage') or {})
+            mode = settings.get('mode', 'trojan')
+            if mode in {'trojan', 'reality'} and not settings.get('password'):
+                settings['password'] = secrets.token_hex(12)
+            profile(mode, settings)
+            options['camouflage'] = dict(settings, mode=mode)
+        validate_options(job['to'], options)
+        update_job(name, status='preflight', message='بررسی دسترسی به همهٔ سرورها')
+        kharej = _resolve_server(original['kharej_server'], 'kharej')
+        servers = [_resolve_server(node, 'iran') for node in original['nodes']]
+        for server in [kharej, *servers]:
+            sessions.append(connect(server))
+        error = _validate_target_prerequisites(job.get('to_engine'), job['to'], kharej, servers, sessions, options)
+        if error:
+            raise ValueError(error)
+    except Exception as error:
+        update_job(name, status='failed', message='بررسی پیش از تغییر ناموفق بود', error=str(error))
         return
     finally:
-        for s in sessions: s.close()
+        for session in sessions:
+            session.close()
 
-    # 2. Teardown old engine runtime
-    update_job(name, status='changing', message='توقف و پاک‌سازی ایمن سرویس‌های تونل قبلی')
-    backup_pool = copy.deepcopy(pool)
+    # Persist BEFORE the first destructive command, including source options.
+    atomic_update(lambda data: data.setdefault('pool_backups', {}).__setitem__(name, copy.deepcopy(original)))
     try:
-        teardown_pool_runtime(pool)
-    except Exception:
-        pass
+        update_job(name, status='changing', message='پاک‌سازی تونل قبلی')
+        teardown_pool_runtime(original)
+    except Exception as error:
+        _universal_failed(name, original, job, error)
+        return
+    try:
+        atomic_update(lambda data: data['pools'].pop(name, None))
+        ok, message, deployed = LoadBalancerManager.create_pool(
+            pool_name=name, kharej_server=kharej, iran_servers=servers,
+            transport=job['to'], client_ports=original['client_ports'], **options)
+        deployed = load_data().get('pools', {}).get(name) or deployed
+        if not ok or not pool_ready(deployed, servers):
+            raise RuntimeError(message or 'همهٔ نودهای تونل جدید آماده نیستند')
+        _finish_universal(name, original, job, deployed, 'succeeded')
+    except Exception as error:
+        _restore_universal(name, original, job, error)
 
-    # 3. Deploy new engine
-    update_job(name, status='changing', message=f'راه‌اندازی و آزمون مسیر ترنسپورت جدید ({target})')
-
-    def _swap_out(data):
-        data.setdefault('pool_backups', {})[name] = backup_pool
-        data.get('pools', {}).pop(name, None)
-    atomic_update(_swap_out)
-
-    from core.load_balancer import LoadBalancerManager
-
-    deploy_kwargs = dict(args)
-    if 'camouflage' not in deploy_kwargs and backup_pool.get('camouflage'):
-        deploy_kwargs['camouflage'] = backup_pool['camouflage']
-    if 'mtu' not in deploy_kwargs:
-        deploy_kwargs['mtu'] = args.get('mtu') or backup_pool.get('wireguard_mtu') or backup_pool.get('gre_mtu') or 1400
-
-    create_ok, create_msg, created_pool = LoadBalancerManager.create_pool(
-        pool_name=name,
-        kharej_server=kharej_srv,
-        iran_servers=iran_srvs,
-        transport=target,
-        client_ports=backup_pool.get('client_ports', []),
-        **deploy_kwargs
-    )
-
-    if create_ok:
-        def _commit_success(data):
-            p = data.get('pools', {}).get(name)
-            if not p:
-                p = created_pool or {}
-                data.setdefault('pools', {})[name] = p
-            if backup_pool.get('subdomain'):
-                p['subdomain'] = backup_pool['subdomain']
-            if backup_pool.get('dns_routing'):
-                p['dns_routing'] = backup_pool['dns_routing']
-            if backup_pool.get('cloudflare'):
-                p['cloudflare'] = backup_pool['cloudflare']
-            p['transport_change'] = {
-                'id': job['id'],
-                'status': 'succeeded',
-                'from': job.get('from'),
-                'to': target,
-                'from_engine': job.get('from_engine'),
-                'to_engine': to_engine,
-                'completed': len(p.get('nodes', [])),
-                'total': len(p.get('nodes', [])),
-                'message': f'نوع تونل با موفقیت به {target} تغییر یافت و آزمون انتقال داده تأیید شد',
-            }
-            data.get('pool_backups', {}).pop(name, None)
-        atomic_update(_commit_success)
-    else:
-        try:
-            curr_partial = load_data().get('pools', {}).get(name)
-            if curr_partial:
-                teardown_pool_runtime(curr_partial)
-        except Exception:
-            pass
-
-        def _restore_old(data):
-            data.setdefault('pools', {})[name] = backup_pool
-            data.get('pool_backups', {}).pop(name, None)
-            data['pools'][name]['transport_change'] = {
-                'id': job['id'],
-                'status': 'rolling_back',
-                'from': job.get('from'),
-                'to': target,
-                'error': create_msg,
-                'message': f'تغییر به {target} ناموفق بود ({create_msg})؛ در حال بازگردانی به نوع قبلی',
-            }
-        atomic_update(_restore_old)
-
-        try:
-            old_trans = backup_pool.get('transport', 'tcp')
-            old_cam = backup_pool.get('camouflage')
-            def _swap_old(data):
-                data.get('pools', {}).pop(name, None)
-            atomic_update(_swap_old)
-            rb_ok, rb_msg, _ = LoadBalancerManager.create_pool(
-                pool_name=name,
-                kharej_server=kharej_srv,
-                iran_servers=iran_srvs,
-                transport=old_trans,
-                client_ports=backup_pool.get('client_ports', []),
-                camouflage=old_cam,
-            )
-            def _finalize_rollback(data):
-                p = data.get('pools', {}).get(name) or backup_pool
-                data.setdefault('pools', {})[name] = p
-                if backup_pool.get('subdomain'): p['subdomain'] = backup_pool['subdomain']
-                if backup_pool.get('dns_routing'): p['dns_routing'] = backup_pool['dns_routing']
-                if backup_pool.get('cloudflare'): p['cloudflare'] = backup_pool['cloudflare']
-                p['transport_change'] = {
-                    'id': job['id'],
-                    'status': 'rolled_back' if rb_ok else 'rollback_failed',
-                    'from': job.get('from'),
-                    'to': target,
-                    'error': create_msg,
-                    'message': f'تغییر نوع تونل لغو و نسخهٔ قبلی بازگردانده شد' if rb_ok else f'خطا در بازگردانی نسخهٔ قبلی: {rb_msg}',
-                }
-            atomic_update(_finalize_rollback)
-        except Exception as rb_exc:
-            def _mark_failed(data):
-                data.setdefault('pools', {})[name] = backup_pool
-                data['pools'][name]['transport_change'] = {
-                    'id': job['id'],
-                    'status': 'rollback_failed',
-                    'from': job.get('from'),
-                    'to': target,
-                    'error': str(rb_exc),
-                    'message': f'بازگردانی خودکار با خطا مواجه شد: {rb_exc}',
-                }
-            atomic_update(_mark_failed)
 
 def _kernel_rollback(name, backup_pool, to_engine, from_engine, target):
-    """Restore a failed kernel migration.
-
-    Removes any target-engine links that were deployed, flips the pool metadata
-    back to the source engine, and re-deploys the source links for every node
-    that was torn down. Untouched source nodes keep their live links.
-    """
+    """Restore every checkpointed node and retain the backup on any failure."""
     failures = []
-    try:
-        data = load_data()
-        job = data['pools'][name].get('transport_change', {})
-        changed = list(job.get('changed', []))
+    job = load_data()['pools'][name].get('transport_change', {})
+    changed = list(job.get('changed', []))
+    blocked = set()
+    update_job(name, status='rolling_back', message='بازگردانی نودهای تغییرکرده')
+    for record in reversed(changed):
+        ip = record.get('ip')
+        current = next((node for node in load_data()['pools'][name].get('nodes', []) if node.get('ip') == ip), None)
+        if current is None:
+            continue
+        engine = current.get('engine') or (from_engine if current.get('node_name') == (record.get('backup') or {}).get('node_name') else to_engine)
+        try:
+            ok, message = _remove_node_engine(name, current, engine, backup_pool)
+            if not ok:
+                raise RuntimeError(message)
+        except Exception as error:
+            blocked.add(ip)
+            failures.append(str(error))
 
-        for rec in reversed(changed):
-            try:
-                target_node = rec.get('target_node')
-                if target_node:
-                    ok, msg = _remove_node_engine(name, target_node, to_engine, backup_pool)
-                    if not ok:
-                        failures.append(str(msg))
-                else:
-                    ok, msg = _remove_node_engine(name, rec, to_engine, backup_pool)
-                    if not ok:
-                        failures.append(str(msg))
-            except Exception as exc:
-                failures.append(str(exc))
+    def restore_metadata(data):
+        pool = data['pools'][name]
+        nodes = pool.get('nodes', [])
+        current_job = pool['transport_change']
+        pool.clear()
+        pool.update(copy.deepcopy(backup_pool))
+        pool['nodes'] = nodes
+        pool['transport_change'] = current_job
+    atomic_update(restore_metadata)
 
-        def _restore_meta(data):
-            p = data['pools'][name]
-            p['transport'] = backup_pool.get('transport')
-            p['engine'] = backup_pool.get('engine')
-            for k in ('gre_mtu', 'tun_mtu', 'dc6_mtu', 'geneve_mtu',
-                      'vxlan_mtu', 'vxsec_mtu', 'gre6_mtu', 'ip6ip6_mtu'):
-                if k in backup_pool:
-                    p[k] = backup_pool[k]
-        atomic_update(_restore_meta)
-
-        for rec in reversed(changed):
-            backup = rec.get('backup') or {}
-            server = dict(backup)
-            server.setdefault('ip', rec.get('ip'))
-            server.setdefault('name', rec.get('node_name') or backup.get('server_name') or backup.get('name'))
-            server.setdefault('server_name', server['name'])
-            try:
-                ok, msg = _deploy_node(name, server)
-                if not ok:
-                    failures.append(str(msg))
-            except Exception as exc:
-                failures.append(str(exc))
-
-        if failures:
-            update_job(name, status='rollback_failed', message='بازگردانی کامل نشد؛ وضعیت منابع را بررسی کنید',
-                       failed_nodes=[r.get('ip') for r in changed])
-            return False
-        update_job(name, status='rolled_back', message='تنظیمات قبلی بازگردانده و عبور آزمایشی ترافیک تأیید شد',
-                   failed_nodes=[])
-        return True
-    except Exception as exc:
-        update_job(name, status='rollback_failed', message='بازگردانی با خطا مواجه شد: ' + str(exc))
+    for record in reversed(changed):
+        if record.get('ip') in blocked:
+            continue
+        server = _resolve_server(record.get('backup') or record, 'iran')
+        server.setdefault('name', server.get('server_name') or server.get('ip'))
+        try:
+            ok, message = _deploy_node(name, server)
+            node = next((node for node in load_data()['pools'][name].get('nodes', []) if node.get('ip') == server['ip']), None)
+            if not ok or not pool_ready({'nodes': [node] if node else []}, [server]):
+                raise RuntimeError(message or 'بازگردانی نود تأیید نشد')
+        except Exception as error:
+            failures.append(str(error))
+    if not pool_ready(load_data()['pools'][name], backup_pool['nodes']):
+        failures.append('همهٔ اعضای استخر قبلی آماده نیستند')
+    if failures:
+        def mark_unready(data):
+            changed_ips = {record.get('ip') for record in changed}
+            for node in data['pools'][name].get('nodes', []):
+                if node.get('ip') in changed_ips:
+                    node.update(provisioning=True, status='FAILED', reason='بازگردانی کامل نشده است')
+        atomic_update(mark_unready)
+        update_job(name, status='rollback_failed', message='بازگردانی کامل نشد؛ نسخهٔ پشتیبان حفظ شده است',
+                   error='; '.join(failures), failed_nodes=[record.get('ip') for record in changed])
         return False
+    update_job(name, status='rolled_back', message='تنظیمات قبلی و آمادگی همهٔ نودها تأیید شد', failed_nodes=[])
+    atomic_update(lambda data: data.get('pool_backups', {}).pop(name, None))
+    return True
+
 
 def _validate_target_prerequisites(
     to_engine, target, kharej_srv, iran_srvs, sessions, args
@@ -914,8 +671,11 @@ def _run_kernel_rolling_change(name, pool, job, recovering=False):
     from_engine = job.get('from_engine') or pool.get('engine') or get_engine_for_transport(job.get('from'))
 
     if recovering:
-        update_job(name, status='rollback_failed',
-                   message='بازگردانی مرحله‌ای هسته پس از قطع شدن نیاز به رسیدگی دستی دارد')
+        original = load_data().get('pool_backups', {}).get(name)
+        if original:
+            _kernel_rollback(name, original, to_engine, from_engine, target)
+        else:
+            update_job(name, status='rollback_failed', message='نسخهٔ پشتیبان تغییر مرحله‌ای موجود نیست؛ رسیدگی دستی لازم است')
         return
 
     update_job(name, status='preflight', message='آماده‌سازی تغییر مرحله‌ای تونل و دسترسی به سرورها')
@@ -951,6 +711,15 @@ def _run_kernel_rolling_change(name, pool, job, recovering=False):
         p = data['pools'][name]
         p['transport'] = target
         p['engine'] = to_engine
+        for key in ('mtu', 'tunnel_port', 'enable_psk', 'vni', 'bridge_name', 'underlay_dev'):
+            if key in args:
+                p[key] = copy.deepcopy(args[key])
+        mtu_key = {'gre6': 'gre6_mtu', 'ip6ip6': 'ip6ip6_mtu', 'geneve_ipsec': 'geneve_mtu',
+                   'wireguard': 'wireguard_mtu', 'tun': 'tun_mtu'}.get(target)
+        if mtu_key and (args.get(mtu_key) or args.get('mtu')):
+            p[mtu_key] = int(args.get(mtu_key) or args['mtu'])
+        if target == 'wireguard' and (args.get('tunnel_port') or args.get('wireguard_port')):
+            p['wireguard_port'] = int(args.get('tunnel_port') or args['wireguard_port'])
         if target == 'gre' and args.get('mtu'):
             p['gre_mtu'] = int(args['mtu'])
         if target == 'tun' and args.get('mtu'):
@@ -985,10 +754,11 @@ def _run_kernel_rolling_change(name, pool, job, recovering=False):
                 p['dc6_mtu'] = int(args.get('mtu') or args.get('dc6_mtu'))
             if args.get('mss_clamp'):
                 p['dc6_mss_clamp'] = int(args['mss_clamp'])
-    atomic_update(_set_target)
+    atomic_update(lambda data: data.setdefault('pool_backups', {}).__setitem__(name, copy.deepcopy(backup_pool)))
 
     changed = []
     try:
+        atomic_update(_set_target)
         total = len(iran_srvs)
         for index, srv in enumerate(iran_srvs):
             data = load_data()
@@ -1002,11 +772,12 @@ def _run_kernel_rolling_change(name, pool, job, recovering=False):
                 raise RuntimeError('نود در استخر یافت نشد: ' + str(label))
             update_job(name, status='changing', changed=list(changed), completed=index, total=total,
                        message='تغییر دو سمت نود: ' + str(label))
+            changed.append({'node_name': cur.get('node_name'), 'ip': cur.get('ip'),
+                           'backup': copy.deepcopy(cur), 'from_engine': from_engine})
+            update_job(name, changed=copy.deepcopy(changed))
             ok_src, msg_src = _remove_node_engine(name, cur, from_engine, pool)
             if not ok_src:
                 raise RuntimeError('پاک‌سازی لینک قبلی نود ناموفق بود: ' + str(msg_src))
-            changed.append({'node_name': cur.get('node_name'), 'ip': cur.get('ip'),
-                           'backup': cur, 'from_engine': from_engine})
             ok_dst, msg_dst = _deploy_node(name, srv)
             if not ok_dst:
                 raise RuntimeError('راه‌اندازی تونل جدید نود ناموفق بود: ' + str(msg_dst))
@@ -1016,6 +787,9 @@ def _run_kernel_rolling_change(name, pool, job, recovering=False):
                 None,
             )
             changed[-1]['target_node'] = copy.deepcopy(deployed_node) if deployed_node else None
+            update_job(name, changed=copy.deepcopy(changed))
+            if not pool_ready({'nodes': [deployed_node] if deployed_node else []}, [srv]):
+                raise RuntimeError('آمادگی نود مقصد تأیید نشد')
 
         def commit(data):
             p = data['pools'][name]
@@ -1023,21 +797,47 @@ def _run_kernel_rolling_change(name, pool, job, recovering=False):
             p['engine'] = to_engine
             p['transport_change'].update(status='succeeded',
                 message='نوع تونل همهٔ نودها تغییر کرد و عبور ترافیک تأیید شد',
-                changed=list(changed), completed=total, total=total)
+                changed=copy.deepcopy(changed), completed=total, total=total)
+            data.get('pool_backups', {}).pop(name, None)
         atomic_update(commit)
     except Exception as error:
         update_job(name, error=str(error), changed=list(changed))
         _kernel_rollback(name, backup_pool, to_engine, from_engine, target)
 
-def run_change(name, recovering=False):
+def run_change(name, recovering=False, job_id=None):
     with mutation_lock():
-        pool_data = load_data().get('pools', {}).get(name)
+        data = load_data()
+        pool = data.get('pools', {}).get(name) or data.get('pool_backups', {}).get(name) or {}
+        job = pool.get('transport_change') or (data.get('pool_backups', {}).get(name) or {}).get('transport_change') or {}
+        if job_id is not None and job.get('id') != job_id:
+            return
+        previous = getattr(_mutation_local, 'job_id', None)
+        _mutation_local.job_id = job.get('id')
+        try:
+            return _run_change_locked(name, recovering)
+        finally:
+            _mutation_local.job_id = previous
+
+
+def _run_change_locked(name, recovering=False):
+    with mutation_lock():
+        data = load_data()
+        pool_data = data.get('pools', {}).get(name) or data.get('pool_backups', {}).get(name)
         if not pool_data:
             return
         pool = copy.deepcopy(pool_data)
-        job = pool.get('transport_change')
+        job = pool.get('transport_change') or (data.get('pool_backups', {}).get(name) or {}).get('transport_change')
         if not job:
             return
+        if not recovering and job.get('status') != 'queued':
+            return
+        if recovering and job.get('status') not in ACTIVE:
+            return
+        if not pool.get('transport_change'):
+            pool['transport_change'] = copy.deepcopy(job)
+            atomic_update(lambda inventory: inventory['pools'][name].__setitem__('transport_change', copy.deepcopy(job)))
+        if name not in data.get('pools', {}):
+            atomic_update(lambda inventory: inventory.setdefault('pools', {}).__setitem__(name, copy.deepcopy(pool)))
 
         from_engine = job.get('from_engine') or pool.get('engine') or get_engine_for_transport(job.get('from'))
         to_engine = job.get('to_engine') or get_engine_for_transport(job.get('to'))
@@ -1064,7 +864,7 @@ def run_change(name, recovering=False):
         _run_universal_engine_change(name, pool, job, recovering)
 
 def start_change(name, target, background=True, repair=False, **kwargs):
-    with routing_lock():
+    with mutation_lock(), routing_lock():
         data = load_data()
         pool = data.get('pools', {}).get(name)
         if busy(data):
@@ -1075,6 +875,16 @@ def start_change(name, target, background=True, repair=False, **kwargs):
         all_transports = {v[0] for v in SUPPORTED_TRANSPORTS.values()}
         if target not in all_transports:
             return False, 'نوع تونل جدید نامعتبر است'
+        try:
+            validate_options(target, kwargs)
+        except (ValueError, TypeError) as error:
+            return False, str(error)
+
+        from core.spoof_adapter import SPOOF_TRANSPORTS
+        if target in SPOOF_TRANSPORTS or pool.get('engine') == 'spoof':
+            return False, 'برای پروفایل پردازش بسته استخر جداگانه بسازید'
+        if target in {'http', 'https'} or pool.get('transport') in {'http', 'https'}:
+            return False, 'برای تغییر HTTP/HTTPS از عملیات اختصاصی CONNECT استفاده کنید؛ مهاجرت بین موتورهای دیگر پشتیبانی نمی‌شود'
 
         target_engine = _coerce_engine(kwargs.get('engine'), target)
         from core.capabilities import validate_production_readiness
@@ -1084,8 +894,14 @@ def start_change(name, target, background=True, repair=False, **kwargs):
         ok_gate, gate_msg = validate_production_readiness(target_engine, is_production=is_prod, allow_experimental=allow_exp)
         if not ok_gate:
             return False, gate_msg
+        try:
+            validate_engine_target(target, target_engine)
+        except ValueError as error:
+            return False, str(error)
         curr_engine = _coerce_engine(pool.get('engine'), pool.get('transport'))
-        if target == pool.get('transport') and target_engine == curr_engine:
+        profile_changed = any(value != (pool.get('camouflage') or {}).get(key)
+                              for key, value in (kwargs.get('camouflage') or {}).items())
+        if target == pool.get('transport') and target_engine == curr_engine and not profile_changed:
             return False, 'نوع تونل جدید برابر نوع فعلی است'
 
         if pool.get('transport') == 'gre' and target_engine not in KERNEL_ENGINES:
@@ -1108,21 +924,28 @@ def start_change(name, target, background=True, repair=False, **kwargs):
             'total': len(pool['nodes']),
             'changed': [],
             'message': 'در صف تغییر مرحله‌ای نوع تونل',
-            'arguments': kwargs,
+            'arguments': copy.deepcopy(kwargs),
         }
         def queue(d):
             d.setdefault('pools', {}).setdefault(name, {})['transport_change'] = job
         atomic_update(queue)
 
     if background:
-        threading.Thread(target=run_change, args=(name,), daemon=True).start()
+        try:
+            threading.Thread(target=run_change, args=(name, False, job['id']), daemon=True).start()
+        except Exception:
+            update_job(name, status='failed', message='عملیات شروع نشد؛ دوباره تلاش کنید')
+            return False, 'عملیات شروع نشد'
     return True, 'تغییر مرحله‌ای شروع شد؛ وضعیت را در کارت استخر دنبال کنید'
 
 def recover_changes():
-    for name, pool in load_data().get('pools', {}).items():
-        if (pool.get('transport_change') or {}).get('status') in ACTIVE - {'rollback_failed'}:
-            if pool.get('engine') == 'waterwall':
-                update_job(name, status='rollback_failed', message='به‌روزرسانی WaterWall قطع شده؛ بازگردانی را اجرا کنید')
-            else:
-                threading.Thread(target=run_change, args=(name, True), daemon=True).start()
+    data = load_data()
+    pools = dict(data.get('pool_backups', {}), **data.get('pools', {}))
+    for name, pool in pools.items():
+        job = pool.get('transport_change') or (data.get('pool_backups', {}).get(name) or {}).get('transport_change') or {}
+        if job.get('status') in ACTIVE - {'rollback_failed'}:
+            try:
+                threading.Thread(target=run_change, args=(name, True, job['id']), daemon=True).start()
+            except Exception:
+                update_job(name, status='rollback_failed', message='شروع بازیابی ناموفق بود؛ دوباره تلاش کنید')
 

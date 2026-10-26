@@ -1222,7 +1222,7 @@
     <div class="sheet-modal" role="dialog" aria-modal="true" tabindex="-1">
       <div class="sheet-handle"></div><div class="sheet-header"><div><h4 class="sheet-title">تغییر مرحله‌ای نوع تونل</h4><p id="transport-summary" class="sheet-subtitle"></p></div><button type="button" class="sheet-close-btn" aria-label="بستن پنجره" onclick="closeModal('transport-modal')"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>
       <div class="sheet-content">
-        <p class="transport-explanation">اعضا، توکن‌ها، پورت‌ها و تنظیمات DNS حفظ می‌شوند. هر بار یک نود و دو سمت آن ری‌استارت می‌شوند؛ اتصال‌های جاری آن نود ممکن است موقتاً قطع شوند.</p>
+        <p class="transport-explanation">اعضا، پورت‌ها و تنظیمات DNS حفظ می‌شوند. تغییر ترنسپورت BackPack و مهاجرت به موتورهای کرنل مرحله‌ای است؛ تغییر بین سایر موتورها ممکن است اتصال همهٔ اعضا را موقتاً قطع کند. اعتبارنامه‌های موتور جدید ممکن است دوباره تولید شوند.</p>
         <p class="transport-explanation">برای هر نود، اتصال کانال کنترل و عبور پیام آزمایشی مستقل بررسی می‌شود؛ نیازی به کاربر فعال نیست. در صورت خطا، نودهای تغییرکرده به تنظیم قبلی برمی‌گردند. هنگام عملیات، تغییرات استخر قفل و هماهنگی DNS این دامنه موقتاً متوقف است.</p>
         <form onsubmit="submitTransportChange(event)">
           <div class="input-group">
@@ -1248,6 +1248,20 @@
             <p id="transport-target-desc" class="field-hint" style="margin-top:6px;"></p>
           </div>
 
+          <div id="transport-change-overlay-fields" class="hidden">
+            <div class="input-group"><label class="field-label" for="transport-overlay-vni">شناسهٔ VNI (خالی: خودکار)</label><input id="transport-overlay-vni" class="field-input" type="number" min="1" max="16777215" disabled></div>
+            <div class="input-group"><label class="field-label" for="transport-overlay-port">پورت UDP برای VXLAN</label><input id="transport-overlay-port" class="field-input" type="number" min="1" max="65535" value="4789" disabled></div>
+          </div>
+          <div id="transport-change-wireguard-fields" class="hidden">
+            <div class="input-group"><label class="field-label" for="transport-wireguard-port">پورت UDP برای WireGuard</label><input id="transport-wireguard-port" class="field-input" type="number" min="1" max="65535" value="51820" disabled></div>
+            <div class="input-group"><label class="field-label" for="transport-wireguard-psk">کلید مشترک اضافی (PSK)</label><input id="transport-wireguard-psk" type="checkbox" disabled></div>
+          </div>
+          <div id="transport-change-rathole-tls-fields" class="hidden">
+            <div class="input-group"><label class="field-label" for="transport-rathole-pkcs12">مسیر گواهی PKCS#12 روی سرور ایران</label><input id="transport-rathole-pkcs12" class="field-input" placeholder="/etc/rathole/identity.pfx" disabled></div>
+            <div class="input-group"><label class="field-label" for="transport-rathole-password">رمز گواهی PKCS#12</label><input id="transport-rathole-password" class="field-input" type="password" disabled></div>
+            <div class="input-group"><label class="field-label" for="transport-rathole-root">مسیر گواهی ریشه روی سرور خارج</label><input id="transport-rathole-root" class="field-input" disabled></div>
+            <div class="input-group"><label class="field-label" for="transport-rathole-hostname">نام میزبان گواهی TLS</label><input id="transport-rathole-hostname" class="field-input" disabled></div>
+          </div>
           <div id="transport-change-spoof-fields" class="hidden">
             <div class="input-group">
               <label class="field-label" for="transport-spoof-fake-sni">نام دامنهٔ جعلی SNI</label>
@@ -1584,6 +1598,6 @@
 
   <script src="hairline.js?v=2.29"></script>
   <script src="copy.fa.js?v=2.29"></script>
-  <script src="app.js?v=2.33"></script>
+  <script src="app.js?v=2.34"></script>
 </body>
 </html>

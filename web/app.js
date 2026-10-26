@@ -2737,7 +2737,7 @@ function openTransportModal(name) {
     engineSel.value = currentEngine in ENGINE_TRANSPORTS ? currentEngine : "backpack";
   }
 
-  const currentMode = pool.camouflage?.mode || pool.waterwall_mode || null;
+  const currentMode = pool.camouflage?.mode || pool.camouflage?.transport || pool.waterwall_mode || pool.rathole_transport || null;
   const currentProfile = pool.camouflage?.profile || null;
   populateTransportModalOptions(engineSel ? engineSel.value : "backpack", currentTransport, currentMode, currentProfile);
 
@@ -2788,6 +2788,7 @@ function populateTransportModalOptions(engineKey, currentTransport, currentMode,
       (!t.mode || t.mode === currentMode) &&
       (!t.profile || t.profile === currentProfile);
   const unavailable = t => t.disabled || packetCurrent || engineKey==='spoof' ||
+      (currentTransport==='gre' && engineKey!=='kernel') ||
       (httpFamily ? !['http','https'].includes(t.value) : ['http','https'].includes(t.value)) ||
       isExactCurrent(t);
 
@@ -2814,7 +2815,7 @@ function onTransportChangeEngineChanged() {
   const engineSel = document.getElementById('transport-change-engine');
   const pool = cachedStatus?.pools.find(p => p.name === poolForTransport);
   const currentTransport = pool ? pool.transport : "";
-  const currentMode = pool ? (pool.camouflage?.mode || pool.waterwall_mode || null) : null;
+  const currentMode = pool ? (pool.camouflage?.mode || pool.camouflage?.transport || pool.waterwall_mode || pool.rathole_transport || null) : null;
   const currentProfile = pool ? (pool.camouflage?.profile || null) : null;
   populateTransportModalOptions(engineSel ? engineSel.value : "backpack", currentTransport, currentMode, currentProfile);
 }
@@ -2832,6 +2833,17 @@ function updateTransportModalAdaptiveFields() {
   const targetSel = document.getElementById('transport-target');
   const transport = targetSel ? targetSel.value : "";
 
+  const selectedMode = targetSel?.selectedOptions?.[0]?.dataset?.mode;
+  const groups = {
+    'transport-change-overlay-fields': ['vxlan', 'vxlan_ipsec', 'geneve_ipsec'].includes(transport),
+    'transport-change-wireguard-fields': transport === 'wireguard',
+    'transport-change-rathole-tls-fields': transport === 'rathole' && selectedMode === 'tls'
+  };
+  Object.entries(groups).forEach(([id, visible]) => {
+    const group = document.getElementById(id);
+    group?.classList.toggle('hidden', !visible);
+    group?.querySelectorAll?.('input').forEach(input => { input.disabled = !visible; });
+  });
   const fecGroup = document.getElementById('transport-change-fec-fields');
   const mtuGroup = document.getElementById('transport-change-mtu-fields');
   const slipGroup = document.getElementById('transport-change-slipstream-fields');
@@ -2840,7 +2852,7 @@ function updateTransportModalAdaptiveFields() {
     dc6Group.classList.toggle('hidden', transport !== 'dc6');
   }
   if (mtuGroup) {
-    mtuGroup.classList.toggle('hidden', !['gre', 'gre6', 'ip6ip6', 'wireguard', 'vxlan', 'geneve_ipsec', 'tun'].includes(transport));
+    mtuGroup.classList.toggle('hidden', !['gre', 'gre6', 'ip6ip6', 'wireguard', 'vxlan', 'vxlan_ipsec', 'geneve_ipsec', 'tun'].includes(transport));
   }
   if (slipGroup) {
     slipGroup.classList.toggle('hidden', transport !== 'slipstream');
@@ -2883,12 +2895,26 @@ async function submitTransportChange(event) {
       payload.fake_send_ip = (document.getElementById('transport-spoof-fake-send-ip')?.value || '').trim();
       payload.knock_key = (document.getElementById('transport-spoof-knock-key')?.value || '').trim();
     }
-    if (['gre', 'gre6', 'ip6ip6', 'wireguard', 'vxlan', 'geneve_ipsec', 'tun'].includes(transport)) {
+    if (['gre', 'gre6', 'ip6ip6', 'wireguard', 'vxlan', 'vxlan_ipsec', 'geneve_ipsec', 'tun'].includes(transport)) {
       payload.mtu = parseInt(document.getElementById('transport-mtu-input')?.value || '1400', 10);
     }
     if (transport === 'slipstream') {
       payload.domain = (document.getElementById('transport-slipstream-domain')?.value || '').trim();
-      payload.resolvers = (document.getElementById('transport-slipstream-resolvers')?.value || '').trim();
+      payload.resolvers = (document.getElementById('transport-slipstream-resolvers')?.value || '').split(',').map(value => value.trim()).filter(Boolean);
+    }
+    const selectedProfile = document.getElementById('transport-target')?.selectedOptions?.[0]?.dataset || {};
+    if (['waterwall', 'frp', 'hedioum'].includes(transport)) {
+      payload.camouflage = {mode: selectedProfile.mode};
+    }
+    if (transport === 'gost') payload.camouflage = {profile: selectedProfile.profile};
+    if (['vxlan', 'vxlan_ipsec', 'geneve_ipsec'].includes(transport)) {
+      const vni = document.getElementById('transport-overlay-vni')?.value;
+      if (vni) payload.vni = Number(vni);
+      if (transport !== 'geneve_ipsec') payload.dst_port = Number(document.getElementById('transport-overlay-port')?.value || 4789);
+    }
+    if (transport === 'wireguard') {
+      payload.tunnel_port = Number(document.getElementById('transport-wireguard-port')?.value || 51820);
+      payload.enable_psk = Boolean(document.getElementById('transport-wireguard-psk')?.checked);
     }
     if (transport === 'rathole') {
       const targetSel = document.getElementById('transport-target');
@@ -2897,8 +2923,12 @@ async function submitTransportChange(event) {
       payload.camouflage = {
         transport: rMode,
         proto: 'tcp',
-        port: 2333,
-        token: genSecret(16)
+        ...(rMode === 'tls' ? {
+          pkcs12: document.getElementById('transport-rathole-pkcs12')?.value || '',
+          pkcs12_password: document.getElementById('transport-rathole-password')?.value || '',
+          trusted_root: document.getElementById('transport-rathole-root')?.value || '',
+          hostname: document.getElementById('transport-rathole-hostname')?.value || ''
+        } : {})
       };
     }
     if (transport === 'paqet') {
