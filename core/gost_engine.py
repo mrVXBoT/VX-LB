@@ -53,7 +53,7 @@ PROFILE_LABELS = {
     'ssh': 'SSH Tunnel',
     'kcp-obfs4': 'KCP + obfs4',
     'web-tunnel': 'Web-Tunnel (HTTP + MWSS)',
-    'gaming-socks5-kcp': 'Gaming (SOCKS5 + KCP)',
+    'gaming-socks5-kcp': 'SOCKS5 + KCP',
     'quic-socks5': 'QUIC + SOCKS5',
 }
 

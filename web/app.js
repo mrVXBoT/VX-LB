@@ -671,27 +671,27 @@ function rememberOperationHistory(pool, open) {
 }
 
 const WATERWALL_MODE_TITLES = {
-  halfduplex: "شلنگ یکطرفه",
-  reverse: "سیفون",
-  trojan: "فلکه آب",
-  bgp4: "لوله فشار قوی",
-  reality: "توهم تئوری توتئه"
+  halfduplex: "HalfDuplex",
+  reverse: "Reverse",
+  trojan: "Trojan",
+  bgp4: "Bgp4",
+  reality: "Reality"
 };
 
 const GOST_PROFILE_TITLES = {
-  "shadowsocks-tcp": "جوراب مشکی",
-  "shadowsocks-udp": "جوراب کشی",
-  "shadowsocks-tls": "سایه مجلسی",
-  "shadowsocks-ws": "سایه خایه کرده",
-  "obfs4": "سوراخ موش",
-  "obfs4-tls": "سولاخ موش",
-  "grpc": "موشک بالستیک",
-  "grpc-tls": "موشک نقطه‌زن",
-  "ssh": "دالان",
-  "kcp-obfs4": "رگبار موش",
-  "web-tunnel": "مرد نامرئی (هیز)",
-  "gaming-socks5-kcp": "گیمینگ (کصشر)",
-  "quic-socks5": "کوییک کوییک"
+  "shadowsocks-tcp": "Shadowsocks TCP",
+  "shadowsocks-udp": "Shadowsocks UDP",
+  "shadowsocks-tls": "Shadowsocks + TLS",
+  "shadowsocks-ws": "Shadowsocks + WebSocket",
+  "obfs4": "obfs4",
+  "obfs4-tls": "obfs4 + TLS",
+  "grpc": "gRPC",
+  "grpc-tls": "gRPC + TLS",
+  "ssh": "SSH Tunnel",
+  "kcp-obfs4": "KCP + obfs4",
+  "web-tunnel": "Web-Tunnel (HTTP + MWSS)",
+  "gaming-socks5-kcp": "SOCKS5 + KCP",
+  "quic-socks5": "QUIC + SOCKS5"
 };
 
 function getTransportTagLabel(p) {
@@ -699,43 +699,41 @@ function getTransportTagLabel(p) {
   const eng = (p.engine || "").toLowerCase();
   if (eng === "gost" || tr === "gost") {
     const prof = p.gost_profile || p.camouflage?.profile || p.nodes?.[0]?.gost?.profile;
-    return GOST_PROFILE_TITLES[prof] || prof || "غول چراغ جادو";
+    return GOST_PROFILE_TITLES[prof] || prof || "GOST";
   }
   if (eng === "waterwall" || tr === "waterwall") {
     const mode = p.waterwall_mode || p.camouflage?.mode || p.nodes?.[0]?.waterwall?.profile?.mode;
-    return WATERWALL_MODE_TITLES[mode] || mode || "سد کرج";
+    return WATERWALL_MODE_TITLES[mode] || mode || "WaterWall";
   }
   if (eng === "frp" || tr === "frp") {
     const mode = p.frp_mode || p.camouflage?.mode || p.nodes?.[0]?.frp?.mode;
-    if (mode === "dual") return "پیچ دوبل";
-    if (mode === "udp") return "پیچ پرسرعت";
-    if (mode === "tcp") return "پیچ تک‌مسیره";
-    return "پیچ شمرون";
+    if (mode === "dual") return "TCP + UDP";
+    if (mode === "udp") return "UDP";
+    if (mode === "tcp") return "TCP";
+    return "FRP";
   }
   if (eng === "hedioum" || tr === "hedioum") {
     const mode = p.hedioum_mode || p.camouflage?.mode || p.nodes?.[0]?.hedioum?.mode || "socks";
-    if (mode === "gateway") return "عوارضی";
-    if (mode === "tun") return "مترو";
-    return "جوراب";
+    if (mode === "gateway") return "Gateway (L3)";
+    if (mode === "tun") return "TUN";
+    return "SOCKS5";
   }
   if (eng === "rathole" || tr === "rathole") {
     const rtr = p.rathole_transport || p.camouflage?.transport || "tcp";
-    const map = { noise: "نویز", tcp: "دودی", tls: "مجلسی", websocket: "خاله زنک" };
+    const map = { noise: "Noise", tcp: "TCP", tls: "TLS", websocket: "WebSocket" };
     return map[rtr] || rtr.toUpperCase();
   }
   if (eng === "paqet" || tr === "paqet") {
     const km = p.paqet_kcp_mode || p.camouflage?.kcp_mode || "fast";
-    if (km === "fast3") return "سوپر شارژ";
-    if (km === "normal") return "لاکپشت فلج";
-    return "انتحاری";
+    return `Paqet · KCP ${km.toUpperCase()}`;
   }
-  if (tr === "ws") return "سولاخ کلودفلر";
-  if (tr === "http") return "پیک موتوری";
-  if (tr === "https") return "رمزی ممزی";
-  if (tr === "slipstream") return "دود سرخپوستی";
-  if (tr === "wireguard") return "موش فاضلاب";
-  if (tr === "tun") return "لوله پولیکا";
-  return tr;
+  if (tr === "ws") return "WebSocket";
+  if (tr === "http") return "HTTP CONNECT";
+  if (tr === "https") return "HTTPS CONNECT";
+  if (tr === "slipstream") return "Slipstream (DNS)";
+  if (tr === "wireguard") return "WireGuard";
+  if (tr === "tun") return "TUN";
+  return ENGINE_TRANSPORTS[TRANSPORT_TO_ENGINE[tr]]?.transports.find(option => option.value === tr)?.label || tr;
 }
 
 function getPoolProtoTag(p) {
@@ -806,29 +804,29 @@ function getEngineBadge(engine, transport, pool) {
 
   if (["ws", "http", "https"].includes(tr)) {
     cls = "engine-other";
-    label = (tr === "ws") ? "سولاخ کلودفلر (WS)" : (tr === "http") ? "پیک موتوری (HTTP)" : "رمزی ممزی (HTTPS)";
+    label = (tr === "ws") ? "WebSocket (WS)" : (tr === "http") ? "HTTP CONNECT" : "HTTPS CONNECT";
   } else if (eng === "slipstream" || tr === "slipstream") {
     cls = "engine-other";
-    label = "اتاق بحران · Slipstream";
+    label = "تونل DNS · Slipstream";
   } else if (eng === "waterwall" || tr === "waterwall" || ["halfduplex", "reverse", "trojan", "bgp4", "reality"].includes(tr)) {
     cls = "engine-waterwall";
     const wm = pool?.waterwall_mode || pool?.camouflage?.mode || pool?.nodes?.[0]?.waterwall?.profile?.mode;
     const wmTitle = WATERWALL_MODE_TITLES[wm] || wm;
-    label = wmTitle ? `سد کرج · ${wmTitle}` : "سد کرج";
+    label = wmTitle ? `WaterWall · ${wmTitle}` : "WaterWall";
   } else if (eng === "gost" || tr === "gost") {
     cls = "engine-gost";
     const prof = pool?.gost_profile || pool?.camouflage?.profile || pool?.nodes?.[0]?.gost?.profile;
     const profTitle = GOST_PROFILE_TITLES[prof] || prof;
-    label = profTitle ? `غول چراغ جادو · ${profTitle}` : "غول چراغ جادو";
+    label = profTitle ? `GOST · ${profTitle}` : "GOST";
   } else if (eng === "frp" || tr === "frp") {
     cls = "engine-frp";
     const fm = pool?.frp_mode || pool?.camouflage?.mode || pool?.nodes?.[0]?.frp?.mode;
-    const fmTitle = fm === "dual" ? "پیچ دوبل" : fm === "udp" ? "پیچ پرسرعت" : fm === "tcp" ? "پیچ تک‌مسیره" : "پیچ شمرون";
-    label = fmTitle ? `پیچ شمرون · ${fmTitle}` : "پیچ شمرون";
+    const fmTitle = fm === "dual" ? "TCP + UDP" : fm === "udp" ? "UDP" : fm === "tcp" ? "TCP" : (fm || "");
+    label = fmTitle ? `FRP · ${fmTitle}` : "FRP";
   } else if (eng === "hedioum" || tr === "hedioum") {
     cls = "engine-hedioum";
     const hm = pool?.hedioum_mode || pool?.camouflage?.mode || pool?.nodes?.[0]?.hedioum?.mode || "socks";
-    label = `Hedioum · ${hm.toUpperCase()}`;
+    label = `Hedioum · ${{socks: "SOCKS5", tun: "TUN", gateway: "Gateway (L3)"}[hm] || hm.toUpperCase()}`;
   } else if (eng === "rathole" || tr === "rathole") {
     cls = "engine-rathole";
     const rTransport = pool?.rathole_transport || pool?.camouflage?.transport || "tcp";
@@ -847,20 +845,20 @@ function getEngineBadge(engine, transport, pool) {
     label = `Paqet · KCP ${km}`;
   } else if (eng === "spoof" || MANAGED_PACKET_TRANSPORTS.includes(tr) || tr.startsWith("spoof")) {
     cls = "engine-spoof";
-    label = `پردازش بسته · ${tr}`;
-  } else if (["wireguard", "gre", "vxlan", "tun", "dc6", "geneve", "geneve_ipsec", "gre6", "ip6ip6"].includes(eng) ||
-             ["wireguard", "gre", "vxlan", "tun", "dc6", "geneve", "geneve_ipsec", "gre6", "ip6ip6"].includes(tr)) {
+    label = `پردازش بسته · ${getTransportTagLabel({transport: tr})}`;
+  } else if (["wireguard", "gre", "vxlan", "vxlan_ipsec", "tun", "dc6", "geneve", "geneve_ipsec", "gre6", "ip6ip6"].includes(eng) ||
+             ["wireguard", "gre", "vxlan", "vxlan_ipsec", "tun", "dc6", "geneve", "geneve_ipsec", "gre6", "ip6ip6"].includes(tr)) {
     cls = "engine-kernel";
-    if (eng === "wireguard" || tr === "wireguard") label = "موش فاضلاب (WireGuard)";
-    else if (eng === "tun" || tr === "tun") label = "لوله پولیکا (TUN)";
-    else if (eng === "dc6" || tr === "dc6") label = `کانال سیکیم (DC6 ${pool?.carrier_type || pool?.carrier || ""})`.trim();
-    else if (tr === "vxlan_ipsec") label = "کانال لجن (VXLAN+IPsec)";
-    else if (tr === "geneve_ipsec") label = "منهول سیکیم (Geneve)";
-    else label = "فاضلاب لینوکس";
-  } else if (eng === "backpack" || ["stealth", "pck", "mux", "tcp", "kcp", "wss"].includes(tr)) {
+    if (eng === "wireguard" || tr === "wireguard") label = "WireGuard";
+    else if (eng === "tun" || tr === "tun") label = "TUN";
+    else if (eng === "dc6" || tr === "dc6") label = `DC6${pool?.carrier_type || pool?.carrier ? " · " + (pool.carrier_type || pool.carrier) : ""}`;
+    else if (tr === "vxlan_ipsec") label = "VXLAN + IPsec";
+    else if (tr === "geneve_ipsec") label = "Geneve + IPsec";
+    else label = getTransportTagLabel({transport: tr, engine: eng});
+  } else if (eng === "backpack" || ["stealth", "pck", "mux", "tcp", "kcp", "wss", "quic"].includes(tr)) {
     cls = "engine-backpack";
-    const bpTitles = { tcp: "جت پک تخمی", stealth: "جت پک شخمی", pck: "جت پک تخمی تخیلی", kcp: "جت پک طرح گیمینگ", wss: "جت پک خایه افکن", quic: "جت پک سوپر کیری خفن" };
-    label = bpTitles[tr] || `جت پک · ${tr.toUpperCase()}`;
+    const bpTitles = { tcp: "TCP", stealth: "Stealth (Noise)", pck: "PCK (Raw TCP)", kcp: "KCP", wss: "WSS (WebSocket + TLS)", quic: "QUIC" };
+    label = `BackPack · ${bpTitles[tr] || tr.toUpperCase()}`;
   }
 
   return `<span class="engine-badge ${cls}"><span class="engine-badge-dot"></span><span>${escapeHtml(label)}</span></span>`;
@@ -948,12 +946,12 @@ function renderPools(pools) {
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
               </button>
-              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))}` : n.engine === "waterwall" ? `سد کرج (${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "فلکه آب")}) · پورت خارج ${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}` : n.engine === "gost" ? `GOST · ${escapeHtml(p.camouflage?.profile || n.gost?.profile || "shadowsocks-tcp")} · پورت خارج ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 8443))}` : n.engine === "frp" ? `پیچ شمرون (${escapeHtml(p.camouflage?.mode || n.frp?.mode || "tcp")}) · پورت اتصال ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 7000))}` : n.engine === "hedioum" ? `Hedioum (${escapeHtml(p.camouflage?.mode || n.hedioum?.mode || "socks")}) · SOCKS پورت ${escapeHtml(String(n.tunnel_port || p.camouflage?.socks_port || n.hedioum?.socks_port || "-"))}` : (n.engine === "rathole" || p.transport === "rathole" || p.engine === "rathole") ? `Rathole (${escapeHtml(String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport || "tcp")).toUpperCase()}) · پورت کنترل ${escapeHtml(String(n.rathole?.port || n.tunnel_port || p.camouflage?.port || 2333))} · فوروارد ${escapeHtml(String(n.rathole?.proto || p.rathole_proto || p.camouflage?.proto || "tcp")).toUpperCase()}${String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport) === "noise" ? " · رمزنگاری ضد فیلتر Noise" : ""}` : (n.engine === "paqet" || p.transport === "paqet" || p.engine === "paqet") ? `Paqet (KCP ${escapeHtml(String(n.paqet?.kcp_mode || p.camouflage?.kcp_mode || "fast")).toUpperCase()}) · پورت تونل ${escapeHtml(String(n.paqet?.port || n.tunnel_port || p.camouflage?.port || 8888))} · موازی ${escapeHtml(String(n.paqet?.conn || p.camouflage?.conn || 1))}` : (n.engine === "slipstream" || p.transport === "slipstream" || p.engine === "slipstream") ? `Slipstream DNS · دامنه ${escapeHtml(n.slipstream?.domain || p.slipstream?.domain || p.domain || "-")} · QPS ${escapeHtml(String(n.slipstream?.rate_limit || p.rate_limit || 1000))} · پورت ${escapeHtml(String(n.slipstream?.dns_port || p.dns_port || 53))}` : (n.engine === "spoof" || p.engine === "spoof" || MANAGED_PACKET_TRANSPORTS.includes(n.transport || p.transport)) ? `پردازش بسته DPI (${escapeHtml(String(n.transport || p.transport || "").toUpperCase())}) · SNI جعلی ${escapeHtml(String(n.spoof?.fake_sni || p.fake_sni || (p.camouflage || {}).server_name || "shaparak.ir"))}${n.spoof?.ttl_delta || p.auto_ttl_delta ? ` · TTL Delta ${escapeHtml(String(n.spoof?.ttl_delta || p.auto_ttl_delta))}` : ""}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : (n.engine === "backpack" || p.engine === "backpack" || ["stealth", "pck", "mux", "tcp", "kcp", "wss", "quic"].includes(p.transport)) ? `جت پک (${escapeHtml(String(n.transport || p.transport || "tcp").toUpperCase())}) · پورت تونل ${escapeHtml(String(n.tunnel_port || "-"))}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
+              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))}` : n.engine === "waterwall" ? `WaterWall (${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "Trojan")}) · پورت خارج ${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}` : n.engine === "gost" ? `GOST · ${escapeHtml(GOST_PROFILE_TITLES[p.camouflage?.profile || n.gost?.profile || "shadowsocks-tcp"] || p.camouflage?.profile || n.gost?.profile)} · پورت خارج ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 8443))}` : n.engine === "frp" ? `FRP (${escapeHtml(p.camouflage?.mode || n.frp?.mode || "tcp")}) · پورت اتصال ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 7000))}` : n.engine === "hedioum" ? `Hedioum (${escapeHtml(p.camouflage?.mode || n.hedioum?.mode || "socks")}) · SOCKS پورت ${escapeHtml(String(n.tunnel_port || p.camouflage?.socks_port || n.hedioum?.socks_port || "-"))}` : (n.engine === "rathole" || p.transport === "rathole" || p.engine === "rathole") ? `Rathole (${escapeHtml(String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport || "tcp")).toUpperCase()}) · پورت کنترل ${escapeHtml(String(n.rathole?.port || n.tunnel_port || p.camouflage?.port || 2333))} · فوروارد ${escapeHtml(String(n.rathole?.proto || p.rathole_proto || p.camouflage?.proto || "tcp")).toUpperCase()}${String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport) === "noise" ? " · رمزنگاری Noise" : ""}` : (n.engine === "paqet" || p.transport === "paqet" || p.engine === "paqet") ? `Paqet (KCP ${escapeHtml(String(n.paqet?.kcp_mode || p.camouflage?.kcp_mode || "fast")).toUpperCase()}) · پورت تونل ${escapeHtml(String(n.paqet?.port || n.tunnel_port || p.camouflage?.port || 8888))} · موازی ${escapeHtml(String(n.paqet?.conn || p.camouflage?.conn || 1))}` : (n.engine === "slipstream" || p.transport === "slipstream" || p.engine === "slipstream") ? `Slipstream DNS · دامنه ${escapeHtml(n.slipstream?.domain || p.slipstream?.domain || p.domain || "-")} · QPS ${escapeHtml(String(n.slipstream?.rate_limit || p.rate_limit || 1000))} · پورت ${escapeHtml(String(n.slipstream?.dns_port || p.dns_port || 53))}` : (n.engine === "spoof" || p.engine === "spoof" || MANAGED_PACKET_TRANSPORTS.includes(n.transport || p.transport)) ? `پردازش بسته DPI (${escapeHtml(String(n.transport || p.transport || "").toUpperCase())}) · SNI جعلی ${escapeHtml(String(n.spoof?.fake_sni || p.fake_sni || (p.camouflage || {}).server_name || "shaparak.ir"))}${n.spoof?.ttl_delta || p.auto_ttl_delta ? ` · TTL Delta ${escapeHtml(String(n.spoof?.ttl_delta || p.auto_ttl_delta))}` : ""}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : (n.engine === "backpack" || p.engine === "backpack" || ["stealth", "pck", "mux", "tcp", "kcp", "wss", "quic"].includes(p.transport)) ? `BackPack (${escapeHtml(String(n.transport || p.transport || "tcp").toUpperCase())}) · پورت تونل ${escapeHtml(String(n.tunnel_port || "-"))}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
             </div>
             ${n.gre_https ? `<div class="gre-private-route"><span>GRE داخل HTTPS:</span><bdi dir="ltr">${escapeHtml(n.gre_https.local_private)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre_https.remote_private)}</bdi><span>MTU ${escapeHtml(n.gre_https.mtu)}</span></div>` : ''}
             ${(n.engine === 'tun' || p.transport === 'tun') ? `<div class="gre-private-route"><span>لینک TUN:</span><bdi dir="ltr">${escapeHtml(n.tun?.iran_inner || "10.210.1.1")}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.tun?.kharej_inner || "10.210.1.2")}</bdi><span>(${escapeHtml(n.tun?.interface || "tun")}) · لایه 3 کرنل</span></div>` : ''}
             ${(n.engine === 'dc6' || p.transport === 'dc6') ? `<div class="gre-private-route"><span>حامل DC6:</span><bdi dir="ltr">${escapeHtml(n.dc6?.private_addressing?.iran_ipv4 || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.dc6?.private_addressing?.kharej_ipv4 || p.kharej_ip)}</bdi><span>(${escapeHtml(n.dc6?.interface || "dc6")}) · Dual-Stack</span></div>` : ''}
-            ${(n.engine === 'waterwall' || p.engine === 'waterwall' || p.transport === 'waterwall') ? `<div class="gre-private-route"><span>لینک سد کرج:</span><bdi dir="ltr">${escapeHtml(n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}:${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}</bdi><span>(حالت: ${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "فلکه آب")})</span></div>` : ''}
+            ${(n.engine === 'waterwall' || p.engine === 'waterwall' || p.transport === 'waterwall') ? `<div class="gre-private-route"><span>لینک WaterWall:</span><bdi dir="ltr">${escapeHtml(n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}:${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}</bdi><span>(حالت: ${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "Trojan")})</span></div>` : ''}
             ${(n.engine === 'gost' || p.engine === 'gost' || p.transport === 'gost') ? `<div class="gre-private-route"><span>لینک GOST:</span><bdi dir="ltr">${escapeHtml(n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}:${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 8443))}</bdi><span>(پروفایل: ${escapeHtml(GOST_PROFILE_TITLES[p.camouflage?.profile || n.gost?.profile] || p.camouflage?.profile || n.gost?.profile || "shadowsocks-tcp")})</span></div>` : ''}
             ${(n.engine === 'frp' || p.engine === 'frp' || p.transport === 'frp') ? `<div class="gre-private-route"><span>لینک FRP:</span><bdi dir="ltr">${escapeHtml(n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}:${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 7000))}</bdi><span>(حالت: ${escapeHtml(p.camouflage?.mode || n.frp?.mode || "tcp")})</span></div>` : ''}
             ${(n.engine === 'slipstream' || p.engine === 'slipstream' || p.transport === 'slipstream') ? `<div class="gre-private-route"><span>مسیر Slipstream DNS:</span><bdi dir="ltr">${escapeHtml(n.ip)}:53</bdi><span>به دامنهٔ</span><bdi dir="ltr">${escapeHtml(p.slipstream?.domain || p.domain || "-")}</bdi><span>(QPS ${escapeHtml(String(p.slipstream?.rate_limit || p.rate_limit || 1000))})</span></div>` : ''}
@@ -2480,87 +2478,87 @@ async function retryTransportRollback(pool, button) {
 const MANAGED_PACKET_TRANSPORTS = ['fake-sni','split-tls','hop-ttl-injection','tcp-state-desync','l7-header-mutation'];
 const ENGINE_TRANSPORTS = {
   backpack: {
-    label: "موتور جت پک",
+    label: "BackPack",
     transports: [
-      { value: "tcp", label: "جت پک تخمی", hint: "اتصال مستقیم خام با سرعت حداکثری و حداقل بار پردازنده" },
-      { value: "stealth", label: "جت پک شخمی", hint: "رمزنگاری نویز ضد DPI و غیرقابل شناسایی در لایه 4" },
-      { value: "pck", label: "جت پک تخمی تخیلی", hint: "مقاوم در برابر دستکاری و ریست‌های فایروال و شبکه" },
-      { value: "kcp", label: "جت پک طرح گیمینگ", hint: "پروتکل پرسرعت مبتنی بر UDP مناسب بازی و خطوط با پکت‌لاس" },
-      { value: "wss", label: "جت پک خایه افکن", hint: "شبیه‌سازی اثرانگشت مرورگر (uTLS) و عبور امن از CDNها" },
-      { value: "quic", label: "جت پک سوپر کیری خفن", hint: "هندشیک سریع 0-RTT با رمزنگاری مدرن" }
+      { value: "tcp", label: "TCP", hint: "انتقال مستقیم روی TCP با سربار کم؛ این حالت رمزنگاری اضافه ندارد." },
+      { value: "stealth", label: "Stealth (Noise)", hint: "انتقال TCP با رمزنگاری Noise؛ مناسب زمانی که رمزنگاری در لایهٔ تونل لازم است." },
+      { value: "pck", label: "PCK (Raw TCP)", hint: "انتقال با بسته‌های خام TCP در BackPack؛ سازگاری به مسیر شبکه و فایروال بستگی دارد." },
+      { value: "kcp", label: "KCP", hint: "انتقال روی UDP با KCP برای مسیرهای دارای اتلاف بسته؛ نیازمند دسترسی UDP." },
+      { value: "wss", label: "WSS (WebSocket + TLS)", hint: "انتقال WebSocket روی TLS؛ استفاده از پراکسی یا CDN به پیکربندی آن بستگی دارد." },
+      { value: "quic", label: "QUIC", hint: "انتقال روی UDP با QUIC و رمزنگاری TLS؛ نیازمند دسترسی UDP." }
     ]
   },
   waterwall: {
-    label: "سد کرج",
+    label: "WaterWall",
     transports: [
-      { value: "waterwall", mode: "halfduplex", label: "شلنگ یکطرفه", hint: "مسیر آپلود و دانلود جداگانه برای عبور از اختلالات نامتقارن" },
-      { value: "waterwall", mode: "reverse", label: "سیفون", hint: "اتصال معکوس سرور ایران به خارج جهت دور زدن مسدودی پورت‌های ورودی" },
-      { value: "waterwall", mode: "trojan", label: "فلکه آب", hint: "رمز عبور مشترک سبک بدون نیاز به گواهی SSL" },
-      { value: "waterwall", mode: "bgp4", label: "لوله فشار قوی", hint: "فریم‌بندی شبیه BGP برای استتار ترافیک" },
-      { value: "waterwall", mode: "reality", label: "توهم تئوری توتئه", hint: "استتار ریالیتی معکوس با دامین جعلی و بدون گواهی" }
+      { value: "waterwall", mode: "halfduplex", label: "HalfDuplex", hint: "کانال‌های جداگانه برای ارسال و دریافت داده؛ مناسب بررسی مسیرهای نامتقارن." },
+      { value: "waterwall", mode: "reverse", label: "Reverse", hint: "اتصال از نود ایران به سرور خارج آغاز می‌شود و ترافیک پورت‌های انتخابی را منتقل می‌کند." },
+      { value: "waterwall", mode: "trojan", label: "Trojan", hint: "احراز هویت با رمز مشترک؛ TLS اختیاری است و در صورت فعال‌سازی به گواهی نیاز دارد." },
+      { value: "waterwall", mode: "bgp4", label: "Bgp4", hint: "فریم‌بندی شبیه BGP برای ترافیک تونل؛ این حالت مسیریابی BGP واقعی انجام نمی‌دهد." },
+      { value: "waterwall", mode: "reality", label: "Reality", hint: "حالت Reality با SNI قابل تنظیم؛ بدون نیاز به گواهی عمومی سرور." }
     ]
   },
   gost: {
-    label: "غول چراغ جادو",
+    label: "GOST",
     transports: [
-      { value: "gost", profile: "shadowsocks-tcp", label: "جوراب مشکی", hint: "رمزنگاری aes-256-gcm؛ استاندارد و سازگار با کل کلاینت‌ها" },
-      { value: "gost", profile: "shadowsocks-udp", label: "جوراب کشی", hint: "رلهٔ UDP با رمزنگاری aes-256-gcm" },
-      { value: "gost", profile: "shadowsocks-tls", label: "سایه مجلسی", hint: "SS روی TLS با گواهی استتار" },
-      { value: "gost", profile: "shadowsocks-ws", label: "سایه خایه کرده", hint: "SS در قالب WebSocket برای عبور از CDN" },
-      { value: "gost", profile: "obfs4", label: "سوراخ موش", hint: "پل Tor؛ بیشینه استتار" },
-      { value: "gost", profile: "obfs4-tls", label: "سولاخ موش", hint: "obfs4 روی TLS" },
-      { value: "gost", profile: "grpc", label: "موشک بالستیک", hint: "پرفورمنس بالا؛ ضد فیلترینگ قوی" },
-      { value: "gost", profile: "grpc-tls", label: "موشک نقطه‌زن", hint: "gRPC روی TLS" },
-      { value: "gost", profile: "ssh", label: "دالان", hint: "فوروارد ssh پروتکل" },
-      { value: "gost", profile: "kcp-obfs4", label: "رگبار موش", hint: "KCP fast3 + obfs4" },
-      { value: "gost", profile: "web-tunnel", label: "مرد نامرئی (هیز)", hint: "HTTP + MWSS چندرسانه‌ای" },
-      { value: "gost", profile: "gaming-socks5-kcp", label: "گیمینگ (کصشر)", hint: "SOCKS5 + KCP برای بازی" },
-      { value: "gost", profile: "quic-socks5", label: "کوییک کوییک", hint: "QUIC + SOCKS5" }
+      { value: "gost", profile: "shadowsocks-tcp", label: "Shadowsocks TCP", hint: "انتقال TCP با Shadowsocks و رمزنگاری AES-256-GCM؛ کلاینت باید با این روش سازگار باشد." },
+      { value: "gost", profile: "shadowsocks-udp", label: "Shadowsocks UDP", hint: "رلهٔ UDP با Shadowsocks و رمزنگاری AES-256-GCM؛ نیازمند دسترسی UDP." },
+      { value: "gost", profile: "shadowsocks-tls", label: "Shadowsocks + TLS", hint: "انتقال Shadowsocks روی TLS؛ نیازمند تنظیم گواهی در سمت سرور." },
+      { value: "gost", profile: "shadowsocks-ws", label: "Shadowsocks + WebSocket", hint: "انتقال Shadowsocks در WebSocket؛ تنظیمات پراکسی و TLS باید با دو سمت هماهنگ باشند." },
+      { value: "gost", profile: "obfs4", label: "obfs4", hint: "انتقال رله با مبهم‌سازی obfs4؛ استفاده از این پروفایل به معنی اتصال به شبکهٔ Tor نیست." },
+      { value: "gost", profile: "obfs4-tls", label: "obfs4 + TLS", hint: "انتقال obfs4 روی TLS؛ نیازمند تنظیم گواهی در سمت سرور." },
+      { value: "gost", profile: "grpc", label: "gRPC", hint: "انتقال رله روی gRPC؛ نتیجه به پشتیبانی مسیر و پراکسی از gRPC بستگی دارد." },
+      { value: "gost", profile: "grpc-tls", label: "gRPC + TLS", hint: "انتقال gRPC روی TLS با گواهی سرور." },
+      { value: "gost", profile: "ssh", label: "SSH Tunnel", hint: "انتقال پورت‌ها در تونل SSH؛ نیازمند احراز هویت و دسترسی به سرویس SSH." },
+      { value: "gost", profile: "kcp-obfs4", label: "KCP + obfs4", hint: "ترکیب KCP در حالت Fast3 و مبهم‌سازی obfs4؛ نیازمند دسترسی UDP." },
+      { value: "gost", profile: "web-tunnel", label: "Web-Tunnel (HTTP + MWSS)", hint: "انتقال HTTP روی WebSocket امن و چندجریانی (MWSS)." },
+      { value: "gost", profile: "gaming-socks5-kcp", label: "SOCKS5 + KCP", hint: "پراکسی SOCKS5 روی KCP؛ تأخیر و مصرف پهنای باند به شرایط مسیر وابسته‌اند." },
+      { value: "gost", profile: "quic-socks5", label: "QUIC + SOCKS5", hint: "پراکسی SOCKS5 روی QUIC؛ نیازمند دسترسی UDP." }
     ]
   },
   frp: {
-    label: "پیچ شمرون",
+    label: "FRP",
     transports: [
-      { value: "frp", mode: "tcp", label: "پیچ تک‌مسیره (TCP)", hint: "فوروارد مستقیم پورت TCP به سرور خارج" },
-      { value: "frp", mode: "udp", label: "پیچ پرسرعت (UDP)", hint: "فوروارد بدون اتصال UDP به سرور خارج" },
-      { value: "frp", mode: "dual", label: "پیچ دوبل (TCP+UDP)", hint: "فوروارد همزمان TCP و UDP برای هر پورت" }
+      { value: "frp", mode: "tcp", label: "FRP · TCP", hint: "انتقال پورت‌های TCP از ایران به سرویس مقصد از طریق اتصال معکوس FRP." },
+      { value: "frp", mode: "udp", label: "FRP · UDP", hint: "انتقال پورت‌های UDP از ایران به سرویس مقصد از طریق اتصال معکوس FRP." },
+      { value: "frp", mode: "dual", label: "FRP · TCP + UDP", hint: "انتقال هم‌زمان TCP و UDP برای هر پورت انتخاب‌شده." }
     ]
   },
   hedioum: {
-    label: "هدیوم",
+    label: "Hedioum",
     transports: [
-      { value: "hedioum", mode: "socks", label: "جوراب", hint: "SOCKS5 روی پورت مشخص (پیش‌فرض پورت اول کلاینت)" },
-      { value: "hedioum", mode: "tun", label: "مترو", hint: "اینترفیس TUN + DNS forwarder اختیاری" },
-      { value: "hedioum", mode: "gateway", label: "عوارضی", hint: "گیت‌وی شفاف L3 برای کل LAN" }
+      { value: "hedioum", mode: "socks", label: "SOCKS5", hint: "ارائهٔ پراکسی SOCKS5؛ پورت پیش‌فرض از اولین پورت کلاینت گرفته می‌شود." },
+      { value: "hedioum", mode: "tun", label: "TUN", hint: "ایجاد رابط شبکهٔ TUN با امکان فعال‌سازی انتقال DNS." },
+      { value: "hedioum", mode: "gateway", label: "Gateway (L3)", hint: "دروازهٔ شفاف لایهٔ ۳ برای شبکهٔ محلی با استفاده از رابط TUN." }
     ]
   },
   rathole: {
-    label: "لانه موش",
+    label: "Rathole",
     transports: [
-      { value: "rathole", mode: "tcp", label: "دودی", hint: "روش انتقال tcp — کنترل بدون رمزنگاری (پیش‌فرض)" },
-      { value: "rathole", mode: "tls", label: "مجلسی", hint: "روش انتقال tls — رمزنگاری با گواهی PKCS#12 روی سرور" },
-      { value: "rathole", mode: "noise", label: "نویز", hint: "روش انتقال noise — رمزنگاری بدون گواهی؛ کلید X25519 خودکار" },
-      { value: "rathole", mode: "websocket", label: "خاله زنک", hint: "روش انتقال websocket — انتقال روی WebSocket (TLS اختیاری)" }
+      { value: "rathole", mode: "tcp", label: "TCP", hint: "حامل TCP بدون رمزنگاری اضافه در لایهٔ انتقال Rathole." },
+      { value: "rathole", mode: "tls", label: "TLS", hint: "حامل TLS با گواهی PKCS#12 در سمت سرور." },
+      { value: "rathole", mode: "noise", label: "Noise", hint: "حامل رمزنگاری‌شدهٔ Noise با کلید X25519؛ نیازی به گواهی TLS ندارد." },
+      { value: "rathole", mode: "websocket", label: "WebSocket", hint: "حامل WebSocket با TLS اختیاری؛ استفاده از CDN به تنظیمات آن بستگی دارد." }
     ]
   },
   paqet: {
-    label: "بستهبندی قاچاق",
+    label: "Paqet",
     transports: [
-      { value: "paqet", mode: "forward", label: "انتحاری", hint: "فوروارد پورت‌های کلاینت از ایران به خارج روی KCP خام" }
+      { value: "paqet", mode: "forward", label: "Paqet · انتقال پورت", hint: "انتقال پورت‌های کلاینت از ایران به خارج با KCP روی بسته‌های خام؛ نیازمند تنظیم رابط شبکه." }
     ]
   },
   kernel: {
-    label: "فاضلاب لینوکس",
+    label: "تونل‌های شبکه و کرنل",
     transports: [
-      { value: "wireguard", label: "موش فاضلاب", hint: "سریع‌ترین و مدرن‌ترین پروتکل VPN کرنل با کلیدهای نامتقارن" },
-      { value: "tun", label: "لوله پولیکا", hint: "کارت شبکهٔ واقعی لینوکس در عمق فاضلاب؛ آزمون TCP/UDP پیش از فعال‌شدن" },
-      { value: "gre", label: "لجن", hint: "تونل لایه 3 رسمی با رمزگذاری سخت‌افزاری IPsec AES-GCM" },
-      { value: "gre6", label: "زباله دونی", hint: "کپسوله‌سازی GRE روی آدرس‌های Native IPv6 بدون رمزنگاری" },
-      { value: "ip6ip6", label: "لوله دوبل", hint: "تونل مستقیم نقطه به نقطه بین سرورهای دارای IPv6 عمومی" },
-      { value: "vxlan", label: "کانال آب", hint: "گسترش شبکه محلی L2 با سه روش Point-to-Point، Bridge و FDB — برای رمزنگاری کانال لجن را انتخاب کنید" },
-      { value: "vxlan_ipsec", label: "کانال لجن", hint: "لینک VXLAN کپسوله‌شده در IPsec ESP احرازشده؛ نیازمند strongSwan/charon روی هر دو سرور" },
-      { value: "dc6", label: "کانال سیکیم", hint: "حامل GRE6 یا IP6IP6 با IPv6 عمومی؛ SIT با IPv4 عمومی. آزمون دوطرفهٔ TCP/UDP پیش از فعال‌شدن" },
-      { value: "geneve_ipsec", label: "منهول سیکیم", hint: "پروتکل مجازی‌سازی نسل جدید شبکه با افزونه‌های متادیتا و رمزنگاری" }
+      { value: "wireguard", label: "WireGuard", hint: "تونل رمزنگاری‌شدهٔ WireGuard روی UDP با کلید عمومی؛ نیازمند دسترسی UDP." },
+      { value: "tun", label: "TUN", hint: "رابط مجازی لایهٔ ۳ روی حامل UDP با احراز هویت Noise؛ عبور TCP و UDP پیش از فعال‌شدن بررسی می‌شود." },
+      { value: "gre", label: "GRE + IPsec", hint: "تونل GRE روی IPv4 با IPsec ESP و رمزنگاری AES-GCM؛ انتقال پورت‌های TCP و UDP." },
+      { value: "gre6", label: "GRE6", hint: "کپسوله‌سازی GRE روی IPv6 عمومی؛ این حالت به‌تنهایی رمزنگاری ندارد." },
+      { value: "ip6ip6", label: "IP6IP6", hint: "کپسوله‌سازی IPv6 در IPv6 برای اتصال مستقیم دو سرور؛ بدون رمزنگاری داخلی." },
+      { value: "vxlan", label: "VXLAN", hint: "تونل لایهٔ ۲ روی UDP با روش‌های نقطه‌به‌نقطه، Bridge و FDB؛ بدون رمزنگاری داخلی." },
+      { value: "vxlan_ipsec", label: "VXLAN + IPsec", hint: "تونل VXLAN با حفاظت IPsec ESP و احراز هویت؛ نیازمند strongSwan در هر دو سمت." },
+      { value: "dc6", label: "DC6", hint: "حامل قابل انتخاب GRE6، IP6IP6 یا SIT؛ نیازمندی IPv4 یا IPv6 به حامل انتخاب‌شده بستگی دارد." },
+      { value: "geneve_ipsec", label: "Geneve + IPsec", hint: "تونل لایهٔ ۲ Geneve با شناسهٔ VNI و حفاظت IPsec ESP." }
     ]
   },
   spoof: {
@@ -2570,24 +2568,24 @@ const ENGINE_TRANSPORTS = {
       { value: "split-tls", label: "TLS Record + TCP Disorder (آزمایشی)", hint: "تقسیم رکورد ClientHello و ارسال معکوس قطعات TCP روی مسیر mTLS" },
       { value: "hop-ttl-injection", label: "TTL محدود با برآورد هاپ (آزمایشی)", hint: "تزریق ClientHello با TTL برآوردشده و محدود؛ مقدار جایگزین و BadSum حفظ می‌شوند" },
       { value: "tcp-state-desync", label: "RST + OOB (آزمایشی)", hint: "تزریق RST نامعتبر و دادهٔ خارج از باند؛ پذیرش فقط پس از مشاهدهٔ تغییر و عبور داده" },
-      { value: "l3-ip-spoof", disabled: true, label: "05. L3 Source-IP Spoofing (جعل آدرس آی‌پی مبدا لایه 3)", hint: "بازنویسی هدر IP در سوکت خام برای قطع همبستگی 5-تایی جریان‌های رفت و برگشت" },
+      { value: "l3-ip-spoof", disabled: true, label: "L3 Source-IP Spoofing (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." },
       { value: "l7-header-mutation", label: "HTTP Host Header Mutation (آزمایشی)", hint: "تغییر واقعی حروف نام هدر Host روی CONNECT؛ دادهٔ TCP/UDP در mTLS عبور می‌کند" },
-      { value: "udp-raw-spoof", disabled: true, label: "07. Raw UDP / QUIC Spoofing (استتار و ضدسانسور ترافیک UDP)", hint: "تزریق پکت‌های اولیه جعلی QUIC/WireGuard جهت دور زدن مسدودسازی پروتکل‌های UDP" },
-      { value: "dns-spoof", disabled: true, label: "08. DNS Anti-Poisoning (مسدودسازی پاسخ‌های جعلی و بوگون‌های زیرساخت)", hint: "فیلتر بسته‌های تزریقی پورت 53 و مسیردهی امن پرس‌وجوهای DNS" },
-      { value: "spoof-tcp-syn", disabled: true, label: "09. ParsaKSH TCP-SYN Spoof (جعل سورس IP با TCP SYN و راند-رابین)", hint: "سوکت خام لایه 4 با تولید بسته‌های TCP SYN، چک‌سام دستی و چرخش بین آی‌پی‌های مجاز" },
-      { value: "spoof-udp-raw", disabled: true, label: "10. ParsaKSH UDP Spoof (جعل بسته‌های خام UDP با راند-رابین)", hint: "ارسال بسته‌های UDP با جعل آی‌پی مبدأ روی لیست آی‌پی‌های سفید بدون نشست مستقیم" },
-      { value: "spoof-icmp", disabled: true, label: "11. ParsaKSH ICMP (تونل داده در اکوی ICMP با غیرفعال‌سازی ریپلای)", hint: "کپسوله‌سازی ترافیک در بسته‌های ICMP Ping و مسدودسازی پاسخ پیش‌فرض لینوکس" },
-      { value: "qs-dns-hybrid", disabled: true, label: "12. QS-Tunnel Hybrid (آپلود DNS بیس32 + دانلود Raw IP-Spoof)", hint: "دور زدن محدودیت uRPF: ارسال آپلود با کوئری‌های DNS استاندارد و دریافت مستقیم از خارج با جعل سورس IP" },
-      { value: "hyperion-x", disabled: true, label: "13. HYPERION-X Tri-Vector (runtime تکمیل نشده)", hint: "موتور مدیریت‌شده و آزمون انتقال داده هنوز تکمیل نشده است" }
+      { value: "udp-raw-spoof", disabled: true, label: "Raw UDP / QUIC Spoofing (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." },
+      { value: "dns-spoof", disabled: true, label: "DNS Anti-Poisoning (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." },
+      { value: "spoof-tcp-syn", disabled: true, label: "TCP SYN Spoofing (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." },
+      { value: "spoof-udp-raw", disabled: true, label: "Raw UDP Spoofing (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." },
+      { value: "spoof-icmp", disabled: true, label: "ICMP Tunnel (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." },
+      { value: "qs-dns-hybrid", disabled: true, label: "QS-Tunnel Hybrid (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." },
+      { value: "hyperion-x", disabled: true, label: "HYPERION-X (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." }
     ]
   },
   other: {
-    label: "اتاق بحران (پروتکل‌های وب و اضطراری)",
+    label: "وب و تونل DNS",
     transports: [
-      { value: "ws", label: "سولاخ کلودفلر (WebSocket)", hint: "استریم وب‌سوکت ساده جهت کار پشت CDN یا Nginx/Caddy" },
-      { value: "http", label: "پیک موتوری (HTTP CONNECT)", hint: "حامل CONNECT با انتقال TCP/UDP و گواهی اختصاصی دوطرفه؛ بدون ادعای HTTP/2 یا تقلید مرورگر" },
-      { value: "https", label: "رمزی ممزی (HTTPS CONNECT)", hint: "CONNECT روی TLS1.3 با گواهی اختصاصی و اعتبارسنجی هویت دوطرفه؛ دامنه یا گواهی عمومی لازم نیست" },
-      { value: "slipstream", label: "دود سرخپوستی (تونل اضطراری DNS)", hint: "مسیر پشتیبان و اضطراری برای عبور از فیلترینگ کامل از طریق پرس‌وجوهای DNS" }
+      { value: "ws", label: "WebSocket (WS)", hint: "انتقال WebSocket بدون TLS؛ برای استفاده پشت پراکسی معکوس باید مسیر و پورت‌ها هماهنگ باشند." },
+      { value: "http", label: "HTTP CONNECT", hint: "حامل HTTP/1.1 CONNECT با انتقال TCP و UDP در کانال دارای احراز هویت دوطرفهٔ TLS." },
+      { value: "https", label: "HTTPS CONNECT", hint: "حامل HTTPS CONNECT روی TLS 1.3 با احراز هویت دوطرفه و گواهی اختصاصی." },
+      { value: "slipstream", label: "Slipstream (DNS)", hint: "تونل پشتیبان روی پرس‌وجوهای DNS؛ نیازمند واگذاری زیردامنه و تنظیم resolver و محدودیت نرخ." }
     ]
   }
 };

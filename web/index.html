@@ -889,29 +889,29 @@
             </div>
           </div>
           <div class="input-group">
-            <label class="field-label" for="new-pool-engine">اسکریپت و هستهٔ پایهٔ تونل</label>
+            <label class="field-label" for="new-pool-engine">موتور تونل</label>
             <select id="new-pool-engine" class="field-input select-styled" onchange="onPoolEngineChanged()">
-              <option value="backpack" selected>موتور جت پک</option>
-              <option value="waterwall">سد کرج</option>
-              <option value="gost">غول چراغ جادو</option>
-              <option value="frp">پیچ شمرون</option>
-              <option value="hedioum">هدیوم</option>
-              <option value="rathole">لانه موش</option>
-              <option value="paqet">بستهبندی قاچاق</option>
-              <option value="kernel">فاضلاب لینوکس</option>
+              <option value="backpack" selected>BackPack</option>
+              <option value="waterwall">WaterWall</option>
+              <option value="gost">GOST</option>
+              <option value="frp">FRP</option>
+              <option value="hedioum">Hedioum</option>
+              <option value="rathole">Rathole</option>
+              <option value="paqet">Paqet</option>
+              <option value="kernel">تونل‌های شبکه و کرنل</option>
                <option value="spoof">پردازش بسته (DPI Spoof)</option>
-              <option value="other">اتاق بحران (وب و اضطراری)</option>
+              <option value="other">وب و تونل DNS</option>
             </select>
           </div>
           <div class="input-group">
-            <label class="field-label" for="new-pool-proto">روش انتقال / ترنسپورت اختصاصی</label>
+            <label class="field-label" for="new-pool-proto">روش انتقال یا پروفایل</label>
             <select id="new-pool-proto" class="field-input select-styled" onchange="onPoolTransportChanged()">
-              <option value="tcp" selected>جت پک تخمی</option>
-              <option value="stealth">جت پک شخمی</option>
-              <option value="pck">جت پک تخمی تخیلی</option>
-              <option value="kcp">جت پک طرح گیمینگ</option>
-              <option value="wss">جت پک خایه افکن</option>
-              <option value="quic">جت پک سوپر کیری خفن</option>
+              <option value="tcp" selected>TCP</option>
+              <option value="stealth">Stealth (Noise)</option>
+              <option value="pck">PCK (Raw TCP)</option>
+              <option value="kcp">KCP</option>
+              <option value="wss">WSS (WebSocket + TLS)</option>
+              <option value="quic">QUIC</option>
             </select>
             <p id="new-pool-transport-desc" class="field-hint" style="margin-top:6px;"></p>
           </div>
@@ -1226,22 +1226,22 @@
         <p class="transport-explanation">برای هر نود، اتصال کانال کنترل و عبور پیام آزمایشی مستقل بررسی می‌شود؛ نیازی به کاربر فعال نیست. در صورت خطا، نودهای تغییرکرده به تنظیم قبلی برمی‌گردند. هنگام عملیات، تغییرات استخر قفل و هماهنگی DNS این دامنه موقتاً متوقف است.</p>
         <form onsubmit="submitTransportChange(event)">
           <div class="input-group">
-            <label class="field-label" for="transport-change-engine">موتور و هستهٔ پایهٔ تونل</label>
+            <label class="field-label" for="transport-change-engine">موتور تونل</label>
             <select id="transport-change-engine" class="field-input select-styled" onchange="onTransportChangeEngineChanged()">
-              <option value="backpack">موتور جت پک</option>
-              <option value="waterwall">سد کرج</option>
-              <option value="gost">غول چراغ جادو</option>
-              <option value="frp">پیچ شمرون</option>
-              <option value="hedioum">هدیوم</option>
-              <option value="rathole">لانه موش</option>
-              <option value="paqet">بستهبندی قاچاق</option>
-              <option value="kernel">فاضلاب لینوکس</option>
+              <option value="backpack">BackPack</option>
+              <option value="waterwall">WaterWall</option>
+              <option value="gost">GOST</option>
+              <option value="frp">FRP</option>
+              <option value="hedioum">Hedioum</option>
+              <option value="rathole">Rathole</option>
+              <option value="paqet">Paqet</option>
+              <option value="kernel">تونل‌های شبکه و کرنل</option>
               <option value="spoof" disabled>پردازش بسته — استخر جداگانه بسازید</option>
-              <option value="other">اتاق بحران (وب و اضطراری)</option>
+              <option value="other">وب و تونل DNS</option>
             </select>
           </div>
           <div class="input-group">
-            <label class="field-label" for="transport-target">روش انتقال / ترنسپورت جدید</label>
+            <label class="field-label" for="transport-target">روش انتقال یا پروفایل جدید</label>
             <select id="transport-target" class="field-input select-styled" required onchange="onTransportChangeTransportChanged()">
               <option value="" selected disabled>نوع جدید را انتخاب کنید</option>
             </select>
@@ -1584,6 +1584,6 @@
 
   <script src="hairline.js?v=2.29"></script>
   <script src="copy.fa.js?v=2.29"></script>
-  <script src="app.js?v=2.32"></script>
+  <script src="app.js?v=2.33"></script>
 </body>
 </html>

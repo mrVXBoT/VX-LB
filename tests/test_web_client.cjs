@@ -231,7 +231,7 @@ const originalApiFetch = context.apiFetch;
   assert.match(element('pools-container').innerHTML,/openAddNodeModal[^>]*disabled/);
   console.log('PASS: GRE private endpoints, MTU settings and dedicated recovery actions');
   run(`renderPools([{name:'ww-one',engine:'waterwall',transport:'waterwall',waterwall_mode:'trojan',camouflage:{mode:'trojan',port:443},nodes:[{name:'iran',ip:'192.0.2.1',engine:'waterwall',transport:'waterwall',outer_port:443,waterwall:{profile:{mode:'trojan'},outer_port:443}}]}])`);
-  assert.match(element('pools-container').innerHTML,/سد کرج/);
+  assert.match(element('pools-container').innerHTML,/WaterWall/);
   assert.match(element('pools-container').innerHTML,/openTransportModal/);
   element('new-pool-proto').value='waterwall';run(`updateGreCreateFields()`);
   assert.equal(element('waterwall-create-fields').classList.contains('hidden'),false);

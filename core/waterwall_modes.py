@@ -19,19 +19,19 @@ import copy
 MODES = ("trojan", "reality", "reverse", "halfduplex", "bgp4")
 
 MODE_LABELS = {
-    "halfduplex": "HalfDuplex (Separate Upload/Download Paths)",
-    "reverse": "Reverse (Iran dials Kharej; bypasses inbound restrictions)",
-    "trojan": "Trojan (Shared password authentication; optional TLS)",
-    "bgp4": "Bgp4 (BGP-shaped framing camouflage)",
-    "reality": "Reality (Reverse Reality fake-SNI disguise)",
+    "halfduplex": "HalfDuplex",
+    "reverse": "Reverse",
+    "trojan": "Trojan",
+    "bgp4": "Bgp4",
+    "reality": "Reality",
 }
 
 MODE_HINTS = {
-    "halfduplex": "Independent upload and download channels for asymmetric networks",
-    "reverse": "Iran node initiates connection outward to Kharej",
-    "trojan": "Lightweight password authentication without mandatory SSL certificates",
-    "bgp4": "BGP-like traffic structure for advanced DPI evasion",
-    "reality": "Dynamic SNI masquerade without public server certificate requirement",
+    "halfduplex": "Separate upload and download channels",
+    "reverse": "Iran initiates the connection to Kharej",
+    "trojan": "Shared-password authentication; optional TLS requires certificates",
+    "bgp4": "BGP-shaped framing; does not provide BGP routing",
+    "reality": "Reality mode with configurable SNI; no public server certificate required",
 }
 
 

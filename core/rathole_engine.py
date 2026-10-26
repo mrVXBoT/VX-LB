@@ -37,7 +37,7 @@ TRANSPORT_LABELS = {
     'tcp': 'TCP (بدون رمزنگاری)',
     'tls': 'TLS (گواهی PKCS#12)',
     'noise': 'Noise (رمزنگاری بدون گواهی)',
-    'websocket': 'WebSocket (پشت CDN)',
+    'websocket': 'WebSocket (TLS اختیاری)',
 }
 
 # Forwarded protocol per service (upstream `[server.services.X] type`).
