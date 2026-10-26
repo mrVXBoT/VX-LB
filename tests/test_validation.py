@@ -85,6 +85,11 @@ class TestValidatePorts(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_ports(["443", "notaport"])
 
+    def test_rejects_scalar_instead_of_port_collection(self):
+        for scalar in ("443", b"443", 443):
+            with self.subTest(scalar=scalar), self.assertRaises(ValueError):
+                validate_ports(scalar)
+
 
 class TestValidateTransport(unittest.TestCase):
     def test_accepts_supported(self):
@@ -99,6 +104,15 @@ class TestValidateTransport(unittest.TestCase):
 
 
 class TestTomlEscaping(unittest.TestCase):
+    def test_control_characters_round_trip_through_toml(self):
+        try:
+            import tomllib
+        except ImportError:
+            self.skipTest("tomllib is available on Python 3.11+")
+        value = ''.join(chr(code) for code in range(32)) + '\x7f"\\'
+        encoded = f'value = "{toml_basic_string(value)}"'
+        self.assertEqual(tomllib.loads(encoded)["value"], value)
+
     def test_escapes_quotes_and_backslashes(self):
         # A quote in the value must not break out of the TOML string:
         # every interior " must be backslash-escaped.

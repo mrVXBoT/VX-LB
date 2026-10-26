@@ -4,6 +4,7 @@ import fcntl
 import tempfile
 import threading
 from typing import Dict, List, Optional, Callable, Tuple
+from core.validation import validate_server_type
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -82,15 +83,16 @@ class _FileLock:
         finally:
             _in_process_lock.release()
 
-def _read_json_if_valid(path: str):
-    """Return parsed JSON, or None if missing/unreadable/invalid."""
+def _read_inventory_if_valid(path: str) -> Optional[dict]:
+    """Read an inventory object, rejecting invalid JSON and scalar/array roots."""
     try:
         with open(path, "r", encoding="utf-8") as f:
             content = f.read().strip()
             if not content:
                 return None
-            return json.loads(content)
-    except Exception:
+            data = json.loads(content)
+            return data if isinstance(data, dict) else None
+    except (OSError, ValueError):
         return None
 
 
@@ -100,12 +102,12 @@ _BACKUP_GENERATIONS = 3  # inventory.json.bak1 .. .bak3
 def _rotate_backups(target_path: str):
     """Shift .bak1->.bak2->.bak3, then copy the current (validated) file to .bak1.
 
-    The current file is only archived if it parses as JSON -- a corrupt file
+    The current file is only archived if it is an inventory object -- a corrupt file
     must never clobber the last good backup.
     """
     import shutil
     dir_name = os.path.dirname(target_path)
-    if _read_json_if_valid(target_path) is None:
+    if _read_inventory_if_valid(target_path) is None:
         return
     for gen in range(_BACKUP_GENERATIONS, 1, -1):
         older = f"{target_path}.bak{gen - 1}"
@@ -206,46 +208,50 @@ def _default_inventory() -> dict:
 
 def load_data(migrate: bool = False) -> dict:
     _ensure_dir()
-    # Shared lock: concurrent readers don't block each other (or writers
-    # longer than necessary). Nested inside atomic_update the outer
-    # exclusive lock is retained.
-    with _FileLock(LOCK_FILE, shared=True):
+    # Migrations can write, so they need an exclusive lock from the start.
+    # Ordinary reads retain the outer exclusive lock inside atomic_update.
+    with _FileLock(LOCK_FILE, shared=not migrate):
+        if os.path.exists(INVENTORY_FILE):
+            return _load_existing_inventory(migrate)
+
+    # Another process may create the inventory before this exclusive lock.
+    # Recheck here so initialization never overwrites its changes.
+    with _FileLock(LOCK_FILE):
         if not os.path.exists(INVENTORY_FILE):
+            backup_paths = [f"{INVENTORY_FILE}.bak{gen}" for gen in range(1, _BACKUP_GENERATIONS + 1)]
+            backup_paths.append(INVENTORY_FILE + ".bak")
+            if any(os.path.exists(path) for path in backup_paths):
+                return _load_existing_inventory(migrate)
             default_data = _default_inventory()
             _atomic_write_json(INVENTORY_FILE, default_data)
             return default_data
+        return _load_existing_inventory(migrate)
 
-        data = _read_json_if_valid(INVENTORY_FILE)
+
+def _load_existing_inventory(migrate: bool) -> dict:
+    """Read/recover inventory while the caller holds the appropriate file lock."""
+    data = _read_inventory_if_valid(INVENTORY_FILE)
+    if data is None:
+        # Main file unreadable: walk the backup generations, newest first.
+        for gen in range(1, _BACKUP_GENERATIONS + 1):
+            data = _read_inventory_if_valid(f"{INVENTORY_FILE}.bak{gen}")
+            if data is not None:
+                break
         if data is None:
-            # Main file unreadable: walk the backup generations, newest first.
-            for gen in range(1, _BACKUP_GENERATIONS + 1):
-                data = _read_json_if_valid(f"{INVENTORY_FILE}.bak{gen}")
-                if data is not None:
-                    break
-            if data is None:
-                # Legacy single .bak from older releases.
-                data = _read_json_if_valid(INVENTORY_FILE + ".bak")
-            if data is None:
-                # NEVER silently return an empty inventory -- the next write
-                # would persist the amnesia and orphan the fleet. Fail loud so the
-                # operator restores from backup instead.
-                raise InventoryCorrupted(
-                    f"inventory.json and all backups under {DATA_DIR} are unreadable. "
-                    "Refusing to continue with an empty inventory; restore from backup."
-                )
+            # Legacy single .bak from older releases.
+            data = _read_inventory_if_valid(INVENTORY_FILE + ".bak")
+        if data is None:
+            raise InventoryCorrupted(
+                f"inventory.json and all backups under {DATA_DIR} are unreadable. "
+                "Refusing to continue with an empty inventory; restore from backup."
+            )
 
-        if migrate:
-            from core.schema_migration import apply_migrations
-            migrated_data, was_modified = apply_migrations(data)
-            if was_modified:
-                try:
-                    with _FileLock(LOCK_FILE, shared=False):
-                        _atomic_write_json(INVENTORY_FILE, migrated_data)
-                except Exception:
-                    pass
-            return migrated_data
-        return data
-
+    if migrate:
+        from core.schema_migration import apply_migrations
+        data, was_modified = apply_migrations(data)
+        if was_modified:
+            _atomic_write_json(INVENTORY_FILE, data)
+    return data
 
 
 def atomic_update(updater_fn: Callable[[dict], None]) -> dict:
@@ -266,13 +272,17 @@ def save_data(data: dict):
     with _FileLock(LOCK_FILE):
         _atomic_write_json(INVENTORY_FILE, data)
 
+def _server_collection_key(server_type: str) -> str:
+    """Resolve an explicit server role; typos must never select another fleet."""
+    return f"{validate_server_type(server_type)}_servers"
+
 def add_server(server_type: str, server_info: dict) -> bool:
     """
     server_type: 'iran' or 'kharej'
     server_info: {name, ip, port, username, password}
     """
-    def _up(d: dict):
-        key = "iran_servers" if server_type.lower() == "iran" else "kharej_servers"
+    key = _server_collection_key(server_type)
+    def upsert_server(d: dict):
         if key not in d:
             d[key] = []
         for s in d[key]:
@@ -281,39 +291,39 @@ def add_server(server_type: str, server_info: dict) -> bool:
                 return
         d[key].append(server_info)
 
-    atomic_update(_up)
+    atomic_update(upsert_server)
     return True
 
 def delete_server(server_type: str, ip: str) -> bool:
+    key = _server_collection_key(server_type)
     deleted = [False]
-    def _up(d: dict):
-        key = "iran_servers" if server_type.lower() == "iran" else "kharej_servers"
+    def remove_server(d: dict):
         if key in d:
             before = len(d[key])
             d[key] = [s for s in d[key] if s["ip"] != ip]
             if len(d[key]) < before:
                 deleted[0] = True
 
-    atomic_update(_up)
+    atomic_update(remove_server)
     return deleted[0]
 
 def get_servers(server_type: str) -> List[dict]:
+    key = _server_collection_key(server_type)
     data = load_data()
-    key = "iran_servers" if server_type.lower() == "iran" else "kharej_servers"
     return data.get(key, [])
 
 
 def update_server_telemetry(server_type: str, ip: str, fields: dict) -> bool:
     """Merge health/telemetry fields into a saved server record. Returns True if found."""
+    key = _server_collection_key(server_type)
     done = [False]
-    def _up(d: dict):
-        key = "iran_servers" if server_type.lower() == "iran" else "kharej_servers"
+    def merge_server_telemetry(d: dict):
         for s in d.get(key, []):
             if s.get("ip") == ip:
                 s.update(fields)
                 done[0] = True
                 break
-    atomic_update(_up)
+    atomic_update(merge_server_telemetry)
     return done[0]
 
 def get_pools() -> Dict[str, dict]:
@@ -321,22 +331,22 @@ def get_pools() -> Dict[str, dict]:
     return data.get("pools", {})
 
 def save_pool(pool_name: str, pool_data: dict):
-    def _up(d: dict):
+    def store_pool(d: dict):
         if "pools" not in d:
             d["pools"] = {}
         d["pools"][pool_name] = pool_data
 
-    atomic_update(_up)
+    atomic_update(store_pool)
 
 def delete_pool(pool_name: str) -> bool:
     deleted = [False]
-    def _up(d: dict):
+    def remove_pool(d: dict):
         if pool_name in d.get("pools", {}):
             del d["pools"][pool_name]
             d.get("pool_creations", {}).pop(pool_name, None)
             deleted[0] = True
 
-    atomic_update(_up)
+    atomic_update(remove_pool)
     return deleted[0]
 
 
@@ -374,45 +384,45 @@ def cf_profile_public(profile_id: str, profile: dict) -> dict:
 
 
 def save_cf_profile(profile_id: str, profile: dict):
-    def _up(d: dict):
+    def store_profile(d: dict):
         _cf_profiles(d)[profile_id] = profile
-    atomic_update(_up)
+    atomic_update(store_profile)
 
 
 def update_cf_profile(profile_id: str, fields: dict) -> bool:
     done = [False]
-    def _up(d: dict):
+    def merge_profile_fields(d: dict):
         p = _cf_profiles(d).get(profile_id)
         if p is not None:
             p.update(fields)
             done[0] = True
-    atomic_update(_up)
+    atomic_update(merge_profile_fields)
     return done[0]
 
 
 def delete_cf_profile(profile_id: str) -> Tuple[bool, List[str]]:
     """Delete a profile. Returns (deleted, pool_names_using_it)."""
-    data = load_data()
-    using = [name for name, p in data.get("pools", {}).items()
-             if (p.get("cloudflare") or {}).get("profile_id") == profile_id]
-    if using:
-        return False, using
+    using = []
     deleted = [False]
-    def _up(d: dict):
+    def remove_unreferenced_profile(d: dict):
+        using.extend(name for name, pool in d.get("pools", {}).items()
+                     if (pool.get("cloudflare") or {}).get("profile_id") == profile_id)
+        if using:
+            return
         if _cf_profiles(d).pop(profile_id, None) is not None:
             deleted[0] = True
-    atomic_update(_up)
-    return deleted[0], []
+    atomic_update(remove_unreferenced_profile)
+    return deleted[0], using
 
 
 def set_cf_profile_zones(profile_id: str, zones: list):
-    def _up(d: dict):
+    def cache_profile_zones(d: dict):
         p = _cf_profiles(d).get(profile_id)
         if p is not None:
             import datetime
             p["zone_cache"] = zones
             p["zone_cache_fetched_at"] = datetime.datetime.utcnow().isoformat() + "Z"
-    atomic_update(_up)
+    atomic_update(cache_profile_zones)
 
 
 def cf_profile_pools(profile_id: str) -> List[str]:
@@ -425,7 +435,7 @@ def cf_audit(action: str, profile_id: str = "", zone_id: str = "",
              detail: str = "", ok: bool = True):
     """Append a bounded, sanitized audit entry — never log tokens or record content."""
     import datetime
-    def _up(d: dict):
+    def append_audit_entry(d: dict):
         log = d.setdefault("cloudflare_audit", [])
         log.append({
             "ts": datetime.datetime.utcnow().isoformat() + "Z",
@@ -436,7 +446,7 @@ def cf_audit(action: str, profile_id: str = "", zone_id: str = "",
             "ok": bool(ok),
         })
         del log[:-200]  # keep last 200 entries
-    atomic_update(_up)
+    atomic_update(append_audit_entry)
 
 
 def migrate_legacy_cf_profiles() -> int:
@@ -446,7 +456,7 @@ def migrate_legacy_cf_profiles() -> int:
     """
     import datetime
     created = [0]
-    def _up(d: dict):
+    def migrate_profiles(d: dict):
         profiles = _cf_profiles(d)
         now = datetime.datetime.utcnow().isoformat() + "Z"
 
@@ -475,5 +485,5 @@ def migrate_legacy_cf_profiles() -> int:
             if cf.get("api_token") and cf.get("zone_id") and not cf.get("profile_id"):
                 pid = ensure_profile(cf["api_token"], cf["zone_id"], "Legacy Cloudflare (pool)")
                 cf["profile_id"] = pid
-    atomic_update(_up)
+    atomic_update(migrate_profiles)
     return created[0]

@@ -111,9 +111,9 @@ def manage_servers_menu():
         elif choice == "3":
             delete_server_flow()
         elif choice == "4":
-            test_server_flow()
+            diagnose_server_flow()
         elif choice == "5":
-            manage_server_cc_flow()
+            configure_server_congestion_control_flow()
         elif choice == "0":
             break
 
@@ -242,7 +242,7 @@ def delete_server_flow():
         console.print("[bold red]Error: Server not found with this IP address.[/bold red]")
     time.sleep(1.5)
 
-def test_server_flow():
+def diagnose_server_flow():
     list_servers_flow()
     stype = Prompt.ask("Location of the server to test", choices=["iran", "kharej"])
     ip = Prompt.ask("Enter IP address of the server to test")
@@ -284,7 +284,7 @@ def test_server_flow():
             console.print(f"  • {label}: [yellow]{val}[/yellow]")
     Prompt.ask("\nPress Enter to return")
 
-def manage_server_cc_flow():
+def configure_server_congestion_control_flow():
     list_servers_flow()
     stype = Prompt.ask("Location of the server", choices=["iran", "kharej"])
     ip = Prompt.ask("Enter IP address of the server")
@@ -349,7 +349,7 @@ def manage_server_cc_flow():
     Prompt.ask("\nPress Enter to return")
 
 @pool_mutation_flow
-def create_load_balancer_flow():
+def create_pool_flow():
     show_banner()
     console.print("[bold green]=== Create Load Balancer (Multi-Iran ⇄ 1-Kharej) ===[/bold green]\n")
 
@@ -484,7 +484,7 @@ def create_load_balancer_flow():
         }
         gre_options = {'camouflage': settings}
     elif selected_transport == 'hedioum':
-        from core.hedioum_engine import MODES, MODE_LABELS, PERSONAS
+        from core.hedioum_engine import MODES, MODE_LABELS
         console.print("[bold cyan]Hedioum mode:[/bold cyan]")
         h_choices = {str(i): m for i, m in enumerate(MODES, 1)}
         for i, m in h_choices.items():
@@ -536,7 +536,7 @@ def create_load_balancer_flow():
         gre_options = {'camouflage': settings}
     elif selected_transport == 'paqet':
         import secrets as _secrets_paqet
-        from core.paqet_engine import KCP_MODES, generate_secret
+        from core.paqet_engine import KCP_MODES
         console.print("[bold cyan]Paqet KCP mode:[/bold cyan]")
         k_choices = {str(i): m for i, m in enumerate(KCP_MODES, 1)}
         for i, m in k_choices.items():
@@ -657,7 +657,7 @@ def create_load_balancer_flow():
 
     # Summary Confirmation
     console.print("\n" + "="*50)
-    console.print(f"[bold yellow]Deployment Summary:[/bold yellow]")
+    console.print("[bold yellow]Deployment Summary:[/bold yellow]")
     console.print(f"• Pool Name: [bold]{pool_name}[/bold]")
     console.print(f"• Destination Kharej: [bold]{selected_kharej['name']} ({selected_kharej['ip']})[/bold]")
     console.print(f"• Iran Nodes Count: [bold]{len(selected_irans)}[/bold]")
@@ -753,7 +753,7 @@ def diagnose_pool_flow(pool_name: str):
         Prompt.ask("Press Enter to return")
         return
     else:
-        console.print(f"  [bold green]✅ SSH connection to Kharej server established.[/bold green]")
+        console.print("  [bold green]✅ SSH connection to Kharej server established.[/bold green]")
 
     # Check listening backend ports on Kharej
     port_status_kh = {}
@@ -766,7 +766,7 @@ def diagnose_pool_flow(pool_name: str):
             console.print(f"  [green]  • Port {p} is active on the Kharej server and a program is listening (LISTEN).[/green]")
         else:
             console.print(f"  [yellow]  • ⚠️ Port {p} is DOWN on the Kharej server! No program (e.g. Xray/V2Ray) is listening on it.[/yellow]")
-            console.print(f"    [dim]💡 Note: the tunnel will connect, but clients won't work until you start the destination service.[/dim]")
+            console.print("    [dim]💡 Note: the tunnel will connect, but clients won't work until you start the destination service.[/dim]")
 
     kh_ssh.close()
 
@@ -1147,11 +1147,11 @@ def manage_pool_ports_flow(pool_name: str):
                 time.sleep(1.5)
                 continue
 
-            def log_cb(msg: str):
+            def log_progress(msg: str):
                 console.print(f"  [cyan]•[/cyan] {msg}")
 
             with console.status("Applying new ports to all Iran nodes..."):
-                ok, msg = LoadBalancerManager.add_client_ports(pool_name, new_ports, callback=log_cb)
+                ok, msg = LoadBalancerManager.add_client_ports(pool_name, new_ports, callback=log_progress)
 
             if ok:
                 console.print(f"[bold green]Success: {msg}[/bold green]")
@@ -1173,11 +1173,11 @@ def manage_pool_ports_flow(pool_name: str):
             target_port = current_ports[int(p_sel)-1]
 
             if Confirm.ask(f"Remove port {target_port} from all Iran nodes in '{pool_name}'?", default=True):
-                def log_cb(msg: str):
+                def log_progress(msg: str):
                     console.print(f"  [cyan]•[/cyan] {msg}")
 
                 with console.status(f"Removing port {target_port} from all nodes..."):
-                    ok, msg = LoadBalancerManager.remove_client_port(pool_name, target_port, callback=log_cb)
+                    ok, msg = LoadBalancerManager.remove_client_port(pool_name, target_port, callback=log_progress)
 
                 if ok:
                     console.print(f"[bold green]Success: {msg}[/bold green]")
@@ -1204,11 +1204,11 @@ def add_node_to_pool_flow(pool_name: str):
     sel = Prompt.ask("Choose server index", choices=[str(i) for i in range(1, len(available)+1)])
     selected_srv = available[int(sel)-1]
 
-    def log_cb(msg: str):
+    def log_progress(msg: str):
         console.print(f"  [cyan]•[/cyan] {msg}")
 
     with console.status(f"Attaching node {selected_srv['name']} to load balancer..."):
-        ok, msg = LoadBalancerManager.add_node(pool_name, selected_srv, callback=log_cb)
+        ok, msg = LoadBalancerManager.add_node(pool_name, selected_srv, callback=log_progress)
 
     if ok:
         console.print(f"[bold green]Success: {msg}[/bold green]")
@@ -1234,11 +1234,11 @@ def remove_node_from_pool_flow(pool_name: str):
     target_ip = nodes[int(sel)-1]["ip"]
 
     if Confirm.ask(f"Are you sure you want to remove node {target_ip}?", default=True):
-        def log_cb(msg: str):
+        def log_progress(msg: str):
             console.print(f"  [cyan]•[/cyan] {msg}")
 
         with console.status(f"Tearing down tunnel for node {target_ip}..."):
-            ok, msg = LoadBalancerManager.remove_node(pool_name, target_ip, callback=log_cb)
+            ok, msg = LoadBalancerManager.remove_node(pool_name, target_ip, callback=log_progress)
 
         if ok:
             console.print(f"[bold green]Success: {msg}[/bold green]")
@@ -1490,9 +1490,9 @@ def manage_web_menu():
             if len(new_pass) >= 8:
                 from core.storage import atomic_update
                 from core.web_server import _hash_password
-                def _set_p(d: dict):
+                def store_web_password(d: dict):
                     d["web_password"] = _hash_password(new_pass)
-                atomic_update(_set_p)
+                atomic_update(store_web_password)
                 console.print("[bold green]Success: Web Dashboard password updated successfully.[/bold green]")
             else:
                 console.print("[red]Password too short (minimum 8 characters).[/red]")
@@ -1525,7 +1525,7 @@ def main():
             if choice == "1":
                 manage_servers_menu()
             elif choice == "2":
-                create_load_balancer_flow()
+                create_pool_flow()
             elif choice == "3":
                 manage_pools_menu()
             elif choice == "4":
@@ -1557,9 +1557,9 @@ def _cli_set_web_password():
         sys.exit(1)
     from core.storage import atomic_update
     from core.web_server import _hash_password
-    def _set_p(d: dict):
+    def store_web_password(d: dict):
         d["web_password"] = _hash_password(pw)
-    atomic_update(_set_p)
+    atomic_update(store_web_password)
     console.print("[bold green]Success: Dashboard password set.[/bold green]")
     sys.exit(0)
 

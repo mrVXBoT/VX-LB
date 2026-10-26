@@ -13,6 +13,14 @@ _POOL_NAME_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
 _TUNNEL_NAME_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,80}")
 
 
+def validate_server_type(server_type) -> str:
+    """Normalize a server role without silently selecting the wrong fleet."""
+    normalized = str(server_type).strip().lower()
+    if normalized not in {"iran", "kharej"}:
+        raise ValueError(f"Invalid server type {server_type!r}: use 'iran' or 'kharej'")
+    return normalized
+
+
 def validate_pool_name(name) -> str:
     """Normalize and whitelist-validate a pool name.
 
@@ -50,8 +58,14 @@ def validate_port(port) -> str:
 
 def validate_ports(ports) -> list:
     """Validate a list of ports, de-duplicated. Raises ValueError if empty/invalid."""
+    if isinstance(ports, (str, bytes)):
+        raise ValueError("Ports must be a collection, not a single string")
+    try:
+        candidates = iter(ports) if ports is not None else iter(())
+    except TypeError:
+        raise ValueError("Ports must be a collection of port numbers") from None
     seen = []
-    for p in ports or []:
+    for p in candidates:
         v = validate_port(p)
         if v not in seen:
             seen.append(v)
@@ -76,11 +90,9 @@ def shquote(s) -> str:
 
 def toml_basic_string(s: str) -> str:
     """Escape a value for embedding inside a TOML basic string ("...")."""
-    return (
-        str(s)
-        .replace("\\", "\\\\")
-        .replace('"', '\\"')
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
-        .replace("\t", "\\t")
+    escapes = {"\\": "\\\\", '"': '\\"', "\b": "\\b", "\t": "\\t",
+               "\n": "\\n", "\f": "\\f", "\r": "\\r"}
+    return "".join(
+        escapes.get(char) or (f"\\u{ord(char):04x}" if ord(char) < 32 or ord(char) == 127 else char)
+        for char in str(s)
     )

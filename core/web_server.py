@@ -20,19 +20,19 @@ from core.storage import (
     add_server, delete_server, update_server_telemetry,
     get_cf_profiles, get_cf_profile, cf_profile_public, save_cf_profile,
     update_cf_profile, delete_cf_profile, set_cf_profile_zones,
-    cf_profile_pools, cf_audit, migrate_legacy_cf_profiles
+    cf_audit, migrate_legacy_cf_profiles
 )
 from core.tunnel import SUPPORTED_TRANSPORTS
 from core.watchdog import TelemetryWatchdog
 from core.cloudflare import CloudflareManager
 from core.dns_routing import routing_lock, route_key, effective_config, snapshot_matches
 from core.dns_scheduler import pool_rotation_status, save_global_schedule, save_pool_schedule, rotate_pool
-from core.transport_change import ACTIVE as TRANSPORT_ACTIVE, mutation_lock, busy as transport_busy, start_change, run_change, recover_changes, force_clear_change
+from core.transport_change import mutation_lock, busy as transport_busy, start_change, run_change, recover_changes, force_clear_change
 from core.load_balancer import LoadBalancerManager
 from core.ssh_client import SSHManager
 from core.node_addition import start as start_node_addition, recover as recover_node_additions
 from core.node_removal import start as start_node_removal, recover as recover_node_removals
-from core.validation import validate_pool_name, validate_port, validate_ports, validate_transport, shquote, shquote
+from core.validation import validate_pool_name, validate_port, validate_ports, validate_transport, validate_server_type, shquote
 from core.domain_manager import get_dashboard_domain_config, apply_nginx_config, issue_letsencrypt_cert
 
 WEB_DIR = os.path.join(BASE_DIR, "web")
@@ -73,7 +73,7 @@ def _hash_password(password: str) -> str:
 
 def _verify_password(password: str, stored: str) -> bool:
     """Constant-time password check. Transparently migrates legacy plaintext."""
-    if not stored or not password:
+    if not isinstance(password, str) or not isinstance(stored, str) or not stored or not password:
         return False
     if stored.startswith("pbkdf2_sha256$"):
         try:
@@ -83,15 +83,15 @@ def _verify_password(password: str, stored: str) -> bool:
         except Exception:
             return False
     # Legacy plaintext password: compare, then upgrade to a hash on success.
-    if hmac.compare_digest(password, stored):
+    if hmac.compare_digest(password.encode("utf-8"), stored.encode("utf-8")):
         try:
             new_hash = _hash_password(password)
 
-            def _migrate(d: dict):
+            def migrate_legacy_password(d: dict):
                 if d.get("web_password") == stored:
                     d["web_password"] = new_hash
 
-            atomic_update(_migrate)
+            atomic_update(migrate_legacy_password)
         except Exception:
             pass
         return True
@@ -811,10 +811,14 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 body = json.loads(raw_body)
             except Exception:
                 return self._send_json({"error": "Invalid JSON"}, 400)
+            if not isinstance(body, dict):
+                return self._send_json({"error": "JSON body must be an object"}, 400)
 
         # 1. Login endpoint (open to unauthenticated)
         if path == "/api/login":
             password_input = body.get("password", "")
+            if not isinstance(password_input, str):
+                return self._send_json({"error": "Password must be a string"}, 400)
             client_ip = self._client_ip()
             if not _login_allowed(client_ip):
                 return self._send_json({"error": "تلاش‌های ناموفق زیاد؛ ۵ دقیقه صبر کنید"}, 429)
@@ -826,10 +830,10 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             # first run (min 8 chars); otherwise fail closed with guidance.
             if not stored_pass:
                 bootstrap = os.environ.get("VX_LB_WEB_PASSWORD", "")
-                if bootstrap and len(bootstrap) >= 8 and hmac.compare_digest(password_input, bootstrap):
-                    def _set_p(d: dict):
+                if bootstrap and len(bootstrap) >= 8 and hmac.compare_digest(password_input.encode("utf-8"), bootstrap.encode("utf-8")):
+                    def store_bootstrap_password(d: dict):
                         d["web_password"] = _hash_password(bootstrap)
-                    atomic_update(_set_p)
+                    atomic_update(store_bootstrap_password)
                     stored_pass = load_data().get("web_password")
                 else:
                     _record_failed_login(client_ip)
@@ -866,6 +870,12 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
         # Protected endpoints below
         if not self._is_authenticated():
             return self._send_json({"error": "Unauthorized"}, 401)
+
+        if path in {"/api/servers/add", "/api/servers/delete", "/api/servers/test", "/api/servers/cc"}:
+            try:
+                body["type"] = validate_server_type(body.get("type", "iran"))
+            except ValueError as error:
+                return self._send_json({"error": str(error)}, 400)
 
         if path == "/api/rotation/settings":
             try:
@@ -1071,7 +1081,6 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             kharej_ip = body.get("kharej_ip", "").strip()
             iran_ips = body.get("iran_ips", [])
             transport = body.get("transport", "pck").strip()
-            raw_ports = [str(p).strip() for p in body.get("client_ports", ["443"]) if str(p).strip()]
 
             if not pool_name or not kharej_ip or not iran_ips:
                 return self._send_json({"error": "نام استخر، سرور خارج و حداقل یک سرور ایران الزامی است"}, 400)
@@ -1080,7 +1089,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             try:
                 pool_name = validate_pool_name(pool_name)
                 transport = validate_transport(transport, SUPPORTED_TRANSPORTS)
-                client_ports = validate_ports(raw_ports)
+                client_ports = validate_ports(body.get("client_ports", ["443"]))
             except ValueError as e:
                 return self._send_json({"error": str(e)}, 400)
 
@@ -1766,7 +1775,6 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             # Restart the panel in place: a detached helper briefly waits for
             # this response to flush, terminates the current process, then
             # starts a fresh copy on the same port.
-            import signal
             port = get_web_port() or 8088
             script = os.path.abspath(__file__)
             helper = (
@@ -1793,11 +1801,13 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
 
         elif path == "/api/password":
             new_pass = body.get("new_password", "")
+            if not isinstance(new_pass, str):
+                return self._send_json({"error": "Password must be a string"}, 400)
             if len(new_pass) < 8:
                 return self._send_json({"error": "رمز عبور باید حداقل ۸ کاراکتر باشد"}, 400)
-            def _change_p(d: dict):
+            def store_new_password(d: dict):
                 d["web_password"] = _hash_password(new_pass)
-            atomic_update(_change_p)
+            atomic_update(store_new_password)
             current_tok = self._get_auth_token()
             AUTH_TOKENS.clear()
             if current_tok:
