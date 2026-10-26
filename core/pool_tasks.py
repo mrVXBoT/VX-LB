@@ -30,6 +30,8 @@ def worker_job(job_id):
 def start(name, kind, values=None):
     if kind not in ('delete','ports_add','ports_remove','slipstream_settings','http_transport'):
         return False,'عملیات نامعتبر است'
+    if busy(load_data()):
+        return False, 'عملیات دیگری در حال اجراست'
     with mutation_lock():
         data=load_data()
         if busy(data):
@@ -62,7 +64,7 @@ def start(name, kind, values=None):
                     return False,'آخرین پورت استخر را نمی‌توان حذف کرد'
         except (ValueError, KeyError, TypeError) as error:
             return False,str(error)
-        job={'id':uuid.uuid4().hex,'kind':kind,'name':name,'status':'queued','message':'در صف حذف استخر' if kind=='delete' else 'در صف تغییر تنظیمات Slipstream' if kind == 'slipstream_settings' else 'در صف تغییر HTTP/HTTPS' if kind == 'http_transport' else 'در صف تغییر پورت‌ها','updated_at':time.time(),'error':'','values':values}
+        job={'created_at':time.time(),'phase':'queued','id':uuid.uuid4().hex,'kind':kind,'name':name,'status':'queued','message':'در صف حذف استخر' if kind=='delete' else 'در صف تغییر تنظیمات Slipstream' if kind == 'slipstream_settings' else 'در صف تغییر HTTP/HTTPS' if kind == 'http_transport' else 'در صف تغییر پورت‌ها','updated_at':time.time(),'error':'','values':values}
         def save(data):
             data.setdefault('pool_tasks',{})[name]=job
         atomic_update(save)
@@ -81,9 +83,18 @@ def run(name,job_id):
         if job.get('id')!=job_id or job.get('status')!='queued':
             return
         try:
-            update(name,status='running',message='در حال پاک‌سازی منابع استخر' if job['kind']=='delete' else 'در حال تغییر تنظیمات Slipstream' if job['kind'] == 'slipstream_settings' else 'در حال تغییر HTTP/HTTPS و بررسی داده' if job['kind'] == 'http_transport' else 'در حال تغییر پورت‌های نودها')
+            update(name,status='running',started_at=time.time(),phase='cleaning' if job['kind']=='delete' else 'configuring',message='در حال پاک‌سازی منابع استخر' if job['kind']=='delete' else 'در حال تغییر تنظیمات Slipstream' if job['kind'] == 'slipstream_settings' else 'در حال تغییر HTTP/HTTPS و بررسی داده' if job['kind'] == 'http_transport' else 'در حال تغییر پورت‌های نودها')
             if job['kind']=='delete':
-                ok,message=LoadBalancerManager.delete_entire_pool(name,callback=lambda _:update(name,message='در حال حذف سرویس‌ها و منابع نودها'))
+                nodes = data.get('pools', {}).get(name, {}).get('nodes', [])
+                last_progress = [None, 0]
+                def progress(message):
+                    current = next((n['ip'] for n in nodes if n['ip'] in str(message) or
+                                    (n.get('node_name') and n['node_name'] in str(message))), '')
+                    if current == last_progress[0] and time.monotonic() - last_progress[1] < 1:
+                        return
+                    last_progress[:] = [current, time.monotonic()]
+                    update(name, phase='cleaning', current_node=current, message='در حال حذف سرویس‌ها و منابع نودها')
+                ok,message=LoadBalancerManager.delete_entire_pool(name,callback=progress)
             elif job['kind'] == 'slipstream_settings':
                 from core.slipstream_update import change
                 ok, message = change(name, job['values'])

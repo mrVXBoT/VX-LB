@@ -31,6 +31,7 @@ from core.transport_change import mutation_lock, busy as transport_busy, start_c
 from core.load_balancer import LoadBalancerManager
 from core.ssh_client import SSHManager
 from core.pool_workflow import operation_options, public_change_job
+from core.ui_events import inventory_events
 from core.node_addition import start as start_node_addition, recover as recover_node_additions
 from core.node_removal import start as start_node_removal, recover as recover_node_removals
 from core.validation import validate_pool_name, validate_port, validate_ports, validate_transport, validate_server_type, shquote
@@ -302,6 +303,27 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             return self._send_file(os.path.join(WEB_DIR, path.lstrip("/")), "image/svg+xml")
 
         # API Endpoints
+        if path == "/api/events":
+            if not self._is_authenticated():
+                return self._send_json({"error": "Unauthorized"}, 401)
+            from core.storage import INVENTORY_FILE
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache, no-transform")
+            self.send_header("X-Accel-Buffering", "no")
+            for key, value in _SECURITY_HEADERS.items():
+                self.send_header(key, value)
+            self.end_headers()
+            try:
+                for event in inventory_events(INVENTORY_FILE, self._is_authenticated):
+                    self.wfile.write(event)
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+            finally:
+                self.close_connection = True
+            return
+
         if path == "/api/status":
             if not self._is_authenticated():
                 return self._send_json({"error": "Unauthorized"}, 401)
@@ -318,7 +340,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 nodes_list = []
                 for n in p_val.get("nodes", []):
                     ip = n["ip"]
-                    telem = TelemetryWatchdog.get_node_telemetry(p_name, ip)
+                    telem = data.get("node_telemetry", {}).get(f"{p_name}:{ip}", {})
                     nodes_list.append({
                         "name": n.get("server_name", ip),
                         "ip": ip,
@@ -375,13 +397,13 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name","profile","persona","transport","proto","port")} if (p_val.get("engine") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet") or p_val.get("transport") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet")) else None,
                     "rathole_transport": p_val.get("rathole_transport") or (p_val.get("camouflage") or {}).get("transport"),
                     "rathole_proto": (p_val.get("camouflage") or {}).get("proto", "tcp"),
-                    "operation_task": p_val.get("operation_task"),
-                    "creation_job": p_val.get("creation_job"),
+                    "operation_task": public_change_job(p_val.get("operation_task"), data),
+                    "creation_job": public_change_job(p_val.get("creation_job"), data),
                     "creation_placeholder": p_val.get("creation_placeholder", False),
-                    "gre_update": p_val.get("gre_update"),
+                    "gre_update": public_change_job(p_val.get("gre_update"), data),
                     "transport_change": public_change_job(p_val.get("transport_change"), data),
-                    "node_removals": p_val.get("node_removals", {}),
-                    "node_additions": p_val.get("node_additions", {}),
+                    "node_removals": {ip: public_change_job(job, data) for ip, job in p_val.get("node_removals", {}).items()},
+                    "node_additions": {ip: public_change_job(job, data) for ip, job in p_val.get("node_additions", {}).items()},
                     "client_ports": p_val.get("client_ports", []),
                     "kharej_ip": p_val.get("kharej_server", {}).get("ip", ""),
                     "subdomain": cf_info.get("subdomain", "Not set"),
@@ -406,12 +428,16 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 "last_check": data.get("watchdog_status", {}).get("last_check", ""),
                 "healthy_ips": data.get("watchdog_status", {}).get("healthy_ips", []),
                 "filtered_ips": data.get("watchdog_status", {}).get("filtered_ips", []),
-                "iran_count": len(get_servers("iran")),
-                "kharej_count": len(get_servers("kharej")),
+                "iran_count": len(data.get("iran_servers", [])),
+                "kharej_count": len(data.get("kharej_servers", [])),
                 "global_cloudflare": global_cf_masked,
                 "rotation_global": data.get("dns_scheduler", {}),
                 "dashboard_domain": get_dashboard_domain_config(),
                 "pools": pools_resp,
+                "recent_operations": [public_change_job(job, data) for job in sorted(
+                    (job for name, job in data.get("pool_tasks", {}).items()
+                     if name not in pools_data and job.get("status") in ("succeeded", "failed")),
+                    key=lambda job: job.get("updated_at", 0), reverse=True)[:5]],
                 "private_links": data.get("custom_links", {}),
                 "link_tasks": data.get("link_tasks", {})
             }

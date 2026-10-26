@@ -31,12 +31,28 @@ jobs:
         run: >-
           ruff check --select F core/pool_workflow.py core/pool_creation.py
           core/transport_change.py core/load_balancer.py core/web_server.py main.py
-          tests/test_pool_workflow_lifecycle.py
+          tests/test_pool_workflow_lifecycle.py core/ui_events.py core/node_removal.py
+          core/pool_tasks.py tests/test_ui_events.py
       - name: Run complete Python suite
         run: python -m pytest -q --junitxml=test-results.xml
       - name: Check browser request and presentation flows
         if: always()
         run: node --check web/app.js && node --test tests/test_web_client.cjs
+      - name: Install browser test dependencies
+        run: |
+          npm install --prefix /tmp/vxlb-browser --no-save playwright@1.58.2
+          /tmp/vxlb-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify mobile and desktop interactions
+        env:
+          NODE_PATH: /tmp/vxlb-browser/node_modules
+          UI_SCREENSHOTS: ui-screenshots
+        run: node tests/test_web_browser.cjs
+      - name: Upload browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-panel-screenshots
+          path: ui-screenshots
       - name: Upload Python test results
         if: always()
         uses: actions/upload-artifact@v4

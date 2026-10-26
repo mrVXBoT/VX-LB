@@ -85,3 +85,27 @@ class NodeRemovalTests(unittest.TestCase):
             self.assertEqual(self.data['pools']['one']['nodes'], [other])
             self.assertFalse(LoadBalancerManager.forget_node('one', '192.0.2.1')[0])
         self.assertEqual(len(self.data['pending_node_cleanup']), 1)
+
+    def test_internal_type_error_never_replays_remote_removal(self):
+        _, job = node_removal.start('one', '192.0.2.1')
+        with patch.object(node_removal.LoadBalancerManager, 'remove_node', side_effect=TypeError('internal failure')) as remove:
+            node_removal.run('one', '192.0.2.1', job_id=job['id'])
+        remove.assert_called_once()
+        self.assertEqual(job['status'], 'failed')
+        self.assertEqual(len(self.data['pools']['one']['nodes']), 1)
+
+    def test_stale_worker_cannot_execute_new_job_or_replay_finished_job(self):
+        _, job = node_removal.start('one', '192.0.2.1')
+        with patch.object(node_removal.LoadBalancerManager, 'remove_node') as remove:
+            node_removal.run('one', '192.0.2.1', job_id='outdated')
+            job['status'] = 'succeeded'
+            node_removal.run('one', '192.0.2.1', job_id=job['id'])
+        remove.assert_not_called()
+
+    def test_remote_failure_redacts_inventory_credentials(self):
+        self.data['pools']['one']['nodes'][0]['password'] = 'fixture-private'
+        _, job = node_removal.start('one', '192.0.2.1')
+        with patch.object(node_removal.LoadBalancerManager, 'remove_node', side_effect=RuntimeError('SSH fixture-private')):
+            node_removal.run('one', '192.0.2.1')
+        self.assertNotIn('fixture-private', str(job))
+        self.assertIn('[REDACTED]', job['error'])

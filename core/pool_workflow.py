@@ -164,7 +164,8 @@ def public_change_job(job, inventory=None):
         return job
     result = {key: copy.deepcopy(job[key]) for key in (
         'id', 'status', 'from', 'to', 'from_engine', 'to_engine', 'completed', 'total',
-        'message', 'error', 'updated_at', 'failed_nodes') if key in job}
+        'message', 'error', 'updated_at', 'failed_nodes', 'kind', 'name', 'ip',
+        'cleanup_pending', 'phase', 'current_node', 'started_at', 'created_at') if key in job}
     secrets = []
     def collect(value):
         if isinstance(value, dict):

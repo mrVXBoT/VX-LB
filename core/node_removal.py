@@ -1,4 +1,5 @@
 """Persisted progress for asynchronous web node removal."""
+import inspect
 import threading
 import time
 import uuid
@@ -15,39 +16,62 @@ def update(pool, ip, **fields):
     atomic_update(write)
 
 def start(pool, ip, force=False, forget=False):
-    data = load_data()
-    if busy(data): return False, 'عملیات دیگری در جریان است یا نیاز به رسیدگی دارد'
-    entry = data.get('pools', {}).get(pool)
-    if not entry or not any(n['ip'] == ip for n in entry.get('nodes', [])):
-        return False, 'نود در این استخر یافت نشد'
-    job = {'id': uuid.uuid4().hex, 'status':'queued', 'message':'حذف در صف اجرا است', 'ip':ip, 'force': force, 'forget': forget}
-    def write(data): data['pools'][pool].setdefault('node_removals', {})[ip] = job
-    atomic_update(write)
-    try:
-        threading.Thread(target=run, args=(pool, ip, force, forget), daemon=True).start()
-    except Exception:
-        update(pool, ip, status='failed', message='اجرای حذف شروع نشد؛ دوباره تلاش کنید')
-        return False, 'اجرای حذف شروع نشد؛ دوباره تلاش کنید'
-    return True, job
-
-def run(pool, ip, force=False, forget=False):
+    # Reject promptly while an SSH operation holds the mutation lock.
+    if busy(load_data()):
+        return False, 'عملیات دیگری در جریان است یا نیاز به رسیدگی دارد'
     with mutation_lock():
+        data = load_data()
+        if busy(data):
+            return False, 'عملیات دیگری در جریان است یا نیاز به رسیدگی دارد'
+        entry = data.get('pools', {}).get(pool)
+        if not entry or not any(n['ip'] == ip for n in entry.get('nodes', [])):
+            return False, 'نود در این استخر یافت نشد'
+        job = {'id': uuid.uuid4().hex, 'status': 'queued', 'phase': 'queued',
+               'created_at': time.time(), 'message': 'حذف در صف اجرا است',
+               'ip': ip, 'force': force, 'forget': forget}
+        def write(data):
+            data['pools'][pool].setdefault('node_removals', {})[ip] = job
+        atomic_update(write)
         try:
-            update(pool, ip, status='running', message='در حال آماده‌سازی حذف نود')
-            messages = {'Tearing down tunnel from Kharej server...':'در حال حذف تانل سمت خارج',
-                        'Tearing down tunnel from Iran server...':'در حال حذف تانل سمت ایران'}
+            threading.Thread(target=run, args=(pool, ip, force, forget, job['id']), daemon=True).start()
+        except Exception:
+            update(pool, ip, status='failed', message='اجرای حذف شروع نشد؛ دوباره تلاش کنید')
+            return False, 'اجرای حذف شروع نشد؛ دوباره تلاش کنید'
+        return True, job
+
+
+def run(pool, ip, force=False, forget=False, job_id=None):
+    with mutation_lock():
+        data = load_data()
+        job = data.get('pools', {}).get(pool, {}).get('node_removals', {}).get(ip, {})
+        if job.get('status') != 'queued' or (job_id is not None and job.get('id') != job_id):
+            return
+        def scrub(message):
+            from core.pool_workflow import public_change_job
+            return public_change_job({'message': str(message)}, data)['message']
+        try:
+            update(pool, ip, status='running', phase='preparing', started_at=time.time(), message='در حال آماده‌سازی حذف نود')
+            messages = {'Tearing down tunnel from Kharej server...': ('removing_kharej', 'در حال حذف تونل سمت خارج'),
+                        'Tearing down tunnel from Iran server...': ('removing_iran', 'در حال حذف تونل سمت ایران')}
+            def progress(message):
+                phase, label = messages.get(message, ('cleaning', 'در حال پاک‌سازی سرویس‌ها و منابع نود'))
+                update(pool, ip, phase=phase, message=label)
             if forget:
                 ok, message = LoadBalancerManager.forget_node(pool, ip)
             else:
-                try:
-                    ok, message = LoadBalancerManager.remove_node(pool, ip, callback=lambda m:update(pool, ip, message=messages.get(m,m)), force=force)
-                except TypeError:
-                    ok, message = LoadBalancerManager.remove_node(pool, ip, callback=lambda m:update(pool, ip, message=messages.get(m,m)))
+                remove = LoadBalancerManager.remove_node
+                parameters = inspect.signature(remove).parameters
+                options = {'callback': progress}
+                if 'force' in parameters or any(p.kind == p.VAR_KEYWORD for p in parameters.values()):
+                    options['force'] = force
+                # Never retry a mutation because its implementation raised TypeError.
+                ok, message = remove(pool, ip, **options)
             update(pool, ip, status='succeeded' if ok else 'failed',
                    cleanup_pending=bool(ok and forget),
-                   message=message if forget or not ok else 'نود از استخر حذف شد')
+                   error='' if ok else scrub(message),
+                   message=scrub(message) if forget or not ok else 'نود از استخر حذف شد')
         except Exception as error:
-            update(pool, ip, status='failed', message='حذف کامل نشد: '+str(error))
+            update(pool, ip, status='failed', message='حذف کامل نشد: ' + scrub(error), error=scrub(error))
 
 def recover():
     # A server restart cannot prove completion of an interrupted remote deletion.

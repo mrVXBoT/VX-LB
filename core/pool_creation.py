@@ -42,6 +42,8 @@ def start(arguments):
     except ValueError as error:
         return False, str(error)
 
+    if busy(load_data()):
+        return False, 'عملیات دیگری در حال اجراست'
     with mutation_lock():
         data = load_data()
         if busy(data):
@@ -50,6 +52,8 @@ def start(arguments):
             return False, 'استخری با این نام وجود دارد؛ ابتدا وضعیت آن را بررسی کنید'
         job = {
             'id': uuid.uuid4().hex, 'status': 'queued', 'message': 'در صف ساخت استخر',
+            'phase': 'queued', 'created_at': time.time(), 'completed': 0,
+            'total': len(arguments['iran_servers']),
             'updated_at': time.time(), 'name': name, 'transport': arguments['transport'],
             'client_ports': arguments['client_ports'], 'kharej_ip': arguments['kharej_server']['ip'],
             'iran_ips': [s['ip'] for s in arguments['iran_servers']], 'error': '',
@@ -92,14 +96,25 @@ def run(arguments, job_id=None):
         previous_job = getattr(_mutation_local, 'job_id', None)
         _mutation_local.job_id = job.get('id')
         try:
-            update(name, status='running', message='در حال آماده‌سازی استخر و سرورها')
+            update(name, status='running', phase='preparing', started_at=time.time(), message='در حال آماده‌سازی استخر و سرورها')
+            last_progress = [None, 0]
             def progress(message):
                 text = str(message).lower()
-                label = 'در حال پیکربندی تونل و رله'
-                if 'connect' in text: label = 'اتصال به سرورهای دو سمت'
-                elif 'install' in text: label = 'آماده‌سازی وابستگی‌های سرورها'
-                elif 'verif' in text or 'probe' in text: label = 'بررسی نتیجهٔ راه‌اندازی'
-                update(name, message=label)
+                phase, label = 'configuring', 'در حال پیکربندی تونل و رله'
+                if 'connect' in text: phase, label = 'connecting', 'اتصال به سرورهای دو سمت'
+                elif 'install' in text: phase, label = 'prerequisites', 'آماده‌سازی وابستگی‌های سرورها'
+                elif 'verif' in text or 'probe' in text: phase, label = 'verifying', 'بررسی نتیجهٔ راه‌اندازی'
+                current = next((s['ip'] for s in arguments['iran_servers'] if s['ip'] in str(message)), '')
+                signature = (phase, current)
+                if signature == last_progress[0] and time.monotonic() - last_progress[1] < 1:
+                    return
+                last_progress[:] = [signature, time.monotonic()]
+                # Count only persisted nodes; log lines do not prove completion.
+                def save(data):
+                    completed = sum(not n.get('provisioning') for n in data.get('pools', {}).get(name, {}).get('nodes', []))
+                    data['pool_creations'][name].update(message=label, phase=phase, current_node=current,
+                                                       completed=completed, updated_at=time.time())
+                atomic_update(save)
             ok, message, _ = LoadBalancerManager.create_pool(**arguments, callback=progress)
             pool = load_data().get('pools', {}).get(name, {})
             provisioned = [n['ip'] for n in pool.get('nodes', []) if not n.get('provisioning')]

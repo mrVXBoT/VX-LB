@@ -7,6 +7,10 @@
 // server (not readable by JS), so the token can't be exfiltrated via XSS.
 let authToken = "";
 let pollTimer = null;
+let statusEvents = null;
+let statusEventsReady = false;
+let statusEventRefresh = null;
+let lastStatusPoll = 0;
 let currentTab = localStorage.getItem("vx_lb_tab") || "pools";
 let nodeFilter = "ALL";
 let serverFilter = "ALL";
@@ -186,6 +190,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function showLoginView() {
+  stopStatusEvents();
   document.getElementById("login-view").classList.remove("hidden");
   document.getElementById("app-view").classList.add("hidden");
   const tabbar = document.getElementById("app-tabbar");
@@ -212,12 +217,61 @@ function showAppView() {
   }
 }
 
+function stopStatusEvents() {
+  if (statusEvents) statusEvents.close();
+  statusEvents = null;
+  statusEventsReady = false;
+  clearTimeout(statusEventRefresh);
+  statusEventRefresh = null;
+}
+function connectStatusEvents() {
+  if (!authToken || document.hidden || statusEvents || typeof EventSource === 'undefined') return;
+  let source;
+  try { source = new EventSource('/api/events'); }
+  catch (_) { return; } // Polling remains available if streaming is unavailable.
+  statusEvents = source;
+  const refresh = () => {
+    if (statusEvents !== source || !authToken) return;
+    if (statusEventRefresh) return;
+    statusEventRefresh = setTimeout(() => {
+      statusEventRefresh = null;
+      lastStatusPoll = Date.now();
+      fetchStatus(true);
+    }, 120);
+  };
+  source.addEventListener('ready', () => {
+    if (statusEvents !== source) return;
+    statusEventsReady = true;
+    refresh(); // Reconcile changes missed during a disconnect.
+  });
+  source.addEventListener('change', refresh);
+  source.onerror = () => { if (statusEvents === source) statusEventsReady = false; };
+}
+function refreshOperationTimers() {
+  document.querySelectorAll('[data-operation-start]').forEach(element => {
+    const seconds = Math.max(0, Math.floor(Date.now() / 1000 - Number(element.dataset.operationStart)));
+    element.textContent = seconds < 60 ? `${faNumber.format(seconds)} ثانیه` : `${faNumber.format(Math.floor(seconds / 60))} دقیقه و ${faNumber.format(seconds % 60)} ثانیه`;
+  });
+}
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
+  connectStatusEvents();
+  lastStatusPoll = Date.now();
   pollTimer = setInterval(() => {
-    if (authToken) fetchStatus();
-  }, 4000);
+    if (!authToken || document.hidden) return;
+    refreshOperationTimers();
+    const active = (cachedStatus?.pools || []).some(poolIsBusy);
+    const interval = statusEventsReady ? 15000 : active ? 1000 : 4000;
+    if (Date.now() - lastStatusPoll >= interval) {
+      lastStatusPoll = Date.now();
+      fetchStatus();
+    }
+  }, 1000);
 }
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopStatusEvents();
+  else if (authToken) { connectStatusEvents(); fetchStatus(true); }
+});
 
 const formActions = {'/api/servers/add':'add-server-submit-btn','/api/pools/create':'create-pool-submit-btn',
   '/api/pools/add_node':'add-node-submit-btn','/api/ports':'add-port-submit-btn',
@@ -259,24 +313,31 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 async function requestJson(endpoint, options = {}) {
-  options.headers = options.headers || {};
-  if (options.body && typeof options.body === "object") {
-    options.headers["Content-Type"] = "application/json";
-    options.body = JSON.stringify(options.body);
+  const request = {...options, headers: {...(options.headers || {})}};
+  if (request.body && typeof request.body === 'object') {
+    request.headers['Content-Type'] = 'application/json';
+    request.body = JSON.stringify(request.body);
   }
-
-  const res = await fetch(endpoint, options);
-  if (res.status === 401) {
-    authToken = "";
-    showLoginView();
-    throw new Error("Unauthorized");
+  const controller = typeof AbortController === 'undefined' || request.signal ? null : new AbortController();
+  if (controller) request.signal = controller.signal;
+  const timeout = controller ? setTimeout(() => controller.abort(), request.method === 'POST' ? 20000 : 10000) : null;
+  try {
+    const res = await fetch(endpoint, request);
+    if (res.status === 401) {
+      authToken = '';
+      showLoginView();
+      throw new Error('Unauthorized');
+    }
+    let payload;
+    try { payload = await res.json(); }
+    catch (_) { throw new Error('پاسخ معتبر از سرور دریافت نشد؛ نتیجهٔ عملیات را در کارت استخر بررسی کنید'); }
+    if (!res.ok && (!request.method || request.method === 'GET')) {
+      throw new Error(payload.error || payload.message || copy.loadFailed);
+    }
+    return payload;
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
-  if (!res.ok && (!options.method || options.method === "GET")) {
-    let message = copy.loadFailed;
-    try { const body = await res.json(); message = body.error || body.message || message; } catch (_) {}
-    throw new Error(message);
-  }
-  return res.json();
 }
 
 /* ==========================================================================
@@ -449,6 +510,7 @@ async function fetchStatus(force = false) {
     if (!authToken) return;
     cachedStatus = data;
     updateHeroMetrics(data);
+    renderRecentPoolOperations(data.recent_operations || []);
     renderPrivateLinks(data);
     const signature = JSON.stringify(data.pools || []);
     const transportInProgress = (data.pools || []).some(pool => ['queued','preflight','changing','validating','rolling_back','rollback_failed'].includes(pool.transport_change?.status));
@@ -461,7 +523,10 @@ async function fetchStatus(force = false) {
     // We keep lastRenderedPools stale so the next non-focused poll cycle paints.
     const poolsContainer = document.getElementById('pools-container');
     const focusInsidePools = poolsContainer && poolsContainer.contains(document.activeElement);
-    const urgent = additionChanged || adding || removalChanged || removing || transportInProgress;
+    const operationSignature = pools => JSON.stringify((pools || []).map(pool => [pool.name,
+      pool.creation_job, pool.operation_task, pool.transport_change, pool.gre_update, pool.node_additions, pool.node_removals]));
+    const operationChanged = operationSignature(data.pools) !== operationSignature(lastPoolsSnapshot);
+    const urgent = operationChanged || additionChanged || adding || removalChanged || removing || transportInProgress;
     const hasFocus = !force && !urgent && focusInsidePools;
     if (signature !== lastRenderedPools && !hasFocus) {
       renderPools(data.pools || []);
@@ -485,7 +550,7 @@ async function fetchStatus(force = false) {
     updateWatchdogTabUI(data);
     document.getElementById('status-error').classList.add('hidden');
     const connection = document.getElementById('connection-label');
-    connection.textContent = data.preview ? 'پیش‌نمایش محلی · دادهٔ آزمایشی' : copy.connected;
+    connection.textContent = data.preview ? 'پیش‌نمایش محلی · دادهٔ آزمایشی' : statusEventsReady ? 'متصل · به‌روزرسانی زنده' : copy.connected;
     connection.dataset.state = 'connected';
   } catch (e) {
     if (authToken) {
@@ -591,6 +656,12 @@ function updateHeroMetrics(data) {
 /* ==========================================================================
    4. Render Pools & Nodes
    ========================================================================== */
+function renderRecentPoolOperations(jobs) {
+  const container = document.getElementById('recent-pool-operations');
+  if (!container) return;
+  const markup = jobs.map(job => `<div class="recent-operation ${job.status === 'failed' ? 'is-failed' : ''}" ${job.status === 'failed' ? 'role="alert"' : ''}><span><bdi>${escapeHtml(job.name)}</bdi> · ${escapeHtml(job.message || 'عملیات پایان یافت')}${job.error ? `<small>${escapeHtml(job.error)}</small>` : ''}</span><button type="button" class="op-dismiss-btn" aria-label="پاک کردن پیام" data-pool="${escapeHtml(job.name)}" onclick="clearPoolOperation(this.dataset.pool,'task','',this)">${uiIcon('close')}</button></div>`).join('');
+  if (container.innerHTML !== markup) container.innerHTML = markup;
+}
 const operationHistoryOpen = new Set();
 const operationLabels = {task:'عملیات استخر',creation:'ساخت استخر',gre:'تنظیمات GRE',addition:'افزودن نود', removal:'حذف نود', transport:'تغییر تونل'};
 function poolIsBusy(pool) {
@@ -604,22 +675,25 @@ function operationMarkup(pool, job, kind) {
   const description = kind === 'task' ? `<span>${job.kind === 'delete' ? 'حذف سرویس‌ها و منابع استخر' : job.kind === 'slipstream_settings' ? 'تغییر دامنه، resolver یا QPS تونل DNS' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS و بررسی انتقال داده' : 'تغییر پورت‌های استخر'}</span>` : kind === 'creation' ? '<span>راه‌اندازی سرورها و تونل‌های استخر</span>' : kind === 'gre' ? '<span>تنظیمات لینک خصوصی و فوروارد پورت</span>' : kind === 'transport' ? `<span class="operation-route" dir="rtl">از <bdi dir="ltr">${escapeHtml(job.from)}</bdi> به <bdi dir="ltr">${escapeHtml(job.to)}</bdi><small style="color:var(--text-muted);font-size:10px;"> · ${faNumber.format(job.completed || 0)} از ${faNumber.format(job.total || 0)} نود</small></span>` : `<span class="op-ip-pill"><bdi dir="ltr">${escapeHtml(job.ip)}</bdi></span>`;
   const clearBtn = !active && job.status !== 'rollback_failed' ? `<button type="button" class="op-dismiss-btn" data-pool="${escapeHtml(pool.name)}" data-kind="${escapeHtml(kind)}" data-id="${escapeHtml(targetId)}" onclick="clearPoolOperation(this.dataset.pool, this.dataset.kind, this.dataset.id, this)" title="پاک کردن این پیام" aria-label="پاک کردن پیام">${uiIcon("close")}</button>` : '';
 
-  const stages = ['اتصال', 'پیش‌نیاز', 'پیکربندی', 'رله', 'بررسی'];
-  const msgText = (job.message || '');
-  const stageIdx =
-    /بررسی|تأیید|verify|probe|echo|health/i.test(msgText) ? 4 :
-    /رله|فوروارد|relay|forward/i.test(msgText) ? 3 :
-    /پیکربندی|تونل|لینک|interface|unit|سرویس|service/i.test(msgText) ? 2 :
-    /پیش‌نیاز|install|prereq|ماژول|module/i.test(msgText) ? 1 :
-    0;
-  const stageBar = active ? `<div class="op-stage-track" aria-hidden="true">${stages.map((s, i) => `<div class="op-stage ${i < stageIdx ? 'done' : i === stageIdx ? 'current' : ''}"></div>`).join('')}</div><div class="op-step-label">${stages[stageIdx] || ''}</div>` : '';
+  const phaseLabels = {queued:'در صف اجرا', preparing:'آماده‌سازی', connecting:'اتصال به سرورها',
+    prerequisites:'بررسی پیش‌نیازها', configuring:'پیکربندی تونل', relay:'تنظیم انتقال پورت‌ها',
+    verifying:'بررسی عبور داده', cleaning:'پاک‌سازی سرویس‌ها', removing_iran:'حذف سمت ایران',
+    removing_kharej:'حذف سمت خارج', finalizing:'ثبت نتیجه', rolling_back:'بازگردانی تنظیمات قبلی'};
+  const phase = job.phase || ({queued:'queued',preflight:'connecting',changing:'configuring',
+    validating:'verifying',rolling_back:'rolling_back'})[job.status];
+  const completed = Number(job.completed);
+  const total = Number(job.total);
+  const counter = Number.isFinite(total) && total > 0
+    ? `<span class="op-member-count">${faNumber.format(Number.isFinite(completed) ? completed : 0)} از ${faNumber.format(total)} نود</span>` : '';
+  const start = typeof job.started_at === 'number' ? job.started_at : typeof job.created_at === 'number' ? job.created_at : null;
+  const stageBar = active ? `<div class="op-live-meta"><span class="op-step-label">${phaseLabels[phase] || 'در حال اجرای عملیات'}</span>${counter}${start ? `<time class="op-elapsed" aria-live="off" data-operation-start="${start}">در حال اجرا</time>` : ''}</div>${job.current_node ? `<span class="op-current-node">نود جاری: <bdi>${escapeHtml(job.current_node)}</bdi></span>` : ''}` : '';
 
-  return `<div class="operation-item ${active ? 'is-active' : failed ? 'is-failed' : 'is-complete'}" data-status="${escapeHtml(job.status)}" ${active ? 'role="status" aria-live="polite"' : ''}>
+  return `<div class="operation-item ${active ? 'is-active' : failed ? 'is-failed' : 'is-complete'}" data-status="${escapeHtml(job.status)}" ${active ? 'role="status" aria-live="polite"' : failed ? 'role="alert"' : ''}>
     <div class="operation-heading">
       <div class="op-heading-title">
         ${active ? '<span class="op-spinner" aria-hidden="true"></span>' : ''}
-        <strong>${['slipstream_runtime','slipstream_settings'].includes(job.kind) ? 'به‌روزرسانی تنظیمات Slipstream' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS' : job.kind === 'relay_ports' ? 'به‌روزرسانی پورت‌های رله' : job.kind === 'waterwall_ports' ? 'به‌روزرسانی پورت‌های WaterWall' : job.kind === 'https_ports' ? 'به‌روزرسانی پورت‌های HTTPS' : operationLabels[kind] || 'عملیات'}</strong>
-        <span class="status-badge ${failed ? 'filtered' : active ? 'canary' : 'healthy'}">${failed ? 'نیازمند بررسی' : active ? 'در حال انجام' : job.status === 'rolled_back' ? 'بازگردانی شد' : 'پایان یافت'}</span>
+        <strong>${['slipstream_runtime','slipstream_settings'].includes(job.kind) ? 'به‌روزرسانی تنظیمات Slipstream' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS' : job.kind === 'delete' ? 'حذف استخر' : job.kind === 'relay_ports' ? 'به‌روزرسانی پورت‌های رله' : job.kind === 'waterwall_ports' ? 'به‌روزرسانی پورت‌های WaterWall' : job.kind === 'https_ports' ? 'به‌روزرسانی پورت‌های HTTPS' : operationLabels[kind] || 'عملیات'}</strong>
+        <span class="status-badge ${failed ? 'filtered' : active ? 'canary' : 'healthy'}">${failed ? 'نیازمند بررسی' : active ? (job.status === 'queued' ? 'در صف اجرا' : 'در حال انجام') : job.status === 'rolled_back' ? 'بازگردانی شد' : 'پایان یافت'}</span>
       </div>
       ${clearBtn}
     </div>
@@ -628,9 +702,10 @@ function operationMarkup(pool, job, kind) {
       ${job.message ? `<p class="op-msg">${escapeHtml(withoutEmoji(job.message || ''))}</p>` : ''}
       ${stageBar}
     </div>
-    ${kind === 'removal' && job.status === 'failed' && (pool.nodes || []).some(n => n.ip === job.ip) ? `<button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" data-ip="${escapeHtml(job.ip)}" onclick="removeNodeFromPool(this.dataset.pool,this.dataset.ip,this,true)" ${poolIsBusy(pool) ? 'disabled' : ''}>حذف از پنل بدون پاک‌سازی</button>` : ''}
-    ${kind === 'task' && job.kind === 'delete' && job.status === 'failed' ? `<button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" onclick="forgetPool(this.dataset.pool)" ${poolIsBusy(pool) ? 'disabled' : ''}>حذف استخر از پنل بدون پاک‌سازی</button>` : ''}
-    ${job.error ? `<details class="operation-error"><summary>جزئیات خطا</summary><pre dir="auto">${escapeHtml(withoutEmoji(job.error))}</pre></details>` : ''}
+    ${kind === 'removal' && job.status === 'failed' && (pool.nodes || []).some(n => n.ip === job.ip) ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" data-ip="${escapeHtml(job.ip)}" onclick="removeNodeFromPool(this.dataset.pool,this.dataset.ip,this)" ${poolIsBusy(pool) ? 'disabled' : ''}>تلاش دوباره برای حذف نود</button><details class="operation-advanced"><summary>گزینه‌های پیشرفته</summary><p>این روش سرویس‌های سرور را پاک نمی‌کند.</p><button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" data-ip="${escapeHtml(job.ip)}" onclick="removeNodeFromPool(this.dataset.pool,this.dataset.ip,this,true)" ${poolIsBusy(pool) ? 'disabled' : ''}>حذف از پنل بدون پاک‌سازی</button></details>` : ''}
+    ${kind === 'task' && job.kind === 'delete' && job.status === 'failed' ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="deleteEntirePool(this.dataset.pool)" ${poolIsBusy(pool) ? 'disabled' : ''}>تلاش دوباره برای حذف استخر</button><details class="operation-advanced"><summary>گزینه‌های پیشرفته</summary><p>این روش سرویس‌ها و DNS را پاک نمی‌کند.</p><button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" onclick="forgetPool(this.dataset.pool)" ${poolIsBusy(pool) ? 'disabled' : ''}>حذف استخر از پنل بدون پاک‌سازی</button></details>` : ''}
+    ${failed ? `<p class="operation-recovery-hint">${job.status === 'rollback_failed' ? 'بازگردانی کامل نشده است؛ نسخهٔ پشتیبان حفظ شده و تغییرات قفل‌اند.' : kind === 'creation' ? 'ساخت کامل نشده است؛ وضعیت نودهای ایجادشده را پیش از ساخت دوباره بررسی کنید.' : 'ابتدا دسترسی سرورها و جزئیات خطا را بررسی کنید؛ سپس دوباره تلاش کنید.'}</p>` : ''}
+    ${job.error ? `<details class="operation-error" data-detail-key="${escapeHtml(pool.name + ":" + kind + ":" + (job.id || job.ip || ""))}"><summary>جزئیات خطا</summary><pre dir="auto">${escapeHtml(withoutEmoji(job.error))}</pre></details>` : ''}
     ${job.status === 'rollback_failed' && kind === 'gre' ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="recoverGreSettings(this.dataset.pool,this)">بازگردانی تنظیمات ${job.kind === 'slipstream_runtime' ? 'Slipstream' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS' : job.kind === 'relay_ports' ? 'پورت‌ها' : 'GRE'}</button>` : ''}${job.status === 'rollback_failed' && kind !== 'gre' ? `<div class="operation-actions"><button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="retryTransportRollback(this.dataset.pool,this)">تلاش دوباره برای بازگردانی</button><button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" onclick="abandonTransportChange(this.dataset.pool,this)">رها کردن عملیات شکست‌خورده</button></div>` : ''}
   </div>`;
 }
@@ -864,7 +939,48 @@ function getEngineBadge(engine, transport, pool) {
   return `<span class="engine-badge ${cls}"><span class="engine-badge-dot"></span><span>${escapeHtml(label)}</span></span>`;
 }
 
+const poolRenderSources = new Map();
+function patchPoolCards(container, markup) {
+  if (typeof document.createElement !== 'function') { container.innerHTML = markup; return; }
+  const template = document.createElement('template');
+  template.innerHTML = markup;
+  const wanted = Array.from(template.content.children);
+  const focusRestores = [];
+  for (let index = 0; index < wanted.length; index++) {
+    let next = wanted[index];
+    const key = next.dataset.poolKey || next.id;
+    const old = Array.from(container.children).find(child => (child.dataset.poolKey || child.id) === key);
+    const source = next.outerHTML;
+    if (old && poolRenderSources.get(key) === source) next = old;
+    else if (old) {
+      const opened = Array.from(old.querySelectorAll('details[open]')).map(details => details.dataset.detailKey || details.querySelector('summary')?.textContent);
+      next.querySelectorAll('details').forEach(details => {
+        if (opened.includes(details.dataset.detailKey || details.querySelector('summary')?.textContent)) details.open = true;
+      });
+      const focused = old.contains(document.activeElement) ? document.activeElement : null;
+      if (focused) {
+        const onclick = focused.getAttribute('onclick');
+        const dataset = JSON.stringify({...focused.dataset});
+        const target = Array.from(next.querySelectorAll('button,input,select,summary')).find(candidate =>
+          candidate.tagName === focused.tagName && candidate.getAttribute('onclick') === onclick &&
+          JSON.stringify({...candidate.dataset}) === dataset && candidate.textContent === focused.textContent &&
+          candidate.closest('details')?.dataset.detailKey === focused.closest('details')?.dataset.detailKey);
+        if (target && !target.disabled) focusRestores.push(target);
+      }
+      old.replaceWith(next);
+    }
+    poolRenderSources.set(key, source);
+    if (container.children[index] !== next) container.insertBefore(next, container.children[index] || null);
+    wanted[index] = next;
+  }
+  Array.from(container.children).forEach(child => { if (!wanted.includes(child)) child.remove(); });
+  const keys = new Set(wanted.map(child => child.dataset.poolKey || child.id));
+  for (const key of poolRenderSources.keys()) if (!keys.has(key)) poolRenderSources.delete(key);
+  focusRestores.forEach(element => element.focus({preventScroll:true}));
+}
+
 function renderPools(pools) {
+  const anyPoolBusy = pools.some(poolIsBusy);
   const container = document.getElementById("pools-container");
   if (!container) return;
 
@@ -889,12 +1005,12 @@ function renderPools(pools) {
   }
   pools = visiblePools;
 
-  container.innerHTML = (pools.some(poolIsBusy) ? '<p id="pool-lock-notice" class="pool-lock-notice" role="status"><span class="lock-spinner" aria-hidden="true"></span><span>عملیات استخر در حال انجام است — تغییرات تا پایان آن قفل است.</span></p>' : '') + pools.map(p => {
+  const markup = (anyPoolBusy ? '<p id="pool-lock-notice" class="pool-lock-notice" role="status"><span class="lock-spinner" aria-hidden="true"></span><span>عملیات استخر در حال انجام است — تغییرات تا پایان آن قفل است.</span></p>' : '') + pools.map(p => {
     const dns = poolDnsState(p);
     const poolDomain = p.subdomain && p.subdomain !== 'Not set' && p.subdomain !== 'تعیین نشده' ? p.subdomain : '';
     const transportJob = p.transport_change;
     const changingTransport = poolIsBusy(p);
-    const mutationsLocked = pools.some(poolIsBusy) || p.creation_placeholder;
+    const mutationsLocked = anyPoolBusy || p.creation_placeholder;
     const lockReason = p.creation_placeholder
       ? 'استخر در حال ساخت است؛ تا پایان راه‌اندازی تغییر ممکن نیست'
       : 'یک عملیات استخر در جریان است؛ تا پایان آن تغییر غیرفعال است';
@@ -946,8 +1062,11 @@ function renderPools(pools) {
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
               </button>
-              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))}` : n.engine === "waterwall" ? `WaterWall (${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "Trojan")}) · پورت خارج ${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}` : n.engine === "gost" ? `GOST · ${escapeHtml(GOST_PROFILE_TITLES[p.camouflage?.profile || n.gost?.profile || "shadowsocks-tcp"] || p.camouflage?.profile || n.gost?.profile)} · پورت خارج ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 8443))}` : n.engine === "frp" ? `FRP (${escapeHtml(p.camouflage?.mode || n.frp?.mode || "tcp")}) · پورت اتصال ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 7000))}` : n.engine === "hedioum" ? `Hedioum (${escapeHtml(p.camouflage?.mode || n.hedioum?.mode || "socks")}) · SOCKS پورت ${escapeHtml(String(n.tunnel_port || p.camouflage?.socks_port || n.hedioum?.socks_port || "-"))}` : (n.engine === "rathole" || p.transport === "rathole" || p.engine === "rathole") ? `Rathole (${escapeHtml(String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport || "tcp")).toUpperCase()}) · پورت کنترل ${escapeHtml(String(n.rathole?.port || n.tunnel_port || p.camouflage?.port || 2333))} · فوروارد ${escapeHtml(String(n.rathole?.proto || p.rathole_proto || p.camouflage?.proto || "tcp")).toUpperCase()}${String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport) === "noise" ? " · رمزنگاری Noise" : ""}` : (n.engine === "paqet" || p.transport === "paqet" || p.engine === "paqet") ? `Paqet (KCP ${escapeHtml(String(n.paqet?.kcp_mode || p.camouflage?.kcp_mode || "fast")).toUpperCase()}) · پورت تونل ${escapeHtml(String(n.paqet?.port || n.tunnel_port || p.camouflage?.port || 8888))} · موازی ${escapeHtml(String(n.paqet?.conn || p.camouflage?.conn || 1))}` : (n.engine === "slipstream" || p.transport === "slipstream" || p.engine === "slipstream") ? `Slipstream DNS · دامنه ${escapeHtml(n.slipstream?.domain || p.slipstream?.domain || p.domain || "-")} · QPS ${escapeHtml(String(n.slipstream?.rate_limit || p.rate_limit || 1000))} · پورت ${escapeHtml(String(n.slipstream?.dns_port || p.dns_port || 53))}` : (n.engine === "spoof" || p.engine === "spoof" || MANAGED_PACKET_TRANSPORTS.includes(n.transport || p.transport)) ? `پردازش بسته DPI (${escapeHtml(String(n.transport || p.transport || "").toUpperCase())}) · SNI جعلی ${escapeHtml(String(n.spoof?.fake_sni || p.fake_sni || (p.camouflage || {}).server_name || "shaparak.ir"))}${n.spoof?.ttl_delta || p.auto_ttl_delta ? ` · TTL Delta ${escapeHtml(String(n.spoof?.ttl_delta || p.auto_ttl_delta))}` : ""}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : (n.engine === "backpack" || p.engine === "backpack" || ["stealth", "pck", "mux", "tcp", "kcp", "wss", "quic"].includes(p.transport)) ? `BackPack (${escapeHtml(String(n.transport || p.transport || "tcp").toUpperCase())}) · پورت تونل ${escapeHtml(String(n.tunnel_port || "-"))}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
             </div>
+            <details class="node-technical-details" data-detail-key="${escapeHtml(p.name + ':' + n.ip)}">
+              <summary>جزئیات اتصال و پایش</summary>
+              <div class="node-technical-body">
+              <small style="color: var(--text-muted); font-size: 10px;">${n.engine === "tun" || p.transport === "tun" ? `TUN / UDP / Noise · MTU ${escapeHtml(String(n.tun?.mtu || p.mtu || "1380"))} · TCPMSS Clamping` : n.engine === "dc6" || p.transport === "dc6" ? `DC6 (${escapeHtml(n.dc6?.carrier_type || p.carrier_type || "ip6gre")}) · MTU ${escapeHtml(String(n.dc6?.mtu || p.mtu || "1400"))} · MSS ${escapeHtml(String(n.dc6?.mss_clamp || n.dc6?.configs?.[0]?.mss_clamp || Number(n.dc6?.mtu || p.dc6_mtu || 1280) - 60))}` : ["http","https"].includes(n.engine) ? `${escapeHtml(String(n.http_connect?.mode || p.transport).toUpperCase())} CONNECT · mTLS · ${escapeHtml(String(n.http_connect?.public_port || ""))}` : n.engine === "waterwall" ? `WaterWall (${escapeHtml(WATERWALL_MODE_TITLES[p.waterwall_mode || n.waterwall?.profile?.mode] || p.waterwall_mode || n.waterwall?.profile?.mode || "Trojan")}) · پورت خارج ${escapeHtml(String(n.waterwall?.outer_port || p.camouflage?.port || 443))}` : n.engine === "gost" ? `GOST · ${escapeHtml(GOST_PROFILE_TITLES[p.camouflage?.profile || n.gost?.profile || "shadowsocks-tcp"] || p.camouflage?.profile || n.gost?.profile)} · پورت خارج ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 8443))}` : n.engine === "frp" ? `FRP (${escapeHtml(p.camouflage?.mode || n.frp?.mode || "tcp")}) · پورت اتصال ${escapeHtml(String(n.tunnel_port || p.camouflage?.port || 7000))}` : n.engine === "hedioum" ? `Hedioum (${escapeHtml(p.camouflage?.mode || n.hedioum?.mode || "socks")}) · SOCKS پورت ${escapeHtml(String(n.tunnel_port || p.camouflage?.socks_port || n.hedioum?.socks_port || "-"))}` : (n.engine === "rathole" || p.transport === "rathole" || p.engine === "rathole") ? `Rathole (${escapeHtml(String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport || "tcp")).toUpperCase()}) · پورت کنترل ${escapeHtml(String(n.rathole?.port || n.tunnel_port || p.camouflage?.port || 2333))} · فوروارد ${escapeHtml(String(n.rathole?.proto || p.rathole_proto || p.camouflage?.proto || "tcp")).toUpperCase()}${String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport) === "noise" ? " · رمزنگاری Noise" : ""}` : (n.engine === "paqet" || p.transport === "paqet" || p.engine === "paqet") ? `Paqet (KCP ${escapeHtml(String(n.paqet?.kcp_mode || p.camouflage?.kcp_mode || "fast")).toUpperCase()}) · پورت تونل ${escapeHtml(String(n.paqet?.port || n.tunnel_port || p.camouflage?.port || 8888))} · موازی ${escapeHtml(String(n.paqet?.conn || p.camouflage?.conn || 1))}` : (n.engine === "slipstream" || p.transport === "slipstream" || p.engine === "slipstream") ? `Slipstream DNS · دامنه ${escapeHtml(n.slipstream?.domain || p.slipstream?.domain || p.domain || "-")} · QPS ${escapeHtml(String(n.slipstream?.rate_limit || p.rate_limit || 1000))} · پورت ${escapeHtml(String(n.slipstream?.dns_port || p.dns_port || 53))}` : (n.engine === "spoof" || p.engine === "spoof" || MANAGED_PACKET_TRANSPORTS.includes(n.transport || p.transport)) ? `پردازش بسته DPI (${escapeHtml(String(n.transport || p.transport || "").toUpperCase())}) · SNI جعلی ${escapeHtml(String(n.spoof?.fake_sni || p.fake_sni || (p.camouflage || {}).server_name || "shaparak.ir"))}${n.spoof?.ttl_delta || p.auto_ttl_delta ? ` · TTL Delta ${escapeHtml(String(n.spoof?.ttl_delta || p.auto_ttl_delta))}` : ""}` : n.engine === "vxlan" || p.transport === "vxlan" ? `VXLAN (${escapeHtml(n.vxlan?.method_title || n.vxlan?.method || p.vxlan_method || "P2P")}) · VNI ${escapeHtml(String(n.vxlan?.vni || p.vni || "1000"))} · UDP ${escapeHtml(String(n.vxlan?.dst_port || p.dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxlan?.mtu || p.vxlan_mtu || "1400"))} · بدون رمزنگاری (Overlay خام)` : n.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec" ? `VXLAN + IPsec · VNI ${escapeHtml(String(n.vxsec?.vni || p.vni || "4000"))} · UDP ${escapeHtml(String(n.vxsec?.dst_port || p.vxsec_dst_port || "4789"))} · MTU ${escapeHtml(String(n.vxsec?.mtu || p.vxsec_mtu || "1280"))} · IPsec AES-256-GCM` : (n.engine === "wireguard" || p.transport === "wireguard") ? `WireGuard · پورت UDP ${escapeHtml(String(n.wireguard?.tunnel_port || p.wireguard_port || "51820"))} · MTU ${escapeHtml(String(n.wireguard?.mtu || p.wireguard_mtu || "1280"))} · رمزنگاری Curve25519/ChaCha20 · آزمایشی (آزمون کرنلی لینک تأیید شد)` : (n.engine === "gre6" || p.transport === "gre6") ? `GRE6 (RFC 7676) · MTU ${escapeHtml(String(n.gre6?.mtu || p.gre6_mtu || "1400"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : (n.engine === "ip6ip6" || p.transport === "ip6ip6") ? `IP6IP6 (RFC 2473) · MTU ${escapeHtml(String(n.ip6ip6?.mtu || p.ip6ip6_mtu || "1420"))} · بدون رمزنگاری (Cleartext خام IPv6) · آزمایشگاه ایزوله` : ['geneve','geneve_ipsec'].includes(n.engine) || n.transport === 'geneve_ipsec' ? `Geneve · VNI ${escapeHtml(String(n.geneve?.vni || "-"))} · MTU ${escapeHtml(String(n.geneve?.mtu || "1400"))} · IPsec / AES-GCM · آزمایشی (آزمون کرنلی لینک تأیید شد)` : n.engine === "gre" ? `GRE · MTU ${escapeHtml(n.gre?.mtu)} · ${n.security === "ipsec" ? "IPsec / AES-GCM" : "ناامن؛ نیازمند مهاجرت"}` : (n.engine === "backpack" || p.engine === "backpack" || ["stealth", "pck", "mux", "tcp", "kcp", "wss", "quic"].includes(p.transport)) ? `BackPack (${escapeHtml(String(n.transport || p.transport || "tcp").toUpperCase())}) · پورت تونل ${escapeHtml(String(n.tunnel_port || "-"))}` : `(پورت تونل: ${escapeHtml(String(n.tunnel_port || "-"))} · ${escapeHtml(n.transport || p.transport || "tcp")})`}</small>
             ${n.gre_https ? `<div class="gre-private-route"><span>GRE داخل HTTPS:</span><bdi dir="ltr">${escapeHtml(n.gre_https.local_private)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre_https.remote_private)}</bdi><span>MTU ${escapeHtml(n.gre_https.mtu)}</span></div>` : ''}
             ${(n.engine === 'tun' || p.transport === 'tun') ? `<div class="gre-private-route"><span>لینک TUN:</span><bdi dir="ltr">${escapeHtml(n.tun?.iran_inner || "10.210.1.1")}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.tun?.kharej_inner || "10.210.1.2")}</bdi><span>(${escapeHtml(n.tun?.interface || "tun")}) · لایه 3 کرنل</span></div>` : ''}
             ${(n.engine === 'dc6' || p.transport === 'dc6') ? `<div class="gre-private-route"><span>حامل DC6:</span><bdi dir="ltr">${escapeHtml(n.dc6?.private_addressing?.iran_ipv4 || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.dc6?.private_addressing?.kharej_ipv4 || p.kharej_ip)}</bdi><span>(${escapeHtml(n.dc6?.interface || "dc6")}) · Dual-Stack</span></div>` : ''}
@@ -965,7 +1084,9 @@ function renderPools(pools) {
             ${(n.engine === 'rathole' || p.transport === 'rathole' || p.engine === 'rathole') ? `<div class="gre-private-route"><span>مسیر Rathole:</span><bdi dir="ltr">${escapeHtml(n.ip)}:${escapeHtml(String(n.rathole?.port || n.tunnel_port || p.camouflage?.port || 2333))}</bdi><span>(سرور ایران) &larr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}</bdi><span>(کلاینت خارج) · انتقال: <strong style="color:var(--text-main);">${escapeHtml(String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport || "tcp").toUpperCase())}</strong></span></div>` : ''}
             ${(n.engine === 'paqet' || p.engine === 'paqet' || p.transport === 'paqet') ? `<div class="gre-private-route"><span>مسیر Paqet KCP:</span><bdi dir="ltr">${escapeHtml(n.ip)}</bdi><span>(کلاینت ایران) &rarr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}:${escapeHtml(String(n.paqet?.port || p.camouflage?.port || 8888))}</bdi><span>(سرور خارج) · حالت: <strong style="color:var(--text-main);">${escapeHtml(String(n.paqet?.kcp_mode || p.camouflage?.kcp_mode || "fast").toUpperCase())}</strong></span></div>` : ''}
             <div class="node-dns-line"><span class="status-badge ${dns.verified ? (dns.ips.includes(n.ip) ? 'healthy' : 'idle') : 'unknown'}">${dns.verified ? (dns.ips.includes(n.ip) ? (p.dns_scope === 'all_subdomains' ? 'آی‌پی در همهٔ ساب‌دامین‌ها ثبت است' : 'آی‌پی در DNS ثبت است') : (p.dns_scope === 'all_subdomains' ? 'آی‌پی در همهٔ ساب‌دامین‌ها ثبت نیست' : 'آی‌پی در DNS نیست')) : 'وضعیت DNS تأیید نشده'}</span><span>${dns.source}</span></div>
-            <div class="node-reason-text ${n.status === 'DEGRADED' || n.status === 'CANARY' ? 'has-issue' : (n.status === 'FILTERED' || n.status === 'DOWN') ? 'has-error' : ''}" title="${escapeHtml(n.reason)}">${n.status === 'DEGRADED' || n.status === 'CANARY' ? '<svg class="ui-icon" style="width:13px;height:13px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' : (n.status === 'FILTERED' || n.status === 'DOWN') ? '<svg class="ui-icon" style="width:13px;height:13px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' : ''}<span>${escapeHtml(copy.translateReason(withoutEmoji(n.reason || "در حال بررسی")))}</span></div>
+              </div>
+            </details>
+            <div class="node-reason-text ${n.status === "HEALTHY" ? "is-healthy-reason" : ""} ${n.status === 'DEGRADED' || n.status === 'CANARY' ? 'has-issue' : (n.status === 'FILTERED' || n.status === 'DOWN') ? 'has-error' : ''}" title="${escapeHtml(n.reason)}">${n.status === 'DEGRADED' || n.status === 'CANARY' ? '<svg class="ui-icon" style="width:13px;height:13px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' : (n.status === 'FILTERED' || n.status === 'DOWN') ? '<svg class="ui-icon" style="width:13px;height:13px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' : ''}<span>${escapeHtml(copy.translateReason(withoutEmoji(n.reason || "در حال بررسی")))}</span></div>
             ${Object.keys(n.port_details || {}).length ? `<details class="node-port-details"><summary><div class="node-port-summary-left"><svg class="ui-icon" style="width:13px;height:13px;color:var(--text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg><span>وضعیت پورت‌ها و آخرین تبادل (${faNumber.format(Object.keys(n.port_details).length)})</span></div><svg class="ui-icon port-chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><div class="node-port-grid">${Object.entries(n.port_details).map(([port, info]) => {
               const pClass = info.status === 'HEALTHY' ? 'healthy' : (info.status === 'DEGRADED' || info.status === 'CANARY') ? 'canary' : (info.status === 'FILTERED' || info.status === 'DOWN') ? 'filtered' : 'idle';
               const pLabel = ({HEALTHY:'سالم',DEGRADED:'مشکوک',FILTERED:'اختلال',IDLE:'بدون ترافیک'})[info.status] || info.status;
@@ -1001,7 +1122,7 @@ function renderPools(pools) {
       : `<span class="pool-nodes-summary">${uiIcon("pin")}<span>بدون نود</span></span>`;
 
     return `
-      <div class="pool-card">
+      <div class="pool-card" data-pool-key="${escapeHtml(p.name)}">
         <div class="pool-card-top">
           <div class="pool-title-line">
             <div class="pool-title-left">
@@ -1044,21 +1165,23 @@ function renderPools(pools) {
           <button class="add-port-btn" data-arg0="${escapeHtml(p.name)}" onclick="openAddPortModal(this.dataset.arg0)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>${uiIcon("plus")}<span>پورت جدید</span></button>
         </div>
 
+        <div class="pool-live-operations" data-pool="${escapeHtml(p.name)}">${renderPoolOperations(p)}</div>
         <div class="nodes-list-body">
           ${nodesHtml}
           ${Object.values(p.node_additions || {}).filter(job => ['queued','running'].includes(job.status)).map(job => `<div class="node-item-row node-addition-row" role="status" aria-live="polite" data-status="${escapeHtml(job.status)}"><div class="node-info-col"><div class="node-header-line"><span class="op-spinner" aria-hidden="true"></span><span class="node-name">${escapeHtml(withoutEmoji(job.name))}</span><span class="status-badge canary">${({queued:'در صف',running:'در حال افزودن',succeeded:'اضافه شد',failed:'ناموفق'})[job.status] || 'در حال بررسی'}</span></div><bdi class="node-ip-text" dir="ltr">${escapeHtml(job.ip)}</bdi><p class="node-reason-text">${escapeHtml(job.message)}</p>${job.error ? `<p class="node-addition-error" dir="auto">${escapeHtml(job.error)}</p>` : ''}</div></div>`).join('')}
         </div>
 
         ${poolActionErrors.has(p.name) ? `<div class="pool-action-error" role="alert"><span>${escapeHtml(poolActionErrors.get(p.name))}</span><button type="button" class="node-log-btn" data-pool="${escapeHtml(p.name)}" onclick="clearPoolActionError(this.dataset.pool)">بستن پیام</button></div>` : ''}
-        ${renderPoolOperations(p)}
         <div class="pool-footer-actions">
           <div class="pool-actions-main pool-management-actions">
             <button class="btn-secondary sm" data-arg0="${escapeHtml(p.name)}" onclick="openAddNodeModal(this.dataset.arg0)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>${uiIcon("plus")}<span>افزودن نود ایران</span></button>
             <button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openTransportModal(this.dataset.pool)" ${mutationsLocked || !p.nodes?.length ? `disabled aria-disabled="true" title="${escapeHtml(mutationsLocked ? lockReason : 'استخر هنوز نود فعالی ندارد')}"` : ''}>تغییر نوع تونل</button>
+            <details class="pool-more-actions"><summary>تنظیمات بیشتر</summary><div class="pool-extra-actions">
             ${(p.engine === "wireguard" || p.transport === "wireguard") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openWireguardSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات و آزمون WireGuard</button>` : (p.engine === "vxlan" || p.transport === "vxlan") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openVxlanSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات و وضعیت VXLAN</button>` : (p.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openVxsecSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات VXLAN+IPsec</button>` : (p.engine === "gre6" || p.transport === "gre6") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGre6SettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات GRE6</button>` : (p.engine === "ip6ip6" || p.transport === "ip6ip6") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openIp6ip6SettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات IP6IP6</button>` : (['geneve','geneve_ipsec'].includes(p.engine) || p.transport === "geneve_ipsec") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGeneveSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات Geneve</button>` : p.transport === "gre" ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGreSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات GRE</button>` : p.engine === "slipstream" ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openSlipstreamSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات Slipstream</button>` : ""}
             <button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="configurePoolRotation(this.dataset.pool)" ${mutationsLocked || !p.cf_enabled || (p.nodes || []).length < 2 ? `disabled aria-disabled="true" title="برای چرخش Cloudflare حداقل دو نود و تنظیم DNS لازم است"` : ''}>زمان‌بندی چرخش IP</button>
             <button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="rotatePoolNow(this.dataset.pool, this)" ${mutationsLocked || !p.cf_enabled || (p.nodes || []).length < 2 ? `disabled aria-disabled="true" title="برای چرخش Cloudflare حداقل دو نود و تنظیم DNS لازم است"` : ''}>چرخش الان</button>
             <button class="btn-secondary sm" data-arg0="${escapeHtml(p.name)}" data-domain="${escapeHtml(p.subdomain || "")}" onclick="openPoolCfModal(this.dataset.arg0, this.dataset.domain)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیم DNS</button>
+            </div></details>
           </div>
           <div class="pool-actions-danger">
             <button class="btn-danger sm" data-arg0="${escapeHtml(p.name)}" onclick="deleteEntirePool(this.dataset.arg0)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>حذف استخر</button>
@@ -1067,6 +1190,8 @@ function renderPools(pools) {
       </div>
     `;
   }).join("");
+  patchPoolCards(container, markup);
+  refreshOperationTimers();
 }
 
 /* ==========================================================================
@@ -1347,9 +1472,11 @@ async function toggleDaemonState() {
 /* ==========================================================================
    8. Modals & Complex Flows
    ========================================================================== */
+let pendingConfirmation = null;
 function closeModal(modalId) {
   const m = document.getElementById(modalId);
   if (m) m.classList.add("hidden");
+  if (modalId === 'confirm-modal' && pendingConfirmation) pendingConfirmation(false);
 }
 
 function closeModalOnBackdrop(e) {
@@ -1360,6 +1487,7 @@ function closeModalOnBackdrop(e) {
 
 /* Async replacement for native window.confirm — uses the styled sheet modal. */
 function confirmDialog(message, opts = {}) {
+  if (pendingConfirmation) pendingConfirmation(false);
   return new Promise(resolve => {
     const modal = document.getElementById('confirm-modal');
     if (!modal) { resolve(window.confirm(message)); return; }
@@ -1375,10 +1503,12 @@ function confirmDialog(message, opts = {}) {
     okBtn.style.flex = '1';
     cancelBtn.style.flex = '1';
     const done = val => {
+      pendingConfirmation = null;
       okBtn.onclick = cancelBtn.onclick = null;
       closeModal('confirm-modal');
       resolve(val);
     };
+    pendingConfirmation = done;
     okBtn.onclick = () => done(true);
     cancelBtn.onclick = () => done(false);
     modal.classList.remove('hidden');
@@ -1754,24 +1884,30 @@ async function submitCreatePool(e) {
 }
 
 /* Delete Entire Pool */
+const pendingPoolDeletes = new Set();
 async function deleteEntirePool(poolName) {
-  if (!await confirmDialog(`آیا از حذف کامل استخر '${poolName}' و متوقف کردن تمام تونل‌های آن اطمینان دارید؟`, { title: 'حذف استخر', confirmText: 'حذف کامل' })) return;
-  showToast(`در حال خاموش کردن و حذف استخر ${poolName}...`);
-
+  if (pendingPoolDeletes.has(poolName)) return;
+  pendingPoolDeletes.add(poolName);
   try {
-    const res = await apiFetch("/api/pools/delete", {
-      method: "POST",
-      body: { pool: poolName }
-    });
-    if (res.success) {
-      showToast(res.accepted ? "حذف شروع شد؛ وضعیت را در کارت استخر دنبال کنید" : (res.message || "استخر با موفقیت حذف شد"));
-      fetchStatus();
-    } else {
-      showToast(`${res.error || "خطا در حذف استخر"}`);
+    if (!await confirmDialog(`آیا از حذف کامل استخر '${poolName}' و متوقف کردن تمام تونل‌های آن اطمینان دارید؟`, { title: 'حذف استخر', confirmText: 'حذف کامل' })) return;
+    showToast(`در حال خاموش کردن و حذف استخر ${poolName}...`);
+
+    try {
+      const res = await apiFetch("/api/pools/delete", {
+        method: "POST",
+        body: { pool: poolName }
+      });
+      if (res.success) {
+        showToast(res.accepted ? "حذف شروع شد؛ وضعیت را در کارت استخر دنبال کنید" : (res.message || "استخر با موفقیت حذف شد"));
+        fetchStatus();
+      } else {
+        showToast(`${res.error || "خطا در حذف استخر"}`);
+      }
+    } catch (e) {
+      showToast("خطا در ارسال درخواست حذف استخر");
     }
-  } catch (e) {
-    showToast("خطا در ارسال درخواست حذف استخر");
-  }
+
+  } finally { pendingPoolDeletes.delete(poolName); }
 }
 
 async function forgetPool(poolName) {
