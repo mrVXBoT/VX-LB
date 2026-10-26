@@ -1,0 +1,612 @@
+{
+  "ui_groups": {
+    "backpack": {
+      "label": "BackPack",
+      "transports": [
+        {
+          "value": "tcp",
+          "label": "TCP",
+          "hint": "انتقال مستقیم روی TCP با سربار کم؛ این حالت رمزنگاری اضافه ندارد."
+        },
+        {
+          "value": "stealth",
+          "label": "Stealth (Noise)",
+          "hint": "انتقال TCP با رمزنگاری Noise؛ مناسب زمانی که رمزنگاری در لایهٔ تونل لازم است."
+        },
+        {
+          "value": "pck",
+          "label": "PCK (Raw TCP)",
+          "hint": "انتقال با بسته‌های خام TCP در BackPack؛ سازگاری به مسیر شبکه و فایروال بستگی دارد."
+        },
+        {
+          "value": "kcp",
+          "label": "KCP",
+          "hint": "انتقال روی UDP با KCP برای مسیرهای دارای اتلاف بسته؛ نیازمند دسترسی UDP."
+        },
+        {
+          "value": "wss",
+          "label": "WSS (WebSocket + TLS)",
+          "hint": "انتقال WebSocket روی TLS؛ استفاده از پراکسی یا CDN به پیکربندی آن بستگی دارد."
+        },
+        {
+          "value": "quic",
+          "label": "QUIC",
+          "hint": "انتقال روی UDP با QUIC و رمزنگاری TLS؛ نیازمند دسترسی UDP."
+        }
+      ]
+    },
+    "waterwall": {
+      "label": "WaterWall",
+      "transports": [
+        {
+          "value": "waterwall",
+          "mode": "halfduplex",
+          "label": "HalfDuplex",
+          "hint": "کانال‌های جداگانه برای ارسال و دریافت داده؛ مناسب بررسی مسیرهای نامتقارن."
+        },
+        {
+          "value": "waterwall",
+          "mode": "reverse",
+          "label": "Reverse",
+          "hint": "اتصال از نود ایران به سرور خارج آغاز می‌شود و ترافیک پورت‌های انتخابی را منتقل می‌کند."
+        },
+        {
+          "value": "waterwall",
+          "mode": "trojan",
+          "label": "Trojan",
+          "hint": "احراز هویت با رمز مشترک؛ TLS اختیاری است و در صورت فعال‌سازی به گواهی نیاز دارد."
+        },
+        {
+          "value": "waterwall",
+          "mode": "bgp4",
+          "label": "Bgp4",
+          "hint": "فریم‌بندی شبیه BGP برای ترافیک تونل؛ این حالت مسیریابی BGP واقعی انجام نمی‌دهد."
+        },
+        {
+          "value": "waterwall",
+          "mode": "reality",
+          "label": "Reality",
+          "hint": "حالت Reality با SNI قابل تنظیم؛ بدون نیاز به گواهی عمومی سرور."
+        }
+      ]
+    },
+    "gost": {
+      "label": "GOST",
+      "transports": [
+        {
+          "value": "gost",
+          "profile": "shadowsocks-tcp",
+          "label": "Shadowsocks TCP",
+          "hint": "انتقال TCP با Shadowsocks و رمزنگاری AES-256-GCM؛ کلاینت باید با این روش سازگار باشد."
+        },
+        {
+          "value": "gost",
+          "profile": "shadowsocks-udp",
+          "label": "Shadowsocks UDP",
+          "hint": "رلهٔ UDP با Shadowsocks و رمزنگاری AES-256-GCM؛ نیازمند دسترسی UDP."
+        },
+        {
+          "value": "gost",
+          "profile": "shadowsocks-tls",
+          "label": "Shadowsocks + TLS",
+          "hint": "انتقال Shadowsocks روی TLS؛ نیازمند تنظیم گواهی در سمت سرور."
+        },
+        {
+          "value": "gost",
+          "profile": "shadowsocks-ws",
+          "label": "Shadowsocks + WebSocket",
+          "hint": "انتقال Shadowsocks در WebSocket؛ تنظیمات پراکسی و TLS باید با دو سمت هماهنگ باشند."
+        },
+        {
+          "value": "gost",
+          "profile": "obfs4",
+          "label": "obfs4",
+          "hint": "انتقال رله با مبهم‌سازی obfs4؛ استفاده از این پروفایل به معنی اتصال به شبکهٔ Tor نیست."
+        },
+        {
+          "value": "gost",
+          "profile": "obfs4-tls",
+          "label": "obfs4 + TLS",
+          "hint": "انتقال obfs4 روی TLS؛ نیازمند تنظیم گواهی در سمت سرور."
+        },
+        {
+          "value": "gost",
+          "profile": "grpc",
+          "label": "gRPC",
+          "hint": "انتقال رله روی gRPC؛ نتیجه به پشتیبانی مسیر و پراکسی از gRPC بستگی دارد."
+        },
+        {
+          "value": "gost",
+          "profile": "grpc-tls",
+          "label": "gRPC + TLS",
+          "hint": "انتقال gRPC روی TLS با گواهی سرور."
+        },
+        {
+          "value": "gost",
+          "profile": "ssh",
+          "label": "SSH Tunnel",
+          "hint": "انتقال پورت‌ها در تونل SSH؛ نیازمند احراز هویت و دسترسی به سرویس SSH."
+        },
+        {
+          "value": "gost",
+          "profile": "kcp-obfs4",
+          "label": "KCP + obfs4",
+          "hint": "ترکیب KCP در حالت Fast3 و مبهم‌سازی obfs4؛ نیازمند دسترسی UDP."
+        },
+        {
+          "value": "gost",
+          "profile": "web-tunnel",
+          "label": "Web-Tunnel (HTTP + MWSS)",
+          "hint": "انتقال HTTP روی WebSocket امن و چندجریانی (MWSS)."
+        },
+        {
+          "value": "gost",
+          "profile": "gaming-socks5-kcp",
+          "label": "SOCKS5 + KCP",
+          "hint": "پراکسی SOCKS5 روی KCP؛ تأخیر و مصرف پهنای باند به شرایط مسیر وابسته‌اند."
+        },
+        {
+          "value": "gost",
+          "profile": "quic-socks5",
+          "label": "QUIC + SOCKS5",
+          "hint": "پراکسی SOCKS5 روی QUIC؛ نیازمند دسترسی UDP."
+        }
+      ]
+    },
+    "frp": {
+      "label": "FRP",
+      "transports": [
+        {
+          "value": "frp",
+          "mode": "tcp",
+          "label": "FRP · TCP",
+          "hint": "انتقال پورت‌های TCP از ایران به سرویس مقصد از طریق اتصال معکوس FRP."
+        },
+        {
+          "value": "frp",
+          "mode": "udp",
+          "label": "FRP · UDP",
+          "hint": "انتقال پورت‌های UDP از ایران به سرویس مقصد از طریق اتصال معکوس FRP."
+        },
+        {
+          "value": "frp",
+          "mode": "dual",
+          "label": "FRP · TCP + UDP",
+          "hint": "انتقال هم‌زمان TCP و UDP برای هر پورت انتخاب‌شده."
+        }
+      ]
+    },
+    "hedioum": {
+      "label": "Hedioum",
+      "transports": [
+        {
+          "value": "hedioum",
+          "mode": "socks",
+          "label": "SOCKS5",
+          "hint": "ارائهٔ پراکسی SOCKS5؛ پورت پیش‌فرض از اولین پورت کلاینت گرفته می‌شود."
+        },
+        {
+          "value": "hedioum",
+          "mode": "tun",
+          "label": "TUN",
+          "hint": "ایجاد رابط شبکهٔ TUN با امکان فعال‌سازی انتقال DNS."
+        },
+        {
+          "value": "hedioum",
+          "mode": "gateway",
+          "label": "Gateway (L3)",
+          "hint": "دروازهٔ شفاف لایهٔ ۳ برای شبکهٔ محلی با استفاده از رابط TUN."
+        }
+      ]
+    },
+    "rathole": {
+      "label": "Rathole",
+      "transports": [
+        {
+          "value": "rathole",
+          "mode": "tcp",
+          "label": "TCP",
+          "hint": "حامل TCP بدون رمزنگاری اضافه در لایهٔ انتقال Rathole."
+        },
+        {
+          "value": "rathole",
+          "mode": "tls",
+          "label": "TLS",
+          "hint": "حامل TLS با گواهی PKCS#12 در سمت سرور."
+        },
+        {
+          "value": "rathole",
+          "mode": "noise",
+          "label": "Noise",
+          "hint": "حامل رمزنگاری‌شدهٔ Noise با کلید X25519؛ نیازی به گواهی TLS ندارد."
+        },
+        {
+          "value": "rathole",
+          "mode": "websocket",
+          "label": "WebSocket",
+          "hint": "حامل WebSocket با TLS اختیاری؛ استفاده از CDN به تنظیمات آن بستگی دارد."
+        }
+      ]
+    },
+    "paqet": {
+      "label": "Paqet",
+      "transports": [
+        {
+          "value": "paqet",
+          "mode": "forward",
+          "label": "Paqet · انتقال پورت",
+          "hint": "انتقال پورت‌های کلاینت از ایران به خارج با KCP روی بسته‌های خام؛ نیازمند تنظیم رابط شبکه."
+        }
+      ]
+    },
+    "kernel": {
+      "label": "تونل‌های شبکه و کرنل",
+      "transports": [
+        {
+          "value": "wireguard",
+          "label": "WireGuard",
+          "hint": "تونل رمزنگاری‌شدهٔ WireGuard روی UDP با کلید عمومی؛ نیازمند دسترسی UDP."
+        },
+        {
+          "value": "tun",
+          "label": "TUN",
+          "hint": "رابط مجازی لایهٔ ۳ روی حامل UDP با احراز هویت Noise؛ عبور TCP و UDP پیش از فعال‌شدن بررسی می‌شود."
+        },
+        {
+          "value": "gre",
+          "label": "GRE + IPsec",
+          "hint": "تونل GRE روی IPv4 با IPsec ESP و رمزنگاری AES-GCM؛ انتقال پورت‌های TCP و UDP."
+        },
+        {
+          "value": "gre6",
+          "label": "GRE6",
+          "hint": "کپسوله‌سازی GRE روی IPv6 عمومی؛ این حالت به‌تنهایی رمزنگاری ندارد."
+        },
+        {
+          "value": "ip6ip6",
+          "label": "IP6IP6",
+          "hint": "کپسوله‌سازی IPv6 در IPv6 برای اتصال مستقیم دو سرور؛ بدون رمزنگاری داخلی."
+        },
+        {
+          "value": "vxlan",
+          "label": "VXLAN",
+          "hint": "تونل لایهٔ ۲ روی UDP با روش‌های نقطه‌به‌نقطه، Bridge و FDB؛ بدون رمزنگاری داخلی."
+        },
+        {
+          "value": "vxlan_ipsec",
+          "label": "VXLAN + IPsec",
+          "hint": "تونل VXLAN با حفاظت IPsec ESP و احراز هویت؛ نیازمند strongSwan در هر دو سمت."
+        },
+        {
+          "value": "dc6",
+          "label": "DC6",
+          "hint": "حامل قابل انتخاب GRE6، IP6IP6 یا SIT؛ نیازمندی IPv4 یا IPv6 به حامل انتخاب‌شده بستگی دارد."
+        },
+        {
+          "value": "geneve_ipsec",
+          "label": "Geneve + IPsec",
+          "hint": "تونل لایهٔ ۲ Geneve با شناسهٔ VNI و حفاظت IPsec ESP."
+        }
+      ]
+    },
+    "spoof": {
+      "label": "پروفایل‌های پردازش بسته (آزمایشی)",
+      "transports": [
+        {
+          "value": "fake-sni",
+          "label": "Fake SNI + MD5/BadSum (آزمایشی)",
+          "hint": "تزریق ClientHello با SNI انتخابی و بررسی بستهٔ واقعی در کنار آزمون TCP/UDP"
+        },
+        {
+          "value": "split-tls",
+          "label": "TLS Record + TCP Disorder (آزمایشی)",
+          "hint": "تقسیم رکورد ClientHello و ارسال معکوس قطعات TCP روی مسیر mTLS"
+        },
+        {
+          "value": "hop-ttl-injection",
+          "label": "TTL محدود با برآورد هاپ (آزمایشی)",
+          "hint": "تزریق ClientHello با TTL برآوردشده و محدود؛ مقدار جایگزین و BadSum حفظ می‌شوند"
+        },
+        {
+          "value": "tcp-state-desync",
+          "label": "RST + OOB (آزمایشی)",
+          "hint": "تزریق RST نامعتبر و دادهٔ خارج از باند؛ پذیرش فقط پس از مشاهدهٔ تغییر و عبور داده"
+        },
+        {
+          "value": "l3-ip-spoof",
+          "disabled": true,
+          "label": "L3 Source-IP Spoofing (غیرفعال)",
+          "hint": "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست."
+        },
+        {
+          "value": "l7-header-mutation",
+          "label": "HTTP Host Header Mutation (آزمایشی)",
+          "hint": "تغییر واقعی حروف نام هدر Host روی CONNECT؛ دادهٔ TCP/UDP در mTLS عبور می‌کند"
+        },
+        {
+          "value": "udp-raw-spoof",
+          "disabled": true,
+          "label": "Raw UDP / QUIC Spoofing (غیرفعال)",
+          "hint": "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست."
+        },
+        {
+          "value": "dns-spoof",
+          "disabled": true,
+          "label": "DNS Anti-Poisoning (غیرفعال)",
+          "hint": "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست."
+        },
+        {
+          "value": "spoof-tcp-syn",
+          "disabled": true,
+          "label": "TCP SYN Spoofing (غیرفعال)",
+          "hint": "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست."
+        },
+        {
+          "value": "spoof-udp-raw",
+          "disabled": true,
+          "label": "Raw UDP Spoofing (غیرفعال)",
+          "hint": "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست."
+        },
+        {
+          "value": "spoof-icmp",
+          "disabled": true,
+          "label": "ICMP Tunnel (غیرفعال)",
+          "hint": "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست."
+        },
+        {
+          "value": "qs-dns-hybrid",
+          "disabled": true,
+          "label": "QS-Tunnel Hybrid (غیرفعال)",
+          "hint": "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست."
+        },
+        {
+          "value": "hyperion-x",
+          "disabled": true,
+          "label": "HYPERION-X (غیرفعال)",
+          "hint": "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست."
+        }
+      ]
+    },
+    "other": {
+      "label": "وب و تونل DNS",
+      "transports": [
+        {
+          "value": "ws",
+          "label": "WebSocket (WS)",
+          "hint": "انتقال WebSocket بدون TLS؛ برای استفاده پشت پراکسی معکوس باید مسیر و پورت‌ها هماهنگ باشند."
+        },
+        {
+          "value": "http",
+          "label": "HTTP CONNECT",
+          "hint": "حامل HTTP/1.1 CONNECT با انتقال TCP و UDP در کانال دارای احراز هویت دوطرفهٔ TLS."
+        },
+        {
+          "value": "https",
+          "label": "HTTPS CONNECT",
+          "hint": "حامل HTTPS CONNECT روی TLS 1.3 با احراز هویت دوطرفه و گواهی اختصاصی."
+        },
+        {
+          "value": "slipstream",
+          "label": "Slipstream (DNS)",
+          "hint": "تونل پشتیبان روی پرس‌وجوهای DNS؛ نیازمند واگذاری زیردامنه و تنظیم resolver و محدودیت نرخ."
+        }
+      ]
+    }
+  },
+  "capability_ids": [
+    "6to4_anycast",
+    "6to4_unicast",
+    "anycast",
+    "backhaul",
+    "backpack",
+    "dc6",
+    "dns-spoof",
+    "eoip",
+    "erspan",
+    "fake-sni",
+    "frp",
+    "geneve",
+    "geneve_gre6",
+    "geneve_gre6_ipv4",
+    "geneve_gre6_native",
+    "geneve_ipsec",
+    "gost",
+    "gre6",
+    "gre6tap",
+    "gre6tap_ipsec",
+    "gre_ipv4",
+    "gretap",
+    "hedioum",
+    "hop-ttl-injection",
+    "http",
+    "https",
+    "hyperion-x",
+    "hysteria2",
+    "ip6ip6",
+    "isatap",
+    "l2tp",
+    "l3-ip-spoof",
+    "l7-header-mutation",
+    "paqet",
+    "qs-dns-hybrid",
+    "rathole",
+    "sit",
+    "slipstream",
+    "split-tls",
+    "spoof",
+    "spoof-icmp",
+    "spoof-tcp-syn",
+    "spoof-udp-raw",
+    "tcp",
+    "tcp-state-desync",
+    "trusttunnel",
+    "tun",
+    "udp-raw-spoof",
+    "vxlan",
+    "vxlan_ipsec",
+    "waterwall",
+    "wireguard",
+    "wireguard_amnezia",
+    "wireguard_hybrid",
+    "wireguard_udp2raw",
+    "ws",
+    "wss"
+  ],
+  "field_ids": [
+    "password",
+    "pool-search",
+    "pool-engine-filter",
+    "server-search",
+    "cf-record-search",
+    "cf-record-type-filter",
+    "new-pass-input",
+    "cf-global-token",
+    "cf-global-zone",
+    "cf-global-sub",
+    "dash-domain-input",
+    "dash-ssl-mode",
+    "new-port-input",
+    "server-name-input",
+    "server-ip-input",
+    "server-ipv6-input",
+    "server-port-input",
+    "server-user-input",
+    "server-pass-input",
+    "rotation-enabled",
+    "rotation-mode",
+    "rotation-interval-val",
+    "rotation-daily-val",
+    "new-pool-name",
+    "new-pool-kharej",
+    "new-pool-engine",
+    "new-pool-proto",
+    "waterwall-outer-port",
+    "waterwall-binary",
+    "waterwall-trojan-password",
+    "waterwall-trojan-tls",
+    "waterwall-server-name",
+    "waterwall-certificate",
+    "waterwall-key",
+    "waterwall-reality-password",
+    "waterwall-reality-sni",
+    "waterwall-reverse-secret",
+    "waterwall-bgp4-password",
+    "gost-password",
+    "gost-outer-port",
+    "gost-binary",
+    "frp-token",
+    "frp-port",
+    "hedioum-persona",
+    "hedioum-domain",
+    "hedioum-move-ssh",
+    "hedioum-tun-dns",
+    "rathole-proto",
+    "rathole-token",
+    "rathole-port",
+    "rathole-ws-tls",
+    "rathole-pkcs12",
+    "rathole-pkcs12-password",
+    "rathole-trusted-root",
+    "rathole-hostname",
+    "paqet-port",
+    "paqet-key",
+    "paqet-kcp-mode",
+    "paqet-conn",
+    "paqet-mtu",
+    "new-pool-tun-mtu",
+    "new-pool-dc6-carrier",
+    "new-pool-dc6-mtu",
+    "new-pool-gre-mtu",
+    "new-pool-geneve-vni",
+    "new-pool-geneve-mtu",
+    "new-pool-vxlan-method",
+    "new-pool-vxlan-vni",
+    "new-pool-vxlan-port",
+    "new-pool-vxlan-mtu",
+    "new-pool-vxlan-bridge",
+    "new-pool-vxsec-vni",
+    "new-pool-vxsec-port",
+    "new-pool-vxsec-mtu",
+    "new-pool-gre6-mtu",
+    "new-pool-ip6ip6-mtu",
+    "new-pool-wireguard-port",
+    "new-pool-wireguard-mtu",
+    "new-pool-wireguard-psk",
+    "slipstream-domain",
+    "slipstream-resolvers",
+    "slipstream-dns-port",
+    "slipstream-rate-limit",
+    "spoof-fake-sni",
+    "spoof-ttl-delta",
+    "spoof-ip-list",
+    "spoof-peer-ip",
+    "spoof-dns-resolvers",
+    "spoof-fake-send-ip",
+    "spoof-knock-key",
+    "new-pool-ports",
+    "select-iran-node-to-add",
+    "pool-cf-token",
+    "pool-cf-zone",
+    "pool-cf-scope",
+    "pool-cf-sub",
+    "transport-change-engine",
+    "transport-target",
+    "transport-overlay-vni",
+    "transport-overlay-port",
+    "transport-wireguard-port",
+    "transport-wireguard-psk",
+    "transport-rathole-pkcs12",
+    "transport-rathole-password",
+    "transport-rathole-root",
+    "transport-rathole-hostname",
+    "transport-spoof-fake-sni",
+    "transport-spoof-ttl-delta",
+    "transport-spoof-ip-list",
+    "transport-spoof-peer-ip",
+    "transport-spoof-dns-resolvers",
+    "transport-spoof-fake-send-ip",
+    "transport-spoof-knock-key",
+    "transport-fec-data",
+    "transport-fec-parity",
+    "transport-dc6-carrier",
+    "transport-dc6-mtu",
+    "transport-mtu-input",
+    "transport-slipstream-domain",
+    "transport-slipstream-resolvers",
+    "gre-settings-mtu",
+    "matrix-port",
+    "matrix-mtu",
+    "slipstream-settings-domain",
+    "slipstream-settings-resolvers",
+    "slipstream-settings-port",
+    "slipstream-settings-rate",
+    "vxsec-settings-mtu",
+    "geneve-settings-mtu",
+    "vxlan-settings-mtu",
+    "gre6-settings-mtu",
+    "ip6ip6-settings-mtu",
+    "wireguard-settings-mtu",
+    "cf-profile-label",
+    "cf-profile-token",
+    "cf-edit-profile-label",
+    "cf-edit-profile-token",
+    "cf-record-type",
+    "cf-record-name",
+    "cf-record-content",
+    "cf-record-priority",
+    "cf-record-ttl",
+    "cf-record-proxied"
+  ],
+  "family_pages": {
+    "backpack": "BackPack",
+    "waterwall": "WaterWall",
+    "gost": "GOST",
+    "frp": "FRP",
+    "hedioum": "Hedioum",
+    "rathole": "Rathole",
+    "paqet": "Paqet",
+    "kernel": "Kernel-Tunnels",
+    "spoof": "Packet-Profiles",
+    "other": "Web-and-DNS"
+  }
+}
