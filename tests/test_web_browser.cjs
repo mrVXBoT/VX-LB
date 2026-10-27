@@ -50,6 +50,22 @@ let browser;
   measurements.push(measure);
  }
  const first=page.locator('.pool-card').first();
+ const more=first.locator('.pool-more-toggle');
+ const settings=first.locator('.pool-settings-panel');
+ assert.equal(await more.getAttribute('aria-expanded'),'false');
+ assert.equal(await settings.evaluate(panel=>panel.inert),true);
+ await more.focus();
+ await page.keyboard.press('Enter');
+ assert.equal(await more.getAttribute('aria-expanded'),'true');
+ assert.equal(await settings.evaluate(panel=>panel.inert),false);
+ assert.equal(await settings.locator('button:disabled').count(),3);
+ for (const width of [390,1440]) {
+  await page.setViewportSize({width,height:width<768?844:1000});
+  await page.evaluate(()=>document.documentElement.dataset.theme='dark');
+  await first.locator('.pool-more-actions').screenshot({path:path.join(screenshots,`settings-open-dark-${width}.png`),animations:'disabled'});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width);
+ }
+ await page.evaluate(()=>document.documentElement.dataset.theme='light');
  const technical=first.locator('.node-technical-details').first();
  assert.equal(await technical.getAttribute('open'),null);
  await technical.locator('summary').click();
@@ -61,6 +77,7 @@ let browser;
  await page.evaluate(()=>window.eventStreams.at(-1).emit('change'));
  await page.waitForFunction(()=>document.querySelector('.op-msg')?.textContent.includes('بررسی نهایی'));
  assert.equal(await technical.getAttribute('open'),'');
+ assert.equal(await more.getAttribute('aria-expanded'),'true');
  assert.equal(await page.evaluate(()=>document.activeElement.matches('.node-technical-details summary')),true);
  assert.equal(await page.evaluate(()=>window.unchangedCard===document.querySelectorAll('.pool-card')[1]),true);
  const failure=page.locator('.pool-card').nth(1).locator('.operation-item');
@@ -74,6 +91,24 @@ let browser;
  await page.evaluate(()=>window.eventStreams.at(-1).emit('change'));
  await page.waitForFunction(()=>!document.querySelector('.pool-card .operation-item.is-active'));
  assert.equal(await technical.getAttribute('open'),'');
+ // Opening, closing and keyboard navigation remain consistent after live updates.
+ assert.equal(await settings.locator('button:disabled').count(),2);
+ await more.focus();await page.keyboard.press('Space');
+ assert.equal(await more.getAttribute('aria-expanded'),'false');
+ assert.equal(await settings.evaluate(panel=>panel.inert),true);
+ await page.keyboard.press('Enter');
+ assert.equal(await more.getAttribute('aria-expanded'),'true');
+ await page.setViewportSize({width:390,height:844});
+ await page.evaluate(()=>document.documentElement.dataset.theme='dark');
+ await first.locator('.pool-more-actions').screenshot({path:path.join(screenshots,'settings-open-enabled-390.png'),animations:'disabled'});
+ const dns=first.locator('.pool-settings-panel').getByRole('button',{name:/تنظیم DNS/});
+ await dns.click();
+ await page.locator('#pool-cf-modal').waitFor({state:'visible'});
+ await page.keyboard.press('Escape');
+ await page.locator('#pool-cf-modal').waitFor({state:'hidden'});
+ await more.click();
+ await first.locator('.pool-more-actions').screenshot({path:path.join(screenshots,'settings-closed-390.png'),animations:'disabled'});
+ await page.evaluate(()=>document.documentElement.dataset.theme='light');
  // Closing confirmation must release the guard and allow a later retry.
  await failure.getByRole('button',{name:'تلاش دوباره برای حذف استخر',exact:true}).click();
  await page.locator('#confirm-modal').waitFor({state:'visible'});
@@ -145,6 +180,6 @@ let browser;
   await page.locator('#create-pool-modal').waitFor({state:'hidden'});
  }
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({measurements,errors,checks:['live updates','completion while focused','preserved details and focus','unchanged card reuse','visible deletion choices','host-key recovery copy','confirmed inventory-only removal','safe retry','confirmation cancel','inline HTTP errors','deleted-pool completion','stream fallback','global mutation lock']}));
+ console.log(JSON.stringify({measurements,errors,checks:['settings keyboard expansion','settings state across updates','settings mutation locks','settings DNS action','live updates','completion while focused','preserved details and focus','unchanged card reuse','visible deletion choices','host-key recovery copy','confirmed inventory-only removal','safe retry','confirmation cancel','inline HTTP errors','deleted-pool completion','stream fallback','global mutation lock']}));
  await browser.close();
 })().catch(async error=>{console.error(error);process.exitCode=1;if(browser) await browser.close();});

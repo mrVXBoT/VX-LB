@@ -961,6 +961,58 @@ function getEngineBadge(engine, transport, pool) {
   return `<span class="engine-badge ${cls}"><span class="engine-badge-dot"></span><span>${escapeHtml(label)}</span></span>`;
 }
 
+const poolSettingsOpen = new Set();
+function togglePoolSettings(button) {
+  const section = button.closest('.pool-more-actions');
+  const panel = section.querySelector('.pool-settings-panel');
+  const open = button.getAttribute('aria-expanded') !== 'true';
+  button.setAttribute('aria-expanded', String(open));
+  section.classList.toggle('is-open', open);
+  panel.inert = !open;
+  panel.setAttribute('aria-hidden', String(!open));
+  if (open) poolSettingsOpen.add(button.dataset.pool);
+  else poolSettingsOpen.delete(button.dataset.pool);
+}
+function renderPoolSettings(pool, locked, lockReason) {
+  const open = poolSettingsOpen.has(pool.name);
+  const panelId = 'pool-settings-' + encodeURIComponent(pool.name);
+  const action = (title, hint, icon, handler, reason = '') => `<button type="button" class="pool-setting-action" data-pool="${escapeHtml(pool.name)}" data-domain="${escapeHtml(pool.subdomain || '')}" onclick="${handler}" ${reason ? `disabled aria-disabled="true" title="${escapeHtml(reason)}"` : ''}>
+    <span class="pool-setting-icon">${uiIcon(icon)}</span><span class="pool-setting-copy"><strong>${title}</strong><small>${hint}</small></span>${uiIcon('chevron')}
+  </button>`;
+  const reason = locked ? lockReason : '';
+  const engine = pool.engine || pool.transport;
+  const tools = {
+    wireguard: ['WireGuard', 'MTU، وضعیت اتصال و آزمون مسیر', 'openWireguardSettingsModal'],
+    vxlan: ['VXLAN', 'MTU و وضعیت شبکهٔ مجازی', 'openVxlanSettingsModal'],
+    vxlan_ipsec: ['VXLAN + IPsec', 'تنظیم MTU لینک خصوصی', 'openVxsecSettingsModal'],
+    gre6: ['GRE6', 'تنظیم MTU لینک IPv6', 'openGre6SettingsModal'],
+    ip6ip6: ['IP6IP6', 'تنظیم MTU لینک IPv6', 'openIp6ip6SettingsModal'],
+    geneve: ['Geneve', 'تنظیم MTU شبکهٔ مجازی', 'openGeneveSettingsModal'],
+    geneve_ipsec: ['Geneve', 'تنظیم MTU شبکهٔ مجازی', 'openGeneveSettingsModal'],
+    gre: ['GRE', 'تنظیم و بررسی MTU لینک', 'openGreSettingsModal'],
+    slipstream: ['Slipstream', 'دامنه، resolver و سقف نرخ DNS', 'openSlipstreamSettingsModal']
+  };
+  const tool = tools[engine] || tools[pool.transport];
+  const rotationReady = pool.cf_enabled && (pool.nodes || []).length >= 2;
+  const rotationReason = reason || (!rotationReady ? 'برای چرخش IP، DNS استخر و حداقل دو نود لازم است.' : '');
+  return `<section class="pool-more-actions${open ? ' is-open' : ''}">
+    <button type="button" class="pool-more-toggle" data-pool="${escapeHtml(pool.name)}" aria-expanded="${open}" aria-controls="${escapeHtml(panelId)}" onclick="togglePoolSettings(this)">
+      <span class="pool-settings-toggle-icon">${uiIcon('settings')}</span><span class="pool-settings-toggle-copy"><strong>تنظیمات بیشتر</strong><small>${tool ? 'تنظیمات تونل، DNS و چرخش IP' : 'DNS و چرخش IP'}</small></span><span class="pool-settings-chevron">${uiIcon('chevron')}</span>
+    </button>
+    <div id="${escapeHtml(panelId)}" class="pool-settings-panel" aria-hidden="${!open}" ${open ? '' : 'inert'}><div class="pool-settings-clip"><div class="pool-settings-content">
+      ${reason ? `<p class="pool-settings-note">${escapeHtml(reason)}</p>` : ''}
+      <div class="pool-settings-group"><p class="pool-settings-group-title">اتصال و DNS</p><div class="pool-settings-grid">
+        ${tool ? action('تنظیمات ' + tool[0], tool[1], 'settings', tool[2] + '(this.dataset.pool)', reason) : ''}
+        ${action('تنظیم DNS', 'دامنه و اتصال به Cloudflare', 'globe', 'openPoolCfModal(this.dataset.pool,this.dataset.domain)', reason)}
+      </div></div>
+      <div class="pool-settings-group"><p class="pool-settings-group-title">چرخش IP</p><div class="pool-settings-grid">
+        ${action('زمان‌بندی چرخش IP', 'جابه‌جایی دوره‌ای بین نودهای سالم', 'clock', 'configurePoolRotation(this.dataset.pool)', rotationReason)}
+        ${action('چرخش الان', 'انتقال DNS به نود سالم بعدی', 'refresh', 'rotatePoolNow(this.dataset.pool,this)', rotationReason)}
+      </div>${!locked && !rotationReady ? `<p class="pool-settings-note">${escapeHtml(rotationReason)}</p>` : ''}</div>
+    </div></div></div>
+  </section>`;
+}
+
 const poolRenderSources = new Map();
 function patchPoolCards(container, markup) {
   if (typeof document.createElement !== 'function') { container.innerHTML = markup; return; }
@@ -1198,12 +1250,7 @@ function renderPools(pools) {
           <div class="pool-actions-main pool-management-actions">
             <button class="btn-secondary sm" data-arg0="${escapeHtml(p.name)}" onclick="openAddNodeModal(this.dataset.arg0)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>${uiIcon("plus")}<span>افزودن نود ایران</span></button>
             <button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openTransportModal(this.dataset.pool)" ${mutationsLocked || !p.nodes?.length ? `disabled aria-disabled="true" title="${escapeHtml(mutationsLocked ? lockReason : 'استخر هنوز نود فعالی ندارد')}"` : ''}>تغییر نوع تونل</button>
-            <details class="pool-more-actions"><summary>تنظیمات بیشتر</summary><div class="pool-extra-actions">
-            ${(p.engine === "wireguard" || p.transport === "wireguard") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openWireguardSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات و آزمون WireGuard</button>` : (p.engine === "vxlan" || p.transport === "vxlan") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openVxlanSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات و وضعیت VXLAN</button>` : (p.engine === "vxlan_ipsec" || p.transport === "vxlan_ipsec") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openVxsecSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات VXLAN+IPsec</button>` : (p.engine === "gre6" || p.transport === "gre6") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGre6SettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات GRE6</button>` : (p.engine === "ip6ip6" || p.transport === "ip6ip6") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openIp6ip6SettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات IP6IP6</button>` : (['geneve','geneve_ipsec'].includes(p.engine) || p.transport === "geneve_ipsec") ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGeneveSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات Geneve</button>` : p.transport === "gre" ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openGreSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات GRE</button>` : p.engine === "slipstream" ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="openSlipstreamSettingsModal(this.dataset.pool)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیمات Slipstream</button>` : ""}
-            <button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="configurePoolRotation(this.dataset.pool)" ${mutationsLocked || !p.cf_enabled || (p.nodes || []).length < 2 ? `disabled aria-disabled="true" title="برای چرخش Cloudflare حداقل دو نود و تنظیم DNS لازم است"` : ''}>زمان‌بندی چرخش IP</button>
-            <button type="button" class="btn-secondary sm" data-pool="${escapeHtml(p.name)}" onclick="rotatePoolNow(this.dataset.pool, this)" ${mutationsLocked || !p.cf_enabled || (p.nodes || []).length < 2 ? `disabled aria-disabled="true" title="برای چرخش Cloudflare حداقل دو نود و تنظیم DNS لازم است"` : ''}>چرخش الان</button>
-            <button class="btn-secondary sm" data-arg0="${escapeHtml(p.name)}" data-domain="${escapeHtml(p.subdomain || "")}" onclick="openPoolCfModal(this.dataset.arg0, this.dataset.domain)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>تنظیم DNS</button>
-            </div></details>
+            ${renderPoolSettings(p, mutationsLocked, lockReason)}
           </div>
           <div class="pool-actions-danger">
             <button class="btn-danger sm" data-arg0="${escapeHtml(p.name)}" onclick="deleteEntirePool(this.dataset.arg0)" ${mutationsLocked ? `disabled aria-disabled="true" title="${escapeHtml(lockReason)}"` : ''}>حذف استخر</button>
@@ -2514,7 +2561,7 @@ function setupNavigation() { setNavigationOpen(); }
 
 /* Icons are markup, never emoji or decorative text glyphs. */
 function uiIcon(name) {
-  const paths = {plus: '<path d="M12 5v14M5 12h14"/>', pin: '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>', globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/>', close: '<path d="m6 6 12 12M6 18 18 6"/>', copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M15 5V3H3v12h2"/>', edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>'};
+  const paths = {settings:'<path d="M4 7h16M4 17h16"/><circle cx="8" cy="7" r="2"/><circle cx="16" cy="17" r="2"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',refresh:'<path d="M20 7v5h-5M4 17v-5h5M5.6 8a7 7 0 0 1 11.5-2L20 9M4 15l2.9 3A7 7 0 0 0 18.4 16"/>',chevron:'<path d="m9 5 7 7-7 7"/>',plus: '<path d="M12 5v14M5 12h14"/>', pin: '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>', globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/>', close: '<path d="m6 6 12 12M6 18 18 6"/>', copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M15 5V3H3v12h2"/>', edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>'};
   return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.globe}</svg>`;
 }
 function withoutEmoji(text) {
