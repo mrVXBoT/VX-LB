@@ -668,9 +668,31 @@ function poolIsBusy(pool) {
   return ['queued','running'].includes(pool.operation_task?.status) || ['queued','running'].includes(pool.creation_job?.status) || ['running','rollback_failed'].includes(pool.gre_update?.status) || ['queued','preflight','changing','validating','rolling_back','rollback_failed'].includes(pool.transport_change?.status) ||
     ['node_additions','node_removals'].some(key => Object.values(pool[key] || {}).some(j => ['queued','running'].includes(j.status)));
 }
+function deletionRecoveryMarkup(pool, job, kind) {
+  const node = kind === 'removal';
+  if (node && !(pool.nodes || []).some(member => member.ip === job.ip)) return '';
+  const attrs = `data-pool="${escapeHtml(pool.name)}" data-ip="${escapeHtml(job.ip || '')}"`;
+  const locked = (poolIsBusy(pool) || (cachedStatus?.pools || []).some(poolIsBusy)) ? 'disabled aria-disabled="true" title="عملیات دیگری در جریان است؛ تا پایان آن منتظر بمانید"' : '';
+  return `<div class="deletion-recovery" aria-label="روش‌های ادامهٔ حذف">
+    <div class="deletion-choice">
+      <button type="button" class="deletion-forget-btn" ${attrs} ${locked} onclick="${node ? 'removeNodeFromPool(this.dataset.pool,this.dataset.ip,this,true)' : 'forgetPool(this.dataset.pool)'}">${uiIcon('close')}<span>${node ? 'حذف از پنل بدون پاک‌سازی' : 'حذف استخر از پنل بدون پاک‌سازی'}</span></button>
+      <p>فقط از پنل حذف می‌شود؛ سرویس‌های سرور و DNS ممکن است باقی بمانند. در مرحلهٔ بعد تأیید می‌کنید.</p>
+    </div>
+    <div class="deletion-choice">
+      <button type="button" class="btn-secondary deletion-retry-btn" ${attrs} ${locked} onclick="${node ? 'removeNodeFromPool(this.dataset.pool,this.dataset.ip,this)' : 'deleteEntirePool(this.dataset.pool)'}">${node ? 'تلاش دوباره برای حذف نود' : 'تلاش دوباره برای حذف استخر'}</button>
+      <p>پس از رفع مشکل اتصال؛ پاک‌سازی سرویس‌ها دوباره انجام می‌شود.</p>
+    </div>
+  </div>`;
+}
 function operationMarkup(pool, job, kind) {
   const active = ['queued','running','preflight','changing','validating','rolling_back'].includes(job.status);
   const failed = ['failed','rollback_failed'].includes(job.status) || job.cleanup_pending === true;
+  const deletionFailed = job.status === 'failed' && (kind === 'removal' || (kind === 'task' && job.kind === 'delete'));
+  const rawError = withoutEmoji(job.error || job.message || '');
+  const hostKeyChanged = deletionFailed && /host key verification failed|server identity changed/i.test(`${job.message || ''} ${job.error || ''}`);
+  const message = hostKeyChanged
+    ? 'کلید هویت SSH سرور تغییر کرده است؛ پاک‌سازی متوقف شد. برای حذف همراه با پاک‌سازی، ابتدا هویت سرور و کلید جدید را بررسی کنید.'
+    : deletionFailed ? 'پاک‌سازی کامل نشد. برای ادامه یکی از روش‌های زیر را انتخاب کنید.' : job.message;
   const targetId = kind === 'transport' ? '' : (job.ip || '');
   const description = kind === 'task' ? `<span>${job.kind === 'delete' ? 'حذف سرویس‌ها و منابع استخر' : job.kind === 'slipstream_settings' ? 'تغییر دامنه، resolver یا QPS تونل DNS' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS و بررسی انتقال داده' : 'تغییر پورت‌های استخر'}</span>` : kind === 'creation' ? '<span>راه‌اندازی سرورها و تونل‌های استخر</span>' : kind === 'gre' ? '<span>تنظیمات لینک خصوصی و فوروارد پورت</span>' : kind === 'transport' ? `<span class="operation-route" dir="rtl">از <bdi dir="ltr">${escapeHtml(job.from)}</bdi> به <bdi dir="ltr">${escapeHtml(job.to)}</bdi><small style="color:var(--text-muted);font-size:10px;"> · ${faNumber.format(job.completed || 0)} از ${faNumber.format(job.total || 0)} نود</small></span>` : `<span class="op-ip-pill"><bdi dir="ltr">${escapeHtml(job.ip)}</bdi></span>`;
   const clearBtn = !active && job.status !== 'rollback_failed' ? `<button type="button" class="op-dismiss-btn" data-pool="${escapeHtml(pool.name)}" data-kind="${escapeHtml(kind)}" data-id="${escapeHtml(targetId)}" onclick="clearPoolOperation(this.dataset.pool, this.dataset.kind, this.dataset.id, this)" title="پاک کردن این پیام" aria-label="پاک کردن پیام">${uiIcon("close")}</button>` : '';
@@ -695,17 +717,17 @@ function operationMarkup(pool, job, kind) {
         <strong>${['slipstream_runtime','slipstream_settings'].includes(job.kind) ? 'به‌روزرسانی تنظیمات Slipstream' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS' : job.kind === 'delete' ? 'حذف استخر' : job.kind === 'relay_ports' ? 'به‌روزرسانی پورت‌های رله' : job.kind === 'waterwall_ports' ? 'به‌روزرسانی پورت‌های WaterWall' : job.kind === 'https_ports' ? 'به‌روزرسانی پورت‌های HTTPS' : operationLabels[kind] || 'عملیات'}</strong>
         <span class="status-badge ${failed ? 'filtered' : active ? 'canary' : 'healthy'}">${failed ? 'نیازمند بررسی' : active ? (job.status === 'queued' ? 'در صف اجرا' : 'در حال انجام') : job.status === 'rolled_back' ? 'بازگردانی شد' : 'پایان یافت'}</span>
       </div>
-      ${clearBtn}
+      ${deletionFailed ? '' : clearBtn}
     </div>
     <div class="op-desc-line">
       ${description}
-      ${job.message ? `<p class="op-msg">${escapeHtml(withoutEmoji(job.message || ''))}</p>` : ''}
+      ${message ? `<p class="op-msg">${escapeHtml(withoutEmoji(message))}</p>` : ''}
       ${stageBar}
     </div>
-    ${kind === 'removal' && job.status === 'failed' && (pool.nodes || []).some(n => n.ip === job.ip) ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" data-ip="${escapeHtml(job.ip)}" onclick="removeNodeFromPool(this.dataset.pool,this.dataset.ip,this)" ${poolIsBusy(pool) ? 'disabled' : ''}>تلاش دوباره برای حذف نود</button><details class="operation-advanced"><summary>گزینه‌های پیشرفته</summary><p>این روش سرویس‌های سرور را پاک نمی‌کند.</p><button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" data-ip="${escapeHtml(job.ip)}" onclick="removeNodeFromPool(this.dataset.pool,this.dataset.ip,this,true)" ${poolIsBusy(pool) ? 'disabled' : ''}>حذف از پنل بدون پاک‌سازی</button></details>` : ''}
-    ${kind === 'task' && job.kind === 'delete' && job.status === 'failed' ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="deleteEntirePool(this.dataset.pool)" ${poolIsBusy(pool) ? 'disabled' : ''}>تلاش دوباره برای حذف استخر</button><details class="operation-advanced"><summary>گزینه‌های پیشرفته</summary><p>این روش سرویس‌ها و DNS را پاک نمی‌کند.</p><button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" onclick="forgetPool(this.dataset.pool)" ${poolIsBusy(pool) ? 'disabled' : ''}>حذف استخر از پنل بدون پاک‌سازی</button></details>` : ''}
-    ${failed ? `<p class="operation-recovery-hint">${job.status === 'rollback_failed' ? 'بازگردانی کامل نشده است؛ نسخهٔ پشتیبان حفظ شده و تغییرات قفل‌اند.' : kind === 'creation' ? 'ساخت کامل نشده است؛ وضعیت نودهای ایجادشده را پیش از ساخت دوباره بررسی کنید.' : 'ابتدا دسترسی سرورها و جزئیات خطا را بررسی کنید؛ سپس دوباره تلاش کنید.'}</p>` : ''}
-    ${job.error ? `<details class="operation-error" data-detail-key="${escapeHtml(pool.name + ":" + kind + ":" + (job.id || job.ip || ""))}"><summary>جزئیات خطا</summary><pre dir="auto">${escapeHtml(withoutEmoji(job.error))}</pre></details>` : ''}
+    ${deletionFailed ? deletionRecoveryMarkup(pool, job, kind) : ''}
+    ${failed && !deletionFailed ? `<p class="operation-recovery-hint">${job.status === 'rollback_failed' ? 'بازگردانی کامل نشده است؛ نسخهٔ پشتیبان حفظ شده و تغییرات قفل‌اند.' : kind === 'creation' ? 'ساخت کامل نشده است؛ وضعیت نودهای ایجادشده را پیش از ساخت دوباره بررسی کنید.' : 'ابتدا دسترسی سرورها و جزئیات خطا را بررسی کنید؛ سپس دوباره تلاش کنید.'}</p>` : ''}
+    ${(deletionFailed ? rawError : job.error) ? `<details class="operation-error" data-detail-key="${escapeHtml(pool.name + ":" + kind + ":" + (job.id || job.ip || ""))}"><summary>جزئیات خطا</summary><pre dir="auto">${escapeHtml(deletionFailed ? rawError : withoutEmoji(job.error))}</pre></details>` : ''}
+    ${deletionFailed ? `<button type="button" class="op-dismiss-text" data-pool="${escapeHtml(pool.name)}" data-kind="${escapeHtml(kind)}" data-id="${escapeHtml(targetId)}" onclick="clearPoolOperation(this.dataset.pool,this.dataset.kind,this.dataset.id,this)">فقط بستن پیام خطا</button>` : ''}
     ${job.status === 'rollback_failed' && kind === 'gre' ? `<button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="recoverGreSettings(this.dataset.pool,this)">بازگردانی تنظیمات ${job.kind === 'slipstream_runtime' ? 'Slipstream' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS' : job.kind === 'relay_ports' ? 'پورت‌ها' : 'GRE'}</button>` : ''}${job.status === 'rollback_failed' && kind !== 'gre' ? `<div class="operation-actions"><button type="button" class="btn-secondary sm" data-pool="${escapeHtml(pool.name)}" onclick="retryTransportRollback(this.dataset.pool,this)">تلاش دوباره برای بازگردانی</button><button type="button" class="btn-danger sm" data-pool="${escapeHtml(pool.name)}" onclick="abandonTransportChange(this.dataset.pool,this)">رها کردن عملیات شکست‌خورده</button></div>` : ''}
   </div>`;
 }

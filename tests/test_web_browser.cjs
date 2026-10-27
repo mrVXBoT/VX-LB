@@ -24,8 +24,14 @@ let browser;
   };
  });
  let deleteRequests=0;
+ const nodeRemovalRequests=[];
  await page.route('**/*',async route=>{
   const url=new URL(route.request().url());
+  if(url.pathname==='/api/pools/remove_node') {
+   const body=route.request().postDataJSON();nodeRemovalRequests.push(body);
+   if(body.forget) {state.pools[0].nodes=state.pools[0].nodes.filter(n=>n.ip!==body.iran_ip);state.pools[0].node_removals[body.iran_ip]={ip:body.iran_ip,status:'succeeded',cleanup_pending:true,message:'نود از پنل حذف شد؛ پاک‌سازی تأیید نشده است'};}
+   return route.fulfill({contentType:'application/json',body:JSON.stringify({success:true,accepted:true})});
+  }
   if(url.pathname==='/api/pools/delete') {deleteRequests++;return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({success:false,error:'سرور در دسترس نیست؛ دوباره تلاش کنید'})});}
   if(url.pathname.startsWith('/api/')) return route.fulfill({contentType:'application/json',body:JSON.stringify(url.pathname==='/api/status'?state:url.pathname==='/api/servers'?{iran:[],kharej:[]}:{success:true,logs:[]})});
   const filename=path.join(path.join(root, 'web'),url.pathname==='/'?'index.html':url.pathname.replace(/^\//,''));
@@ -59,7 +65,9 @@ let browser;
  assert.equal(await page.evaluate(()=>window.unchangedCard===document.querySelectorAll('.pool-card')[1]),true);
  const failure=page.locator('.pool-card').nth(1).locator('.operation-item');
  assert.equal(await failure.getAttribute('role'),'alert');
- assert.equal(await failure.locator('.operation-advanced').getAttribute('open'),null);
+ assert.equal(await failure.locator('.operation-advanced').count(),0);
+ assert.ok(await failure.getByRole('button',{name:'حذف استخر از پنل بدون پاک‌سازی',exact:true}).isVisible());
+ assert.ok(await failure.locator('.deletion-forget-btn').isDisabled());
  assert.ok(await failure.getByRole('button',{name:'تلاش دوباره برای حذف استخر',exact:true}).isVisible());
  state.pools[0].creation_job.status='succeeded';
  state.pools[0].creation_job.message='ساخت استخر پایان یافت';
@@ -86,6 +94,40 @@ let browser;
  state.pools[0].creation_job.message='وضعیت از بررسی جایگزین دریافت شد';
  await page.evaluate(()=>{window.eventStreams.at(-1).onerror();lastStatusPoll=0;});
  await page.waitForFunction(()=>document.querySelector('.op-msg')?.textContent.includes('بررسی جایگزین'),{},{timeout:5000});
+ // Reproduce a changed SSH host key: both choices must be visible without expanding anything.
+ state.pools[0].creation_job.status='succeeded';
+ state.pools[0].node_removals={[nodes[0].ip]:{id:'remove-host-key',ip:nodes[0].ip,status:'failed',message:'Failed to connect to Iran server (Host key verification failed: server identity changed); cleanup aborted. Use force=True to remove anyway'}};
+ await page.evaluate(()=>window.eventStreams.at(-1).emit('change'));
+ await page.waitForFunction(()=>document.querySelector('.op-msg')?.textContent.includes('کلید هویت SSH'));
+ const removal=first.locator('.pool-live-operations > .operation-item.is-failed');
+ const forget=removal.getByRole('button',{name:'حذف از پنل بدون پاک‌سازی',exact:true});
+ assert.ok(await forget.isVisible());
+ assert.ok(await forget.isEnabled());
+ assert.equal(await removal.locator('.operation-advanced').count(),0);
+ assert.equal(await removal.locator('.operation-error pre').isVisible(),false);
+ assert.ok(await removal.getByRole('button',{name:'فقط بستن پیام خطا',exact:true}).isVisible());
+ for (const width of [390,1440]) {
+  await page.setViewportSize({width,height:width<768?844:1000});
+  const box=await forget.boundingBox();assert.ok(box.height>=48);
+  await removal.screenshot({path:path.join(screenshots,`delete-recovery-${width}.png`)});
+  await page.evaluate(()=>document.documentElement.dataset.theme='dark');
+  await removal.screenshot({path:path.join(screenshots,`delete-recovery-dark-${width}.png`)});
+  await page.evaluate(()=>document.documentElement.dataset.theme='light');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width);
+ }
+ await forget.click();
+ await page.locator('#confirm-modal').waitFor({state:'visible'});
+ assert.match(await page.locator('#confirm-modal-message').textContent(),/سرویس‌ها.*DNS/);
+ assert.equal(nodeRemovalRequests.length,0);
+ await page.locator('#confirm-modal-cancel').click();
+ assert.equal(nodeRemovalRequests.length,0);
+ await forget.click();
+ await page.locator('#confirm-modal-ok').click();
+ await page.waitForFunction(()=>!document.querySelector('.op-msg')?.textContent.includes('کلید هویت SSH'));
+ assert.equal(nodeRemovalRequests.length,1);
+ assert.equal(nodeRemovalRequests[0].forget,true);
+ assert.equal(nodeRemovalRequests[0].iran_ip,nodes[0].ip);
+ assert.equal(Object.hasOwn(nodeRemovalRequests[0],'force'),false);
  // A hidden busy pool must still lock mutations in a filtered visible pool.
  await page.evaluate(()=>{
   poolSearch='edge-fallback';
@@ -103,6 +145,6 @@ let browser;
   await page.locator('#create-pool-modal').waitFor({state:'hidden'});
  }
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({measurements,errors,checks:['live updates','completion while focused','preserved details and focus','unchanged card reuse','safe retry','confirmation cancel','inline HTTP errors','deleted-pool completion','stream fallback','global mutation lock']}));
+ console.log(JSON.stringify({measurements,errors,checks:['live updates','completion while focused','preserved details and focus','unchanged card reuse','visible deletion choices','host-key recovery copy','confirmed inventory-only removal','safe retry','confirmation cancel','inline HTTP errors','deleted-pool completion','stream fallback','global mutation lock']}));
  await browser.close();
 })().catch(async error=>{console.error(error);process.exitCode=1;if(browser) await browser.close();});
