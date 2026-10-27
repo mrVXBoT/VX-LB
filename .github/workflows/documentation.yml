@@ -1,0 +1,32 @@
+name: Persian documentation references
+
+on:
+  pull_request:
+    paths: ['README.md', 'docs/wiki/**', 'scripts/generate_wiki_reference.py', 'scripts/publish_wiki.py', 'core/capabilities.py', 'core/transports_13.py', 'core/*engine.py', 'core/waterwall_modes.py', 'web/app.js', 'web/index.html', '.github/workflows/documentation.yml']
+  push:
+    branches: [main, 'codex/**']
+    paths: ['README.md', 'docs/wiki/**', 'scripts/generate_wiki_reference.py', 'scripts/publish_wiki.py', 'core/capabilities.py', 'core/transports_13.py', 'core/*engine.py', 'core/waterwall_modes.py', 'web/app.js', 'web/index.html', '.github/workflows/documentation.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  references:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify source coverage and generated references
+        run: python scripts/generate_wiki_reference.py --check
+      - name: Check portable Wiki links and render publication bundle
+        run: python scripts/publish_wiki.py --output wiki-pages
+      - uses: actions/upload-artifact@v4
+        with:
+          name: persian-wiki-pages
+          path: wiki-pages
