@@ -2,8 +2,7 @@
 
 Pool creation, tunnel changes, pool deletion and node deletion now keep progress
 near the top of each pool card. Secondary connection/monitoring information and
-advanced management controls are collapsed; failures stay visible with a normal
-retry path before inventory-only deletion.
+advanced management controls are collapsed; failures stay visible with clearly labeled retry and inventory-only deletion actions.
 
 ## Performance and live behavior
 
@@ -36,8 +35,7 @@ resources for retry, reject stale node-removal jobs, and never replay removal af
 an internal TypeError. Inventory credentials are redacted from public job errors.
 
 A deleted pool's terminal task remains visible in a compact dismissible notice
-(up to five recent tasks). Failed deletion exposes retry and error details;
-forgetting resources without cleanup is in an explicit advanced section.
+(up to five recent tasks). Failed deletion shows inventory-only deletion and retry directly, with a description of each outcome. Neither action is hidden behind a disclosure. Changed SSH host keys receive a Persian explanation, while raw technical details are collapsible. Closing an error uses a labeled text button so it cannot be mistaken for deleting the resource. Inventory-only deletion still requires explicit confirmation.
 Confirmation cancellation, including Escape/backdrop/close, resolves the pending
 confirmation so a subsequent retry can proceed. Pool filtering cannot hide the
 global mutation lock.
