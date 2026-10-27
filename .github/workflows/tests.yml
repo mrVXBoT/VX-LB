@@ -39,9 +39,15 @@ jobs:
         if: always()
         run: node --check web/app.js && node --test tests/test_web_client.cjs
       - name: Install browser test dependencies
+        timeout-minutes: 4
         run: |
           npm install --prefix /tmp/vxlb-browser --no-save playwright@1.58.2
-          /tmp/vxlb-browser/node_modules/.bin/playwright install --with-deps chromium
+          vxlb_browser_path="$(command -v google-chrome || command -v chromium || true)"
+          if [ -n "$vxlb_browser_path" ]; then
+            echo "CHROMIUM_PATH=$vxlb_browser_path" >> "$GITHUB_ENV"
+          else
+            /tmp/vxlb-browser/node_modules/.bin/playwright install --with-deps chromium
+          fi
       - name: Verify mobile and desktop interactions
         env:
           NODE_PATH: /tmp/vxlb-browser/node_modules
