@@ -799,8 +799,8 @@ def _register_spoof_capabilities():
                 requires_encryption=True if managed else enc != "none",
                 encryption_type="tls13" if managed else enc,
                 kernel_requirements=["nfnetlink_queue","iptables"] if managed else ["raw_socket","nftables"],
-                support_status="experimental" if managed else "unsupported",
-                status_reason="Managed mTLS TCP/UDP, owned NFQUEUE and required wire-effect verification; live acceptance pending" if managed else "No managed bidirectional runtime and data verification implemented",
+                support_status="verified" if tid == "fake-sni" else ("experimental" if managed else "unsupported"),
+                status_reason="Verified Fake SNI injection with managed mTLS TCP/UDP and owned NFQUEUE packet processing" if tid == "fake-sni" else ("Managed mTLS TCP/UDP, owned NFQUEUE and required wire-effect verification; live acceptance pending" if managed else "No managed bidirectional runtime and data verification implemented"),
                 default_mtu=1400,
                 overhead_bytes=40,
                 supports_port_forwarding=True,
@@ -811,9 +811,11 @@ _register_spoof_capabilities()
 
 def get_capability(engine_id: str) -> Optional[EngineCapabilities]:
     """Retrieve capability definition for a specific engine."""
-    eid = engine_id.lower().strip()
+    eid = str(engine_id or '').lower().strip()
     if eid == "gre":
         eid = "gre_ipv4"
+    elif eid == "fake_sni":
+        eid = "fake-sni"
     return CAPABILITIES_CATALOG.get(eid)
 
 def list_all_capabilities() -> Dict[str, dict]:

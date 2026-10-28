@@ -2769,7 +2769,7 @@ const ENGINE_TRANSPORTS = {
   spoof: {
     label: "پروفایل‌های پردازش بسته (آزمایشی)",
     transports: [
-      { value: "fake-sni", label: "Fake SNI + MD5/BadSum (آزمایشی)", hint: "تزریق ClientHello با SNI انتخابی و بررسی بستهٔ واقعی در کنار آزمون TCP/UDP" },
+      { value: "fake-sni", label: "Fake SNI + MD5/BadSum (پایدار)", hint: "تزریق ClientHello با SNI انتخابی و بررسی بستهٔ واقعی در کنار آزمون TCP/UDP" },
       { value: "split-tls", label: "TLS Record + TCP Disorder (آزمایشی)", hint: "تقسیم رکورد ClientHello و ارسال معکوس قطعات TCP روی مسیر mTLS" },
       { value: "hop-ttl-injection", label: "TTL محدود با برآورد هاپ (آزمایشی)", hint: "تزریق ClientHello با TTL برآوردشده و محدود؛ مقدار جایگزین و BadSum حفظ می‌شوند" },
       { value: "tcp-state-desync", label: "RST + OOB (آزمایشی)", hint: "تزریق RST نامعتبر و دادهٔ خارج از باند؛ پذیرش فقط پس از مشاهدهٔ تغییر و عبور داده" },

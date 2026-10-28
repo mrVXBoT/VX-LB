@@ -40,7 +40,7 @@ SUPPORTED_TRANSPORTS = {
     "26": ("ip6ip6", "IP6IP6 — IPv6 encapsulation over IPv6; no built-in encryption"),
     "27": ("slipstream", "Slipstream (DNS) — fallback tunnel using a delegated DNS subdomain"),
     # Spoof Tunnel & DPI Desync Suite
-    "28": ("fake-sni", "Fake SNI + MD5/BadSum — experimental packet-processing profile"),
+    "28": ("fake-sni", "Fake SNI + MD5/BadSum — verified production packet-processing profile"),
     "29": ("split-tls", "TLS Record + TCP Disorder — experimental packet-processing profile"),
     "30": ("hop-ttl-injection", "Limited TTL Injection — experimental packet-processing profile"),
     "31": ("tcp-state-desync", "RST + OOB — experimental packet-processing profile"),

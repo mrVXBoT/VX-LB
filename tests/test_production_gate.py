@@ -29,14 +29,62 @@ class TestProductionReadinessGate(unittest.TestCase):
 
     def test_verified_engine_approved_directly(self):
         # Engines that completed production verification
-        for eng in ["backpack", "gre_ipv4"]:
+        for eng in ["backpack", "gre_ipv4", "fake-sni"]:
             ok, msg = validate_production_readiness(eng, is_production=True)
             self.assertTrue(ok, f"Verified engine {eng} failed production validation: {msg}")
             self.assertIn("verified", msg.lower())
 
+    def test_fake_sni_approved_in_production(self):
+        # fake-sni is promoted to verified; approved in production without requiring allow_experimental=True
+        ok_prod, msg_prod = validate_production_readiness("fake-sni", is_production=True, allow_experimental=False)
+        self.assertTrue(ok_prod, f"fake-sni must be approved in production without override: {msg_prod}")
+        self.assertIn("verified", msg_prod.lower())
+
+        ok_prod_default, msg_prod_default = validate_production_readiness("fake-sni", is_production=True)
+        self.assertTrue(ok_prod_default, f"fake-sni must be approved in production by default: {msg_prod_default}")
+        self.assertIn("verified", msg_prod_default.lower())
+
+        ok_dev, msg_dev = validate_production_readiness("fake-sni", is_production=False)
+        self.assertTrue(ok_dev, f"fake-sni must be approved in development: {msg_dev}")
+        self.assertIn("verified", msg_dev.lower())
+
+        # Whitespace and case tolerance
+        ok_case, _ = validate_production_readiness("  FAKE-SNI  ", is_production=True)
+        self.assertTrue(ok_case, "fake-sni should be resolved case-insensitively with trimmed whitespace")
+
+        # Underscore alias tolerance
+        ok_alias, msg_alias = validate_production_readiness("fake_sni", is_production=True)
+        self.assertTrue(ok_alias, f"fake_sni alias should resolve to fake-sni: {msg_alias}")
+        self.assertIn("verified", msg_alias.lower())
+
+        cap = get_capability("fake-sni")
+        self.assertIsNotNone(cap)
+        self.assertEqual(cap.support_status, "verified")
+        self.assertTrue(cap.requires_encryption)
+        self.assertEqual(cap.encryption_type, "tls13")
+        self.assertEqual(cap.kernel_requirements, ["nfnetlink_queue", "iptables"])
+        self.assertIn("verified", cap.status_reason.lower())
+
+        # Capability resolution via underscore alias
+        cap_alias = get_capability("fake_sni")
+        self.assertEqual(cap, cap_alias)
+
+        rep = get_engine_production_gate_report("fake-sni")
+        self.assertTrue(rep["found"])
+        self.assertEqual(rep["support_status"], "verified")
+        self.assertTrue(rep["production_ready"])
+        self.assertEqual(rep["disclaimers"], [])
+
+        self.assertTrue(is_engine_supported("fake-sni"))
+
+        # Contrast with sibling spoof engine that remains experimental
+        ok_sibling_prod, msg_sibling_prod = validate_production_readiness("split-tls", is_production=True, allow_experimental=False)
+        self.assertFalse(ok_sibling_prod, "Sibling spoof engine split-tls must still be blocked in production")
+        self.assertIn("allow_experimental=True", msg_sibling_prod)
+
     def test_experimental_engine_gating(self):
         # Experimental engines: permitted in dev/lab, blocked in prod unless allow_experimental=True
-        for exp_eng in ["waterwall", "wireguard", "sit", "6to4_unicast", "geneve"]:
+        for exp_eng in ["waterwall", "wireguard", "sit", "6to4_unicast", "geneve", "split-tls", "hop-ttl-injection"]:
             # In non-production (dev / staging / lab) -> Allowed
             ok_lab, msg_lab = validate_production_readiness(exp_eng, is_production=False)
             self.assertTrue(ok_lab, f"Experimental engine {exp_eng} should be permitted in non-production")
@@ -57,6 +105,15 @@ class TestProductionReadinessGate(unittest.TestCase):
         ok, msg = validate_production_readiness("non_existent_engine_xyz")
         self.assertFalse(ok)
         self.assertIn("Unknown", msg)
+
+        # None and empty inputs should reject gracefully without unhandled exception
+        ok_none, msg_none = validate_production_readiness(None)
+        self.assertFalse(ok_none)
+        self.assertIn("Unknown", msg_none)
+
+        ok_empty, msg_empty = validate_production_readiness("")
+        self.assertFalse(ok_empty)
+        self.assertIn("Unknown", msg_empty)
 
     def test_engine_production_gate_report(self):
         rep_bp = get_engine_production_gate_report("backpack")

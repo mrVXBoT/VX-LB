@@ -1,6 +1,6 @@
 # پروفایل‌های پردازش بسته
 
-پنج گزینهٔ مدیریت‌شده زیر آزمایشی‌اند. پذیرش ساخت به عبور TCP/UDP، مالکیت قواعد صف و مشاهدهٔ تغییر واقعی بسته وابسته است. موفقیت محلی یک codec یا صرف وجود nfqws2، مدرک عبور موفق در شبکهٔ کاربر نیست.
+پروفایل Fake SNI تأییدشده و آمادهٔ استفاده در محیط عملیاتی است؛ سایر گزینه‌های مدیریت‌شده آزمایشی‌اند. پذیرش ساخت به عبور TCP/UDP، مالکیت قواعد صف و مشاهدهٔ تغییر واقعی بسته وابسته است. موفقیت محلی یک codec یا صرف وجود nfqws2، مدرک عبور موفق در شبکهٔ کاربر نیست.
 
 **تنظیمات مرتبط:** دامنهٔ SNI جعلی برای حالت‌های وابسته و TTL delta از 1 تا 15 (پیش‌فرض 3) برای Auto-TTL. کتابخانهٔ pinned nfqws2، NFQUEUE/iptables و مجوز اعمال قواعد لازم‌اند. حامل داده با احراز هویت TLS/mTLS از مکانیزم تغییر بسته جداست. دامنهٔ جعلی، مالکیت یا همکاری آن سایت را ایجاد نمی‌کند.
 
@@ -12,15 +12,35 @@
 
 نام‌های زیر عین گزینه‌های کد هستند. شناسهٔ transport، mode و profile در صورت تفاوت جدا نوشته شده‌اند.
 
-## Fake SNI + MD5/BadSum (آزمایشی)
+## Fake SNI + MD5/BadSum (پایدار)
 
 <!-- profile:spoof:fake-sni:default -->
 
-شناسهٔ انتقال: `fake-sni`.
+شناسهٔ انتقال: `fake-sni`. وضعیت: **تأییدشده در محیط تولید (Verified / Production-Ready)**.
 
 تزریق ClientHello با SNI انتخابی و بررسی بستهٔ واقعی در کنار آزمون TCP/UDP
 
-ClientHello جعلی با SNI و کنترل MD5/BadSum؛ نتیجه فقط با شاهد بسته و عبور داده پذیرفته می‌شود.
+ClientHello جعلی با SNI و کنترل MD5/BadSum؛ پروفایل تأییدشده برای محیط تولید بدون نیاز به allow_experimental؛ نتیجه با شاهد بسته و عبور داده پذیرفته می‌شود.
+
+### نحوهٔ آزمون و اعتبارسنجی (Testing & Verification Instructions)
+
+برای اعتبارسنجی ارتقای `fake-sni` به وضعیت پایدار و تأییدشده در محیط تولید، مراحل زیر را اجرا کنید:
+
+1. **اجرای آزمون‌های درگاه تولید (Production Gate Tests):**
+   اجرای تست‌های واحد برای اطمینان از عبور `fake-sni` در محیط تولید بدون نیاز به فلگ `allow_experimental`:
+   ```bash
+   pytest tests/test_production_gate.py -v
+   ```
+2. **بررسی رجیستری قابلیت‌ها از طریق پایتون (Capabilities Verification):**
+   ```python
+   from core.capabilities import get_capability, validate_production_readiness
+   cap = get_capability("fake-sni")
+   assert cap.support_status == "verified"
+   ok, msg = validate_production_readiness("fake-sni", is_production=True, allow_experimental=False)
+   assert ok is True
+   ```
+3. **بررسی برچسب در پنل کاربری وب (Web UI Verification):**
+   در فایل `web/app.js` زیر شاخهٔ `ENGINE_TRANSPORTS.spoof`، برچسب انتقال `fake-sni` باید برابر `"Fake SNI + MD5/BadSum (پایدار)"` باشد.
 
 ## TLS Record + TCP Disorder (آزمایشی)
 

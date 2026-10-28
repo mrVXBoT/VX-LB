@@ -450,11 +450,11 @@ HTTPS CONNECT با TLS/mTLS؛ به معنی XHTTP یا HTTP/3 نیست
 
 تزریق ClientHello جعلی با کنترل و شاهد بسته
 
-- وضعیت: **آزمایشی**؛ مسیر راهنما: [Packet-Profiles](Packet-Profiles.md).
+- وضعیت: **تأییدشده در رجیستری**؛ مسیر راهنما: [Packet-Profiles](Packet-Profiles.md).
 - لایه: `L7`؛ پروتکل‌های ثبت‌شده: `tcp, udp`؛ خانواده آدرس: `ipv4`.
 - رمزنگاری رجیستری: `tls13`؛ ماژول/نیازمندی: `nfnetlink_queue, iptables`.
 - MTU پیش‌فرض رجیستری: `1400`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1, N:1`.
-- دلیل وضعیت در منبع: Managed mTLS TCP/UDP, owned NFQUEUE and required wire-effect verification; live acceptance pending
+- دلیل وضعیت در منبع: Verified Fake SNI injection with managed mTLS TCP/UDP and owned NFQUEUE packet processing
 
 ## `split-tls` — TLS Record & TCP MultiSplit
 

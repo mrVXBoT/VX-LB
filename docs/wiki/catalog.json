@@ -294,7 +294,7 @@
       "transports": [
         {
           "value": "fake-sni",
-          "label": "Fake SNI + MD5/BadSum (آزمایشی)",
+          "label": "Fake SNI + MD5/BadSum (پایدار)",
           "hint": "تزریق ClientHello با SNI انتخابی و بررسی بستهٔ واقعی در کنار آزمون TCP/UDP"
         },
         {

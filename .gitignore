@@ -56,3 +56,4 @@ reference_repos/
 
 # Installer UI development dependencies
 node_modules/
+.agents/
