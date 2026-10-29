@@ -809,6 +809,54 @@ def _register_spoof_capabilities():
 
 _register_spoof_capabilities()
 
+def _register_candy_spoof_capabilities():
+    if "candy-spoof" not in CAPABILITIES_CATALOG:
+        CAPABILITIES_CATALOG["candy-spoof"] = EngineCapabilities(
+            engine_id="candy-spoof",
+            display_name="Candy-Spoof",
+            description="Candy-Spoof (تونل جعل دوطرفه آدرس مبدا — Rust؛ SOCKS5 + کانال ICMP/UDP با احراز هویت PSK)",
+            supported_protocols=["tcp", "udp"],
+            address_families=["ipv4"],
+            layer="L3",
+            directionality="bidirectional",
+            supported_topologies=["1:1"],
+            requires_encryption=False,
+            encryption_type="psk",
+            kernel_requirements=["raw_socket", "cap_net_raw"],
+            support_status="experimental",
+            status_reason="Bidirectional source-IP spoofing tunnel with ARQ/AIMD and PSK authentication; live acceptance pending",
+            default_mtu=1380,
+            overhead_bytes=40,
+            supports_port_forwarding=True,
+            supports_raw_link=True,
+        )
+
+_register_candy_spoof_capabilities()
+
+def _register_parsaksh_capabilities():
+    if "parsaksh" not in CAPABILITIES_CATALOG:
+        CAPABILITIES_CATALOG["parsaksh"] = EngineCapabilities(
+            engine_id="parsaksh",
+            display_name="ParsaKSH Spoof Tunnel",
+            description="ParsaKSH Spoof Tunnel (جعل دوطرفه IP — لایه ۳/۴؛ UDP-pipe با ترنسپورت‌های ICMP/ICMPv6/UDP/TCP-SYN و XDP/eBPF)",
+            supported_protocols=["udp", "tcp", "icmp"],
+            address_families=["ipv4", "ipv6"],
+            layer="L3",
+            directionality="bidirectional",
+            supported_topologies=["1:1"],
+            requires_encryption=False,
+            encryption_type="none",
+            kernel_requirements=["raw_socket", "cap_net_raw"],
+            support_status="experimental",
+            status_reason="Mutual IP-spoofing UDP-pipe; requires spoof-capable path and per-direction real validation; live acceptance pending",
+            default_mtu=1400,
+            overhead_bytes=40,
+            supports_port_forwarding=True,
+            supports_raw_link=True,
+        )
+
+_register_parsaksh_capabilities()
+
 def get_capability(engine_id: str) -> Optional[EngineCapabilities]:
     """Retrieve capability definition for a specific engine."""
     eid = str(engine_id or '').lower().strip()

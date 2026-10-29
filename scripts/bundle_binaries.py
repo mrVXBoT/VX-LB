@@ -95,6 +95,34 @@ TARGETS = [
         "sha256": "f6db279a57a772a250efffe4bb0a79b112495331568ccc0f6e5f4398bbe962e3",
         "dest": "paqet",
     },
+    {
+        "name": "candy-spoof-client",
+        "arch": "x86_64",
+        "url": "https://github.com/AmiRCandy/Candy-Spoof/releases/download/nightly-20260402-143253/candy-spoof-client-linux-x86_64",
+        "sha256": "2aff9805f3825cdeb0e6d6860640256229a179c461d0b49b45edc38a11c1cbaf",
+        "dest": "candy-spoof-client",
+    },
+    {
+        "name": "candy-spoof-server",
+        "arch": "x86_64",
+        "url": "https://github.com/AmiRCandy/Candy-Spoof/releases/download/nightly-20260402-143253/candy-spoof-server-linux-x86_64",
+        "sha256": "269a04b768905491c9bae0b8f20ff5412fa99a0897bafe1a874d312448a996ef",
+        "dest": "candy-spoof-server",
+    },
+    {
+        "name": "parsaksh-spoof",
+        "arch": "x86_64",
+        "url": "https://github.com/ParsaKSH/spoof-tunnel/releases/download/v3.0.2/spoof-linux-amd64",
+        "sha256": "a8dfe9e838ad5655b467765eae6f374e5f63af31bf2dded9aab295815fbcabf8",
+        "dest": "spoof",
+    },
+    {
+        "name": "parsaksh-spoof",
+        "arch": "aarch64",
+        "url": "https://github.com/ParsaKSH/spoof-tunnel/releases/download/v3.0.2/spoof-linux-arm64",
+        "sha256": "caf08b3960d4eea72910fb0613a8893560a41f5b2f2e18f9a6c595c9ad7ea16c",
+        "dest": "spoof",
+    },
 ]
 
 def sha256_file(stream):

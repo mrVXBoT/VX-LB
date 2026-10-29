@@ -534,6 +534,39 @@ def create_pool_flow():
                 settings['pkcs12_password'] = Prompt.ask("PKCS#12 password", default='')
                 settings['trusted_root'] = Prompt.ask("Client trusted_root CA path (on Kharej)", default='/etc/rathole/rootCA.crt')
         gre_options = {'camouflage': settings}
+    elif selected_transport == 'candy-spoof':
+        import secrets as _secrets_candy
+        console.print("[bold cyan]Candy-Spoof settings:[/bold cyan]")
+        settings = {
+            'data_port': Prompt.ask("Data channel UDP port (shared)", default='51820'),
+            'icmp_id': Prompt.ask("ICMP echo identifier (0-65535; shared)", default=str(_secrets_candy.randbelow(65536))),
+            'pre_shared_key': Prompt.ask("Pre-shared key (min 16 chars)", default=_secrets_candy.token_hex(24)),
+            'client_spoofed_ip': Prompt.ask("Client spoofed source IP (Iran edge)", default='8.8.4.4'),
+            'server_spoofed_ip': Prompt.ask("Server spoofed source IP (Kharej egress)", default='1.2.3.4'),
+            'tunnel_count': Prompt.ask("Parallel tunnels (1-32)", default='4'),
+            'mtu': Prompt.ask("MTU (576-9000)", default='1380'),
+            'interface': Prompt.ask("Network interface (empty = auto-detect)", default=''),
+        }
+        settings['interface'] = settings['interface'].strip()
+        gre_options = {'camouflage': settings}
+    elif selected_transport == 'parsaksh':
+        from core.parsaksh_transport import TRANSPORTS, _TRANSPORT_HINTS
+        console.print("[bold cyan]ParsaKSH transport (پروتکل تونل):[/bold cyan]")
+        tr_choices = {str(i): t for i, t in enumerate(TRANSPORTS, 1)}
+        for i, t in tr_choices.items():
+            console.print(f"  [{i}] {t} — {_TRANSPORT_HINTS[t]}")
+        trchoice = Prompt.ask("Select transport", choices=list(tr_choices), default="1")
+        settings = {
+            'transport': tr_choices[trchoice],
+            'data_port': Prompt.ask("Tunnel UDP port (server listen, shared)", default='8090'),
+            'recv_port': Prompt.ask("Client receive UDP port (shared)", default='5001'),
+            'spoof_port': Prompt.ask("Spoofed source port", default='443'),
+            'spoof_ip': Prompt.ask("Client spoofed source IP (Iran)", default='8.8.4.4'),
+            'server_spoof_ip': Prompt.ask("Server spoofed source IP (Kharej)", default='1.2.3.4'),
+            'forward_target': Prompt.ask("Server forward endpoint host:port (empty = auto)", default=''),
+        }
+        settings['forward_target'] = settings['forward_target'].strip() or 'auto'
+        gre_options = {'camouflage': settings}
     elif selected_transport == 'paqet':
         import secrets as _secrets_paqet
         from core.paqet_engine import KCP_MODES

@@ -54,6 +54,8 @@ SUPPORTED_TRANSPORTS = {
     "39": ("qs-dns-hybrid", "QS-Tunnel Hybrid — unavailable in this release"),
     "40": ("hyperion-x", "HYPERION-X — unavailable in this release"),
     "41": ("vxlan_ipsec", "VXLAN + IPsec — Layer 2 overlay protected by authenticated IPsec ESP"),
+    "46": ("candy-spoof", "Candy-Spoof — bidirectional IP-spoofing tunnel (Rust, SOCKS5 + ICMP/UDP, PSK)"),
+    "47": ("parsaksh", "ParsaKSH Spoof Tunnel — mutual IP-spoofing UDP-pipe (Go/Rust, ICMP/UDP/TCP-SYN, XDP)"),
 }
 
 NON_BACKPACK_TRANSPORTS = {
@@ -62,7 +64,8 @@ NON_BACKPACK_TRANSPORTS = {
     "tun", "dc6", "http", "https",
     "fake-sni", "split-tls", "hop-ttl-injection", "tcp-state-desync",
     "l3-ip-spoof", "l7-header-mutation", "udp-raw-spoof", "dns-spoof", "spoof",
-    "spoof-tcp-syn", "spoof-udp-raw", "spoof-icmp", "qs-dns-hybrid", "hyperion-x"
+    "spoof-tcp-syn", "spoof-udp-raw", "spoof-icmp", "qs-dns-hybrid", "hyperion-x",
+    "candy-spoof", "parsaksh"
 }
 
 def generate_token(length: int = 64) -> str:

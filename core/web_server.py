@@ -362,6 +362,8 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                         "status_note": n.get("status_note") or p_val.get("status_note") if n.get("engine") == "wireguard" else None,
                         "waterwall": {"uuid_tcp": n.get("waterwall", {}).get("uuid_tcp"), "outer_port": n.get("waterwall", {}).get("outer_port"), "server_name": n.get("waterwall", {}).get("profile", {}).get("server_name") or n.get("waterwall", {}).get("server_name"), "profile": n.get("waterwall", {}).get("profile")} if n.get("engine") == "waterwall" else None,
                         "rathole": {"transport": n.get("rathole", {}).get("transport") or p_val.get("rathole_transport") or (p_val.get("camouflage") or {}).get("transport", "tcp"), "proto": n.get("rathole", {}).get("proto") or (p_val.get("camouflage") or {}).get("proto", "tcp"), "port": n.get("rathole", {}).get("port") or n.get("tunnel_port") or (p_val.get("camouflage") or {}).get("port", 2333)} if (n.get("engine") == "rathole" or p_val.get("engine") == "rathole" or p_val.get("transport") == "rathole") else None,
+                        "candy": {"data_port": n.get("candy", {}).get("data_port") or (p_val.get("camouflage") or {}).get("data_port", 51820), "icmp_id": n.get("candy", {}).get("icmp_id") or (p_val.get("camouflage") or {}).get("icmp_id", 0x4321), "socks5_port": n.get("candy", {}).get("socks5_port") or (p_val.get("camouflage") or {}).get("socks5_port", 1080), "client_spoofed_ip": n.get("candy", {}).get("client_spoofed_ip") or (p_val.get("camouflage") or {}).get("client_spoofed_ip", "8.8.4.4"), "server_spoofed_ip": n.get("candy", {}).get("server_spoofed_ip") or (p_val.get("camouflage") or {}).get("server_spoofed_ip", "1.2.3.4")} if (n.get("engine") == "candy-spoof" or p_val.get("engine") == "candy-spoof" or p_val.get("transport") == "candy-spoof") else None,
+                        "parsaksh": {"data_port": n.get("parsaksh", {}).get("data_port") or (p_val.get("camouflage") or {}).get("data_port", 8090), "transport": n.get("parsaksh", {}).get("transport") or (p_val.get("camouflage") or {}).get("transport", "udp"), "forward_target": n.get("parsaksh", {}).get("forward_target") or (p_val.get("camouflage") or {}).get("forward_target", ""), "client_udp_port": n.get("parsaksh", {}).get("client_udp_port") or (p_val.get("camouflage") or {}).get("client_udp_port", 51820)} if (n.get("engine") == "parsaksh" or p_val.get("engine") == "parsaksh" or p_val.get("transport") == "parsaksh") else None,
                         "transport": n.get("transport", p_val.get("transport", "tcp")),
                         "status": "PROVISIONING" if n.get("creation_pending") else "DOWN" if n.get("provisioning") else telem.get("status", "IDLE"),
                         "reason": p_val.get("creation_job", {}).get("message", "در انتظار راه‌اندازی") if n.get("creation_pending") else "راه‌اندازی نود کامل نشده؛ منابع آن را بررسی یا پاک‌سازی کنید" if n.get("provisioning") else telem.get("reason", "Awaiting checks"),
@@ -394,7 +396,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "wireguard_port": p_val.get("wireguard_port") or p_val.get("tunnel_port"),
                     "status_note": p_val.get("status_note"),
                     "vni": p_val.get("vni"),
-                    "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name","profile","persona","transport","proto","port")} if (p_val.get("engine") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet") or p_val.get("transport") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet")) else None,
+                    "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name","profile","persona","transport","proto","port","data_port","icmp_id","pre_shared_key","tunnel_count","initial_cwnd","interface","client_spoofed_ip","server_spoofed_ip","spoofed_ip_pool","recv_port","spoof_port","forward_target")} if (p_val.get("engine") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet", "candy-spoof", "parsaksh") or p_val.get("transport") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet", "candy-spoof", "parsaksh")) else None,
                     "rathole_transport": p_val.get("rathole_transport") or (p_val.get("camouflage") or {}).get("transport"),
                     "rathole_proto": (p_val.get("camouflage") or {}).get("proto", "tcp"),
                     "operation_task": public_change_job(p_val.get("operation_task"), data),
@@ -704,6 +706,12 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} 2>/dev/null")
             elif eng == 'rathole':
                 svc = f"vxlb-ratholec-{nnq}.service" if node_name else "vxlb-rathole*.service"
+                _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} 2>/dev/null")
+            elif eng == 'candy-spoof':
+                svc = f"vxlb-candyc-{nnq}.service" if node_name else "vxlb-candy*.service"
+                _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} 2>/dev/null")
+            elif eng == 'parsaksh':
+                svc = f"vxlb-parsakshc-{nnq}.service" if node_name else "vxlb-parsaksh*.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} 2>/dev/null")
             else:
                 _, log_text, _ = ssh.execute("tail -n 60 /var/log/vxlb-user-connections.log 2>/dev/null || echo 'No connection logs yet.'")

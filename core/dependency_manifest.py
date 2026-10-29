@@ -300,6 +300,56 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
             }
         }
     ),
+    "candy-spoof-client": BinaryManifest(
+        name="Candy-Spoof Client",
+        engine_id="candy-spoof-client",
+        pinned_version="v0.1.0",
+        license_spdx="MIT",
+        executable_name="candy-spoof-client",
+        required_capabilities=[],
+        architectures={
+            "x86_64": {
+                "sha256": "2aff9805f3825cdeb0e6d6860640256229a179c461d0b49b45edc38a11c1cbaf",
+                "source_url": "https://github.com/AmiRCandy/Candy-Spoof/releases/download/nightly-20260402-143253/candy-spoof-client-linux-x86_64",
+                "is_verified": True
+            }
+        }
+    ),
+    "candy-spoof-server": BinaryManifest(
+        name="Candy-Spoof Server",
+        engine_id="candy-spoof-server",
+        pinned_version="v0.1.0",
+        license_spdx="MIT",
+        executable_name="candy-spoof-server",
+        required_capabilities=[],
+        architectures={
+            "x86_64": {
+                "sha256": "269a04b768905491c9bae0b8f20ff5412fa99a0897bafe1a874d312448a996ef",
+                "source_url": "https://github.com/AmiRCandy/Candy-Spoof/releases/download/nightly-20260402-143253/candy-spoof-server-linux-x86_64",
+                "is_verified": True
+            }
+        }
+    ),
+    "parsaksh": BinaryManifest(
+        name="ParsaKSH Spoof Tunnel",
+        engine_id="parsaksh",
+        pinned_version="v3.0.2",
+        license_spdx="Apache-2.0",
+        executable_name="spoof",
+        required_capabilities=[],
+        architectures={
+            "x86_64": {
+                "sha256": "a8dfe9e838ad5655b467765eae6f374e5f63af31bf2dded9aab295815fbcabf8",
+                "source_url": "https://github.com/ParsaKSH/spoof-tunnel/releases/download/v3.0.2/spoof-linux-amd64",
+                "is_verified": True
+            },
+            "aarch64": {
+                "sha256": "caf08b3960d4eea72910fb0613a8893560a41f5b2f2e18f9a6c595c9ad7ea16c",
+                "source_url": "https://github.com/ParsaKSH/spoof-tunnel/releases/download/v3.0.2/spoof-linux-arm64",
+                "is_verified": True
+            }
+        }
+    ),
 }
 
 def get_dependency_manifest(name: str) -> Optional[BinaryManifest]:

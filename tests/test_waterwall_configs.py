@@ -77,9 +77,18 @@ class WaterWallConfigTests(unittest.TestCase):
                                 self.assertIn(rule["target"], node_names, f"{mode}:{side} {n['name']} target {rule['target']}")
 
     def test_backend_router_and_blackhole_present(self):
+        # halfduplex/bgp4 bypass the Router (their server node routes directly to
+        # a fixed-port backend connector, which is what makes data pass).
+        direct_backend_modes = {"halfduplex", "bgp4"}
         for mode in MODES:
             node = make_node(mode)
             _, kharej_chain = waterwall.chain_configs(node, "192.0.2.1", ["443"])
+            if mode in direct_backend_modes:
+                connector = next((n for n in kharej_chain["nodes"] if n["name"] == "tcp-connector-backend"), None)
+                self.assertIsNotNone(connector, mode)
+                self.assertEqual(connector["type"], "TcpConnector", mode)
+                self.assertIsInstance(connector["settings"]["port"], int, mode)
+                continue
             router = next((n for n in kharej_chain["nodes"] if n["name"] == "backend-router"), None)
             self.assertIsNotNone(router, mode)
             self.assertEqual(router["next"], "blackhole-reject", mode)

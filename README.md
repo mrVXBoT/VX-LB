@@ -27,6 +27,8 @@ choices from development-only registry entries and disabled profiles. See
 | Hedioum | SOCKS5, TUN, L3 Gateway; configurable Persona | [Hedioum](docs/wiki/Hedioum.md) |
 | Rathole | TCP, TLS, Noise, WebSocket; separate forwarded protocol | [Rathole](docs/wiki/Rathole.md) |
 | Paqet | Raw-packet port forwarding; normal/fast/fast2/fast3 KCP | [Paqet](docs/wiki/Paqet.md) |
+| Candy-Spoof | Bidirectional IP-spoofing tunnel; SOCKS5 + ICMP/UDP, PSK | [Candy-Spoof](docs/wiki/Candy-Spoof.md) |
+| ParsaKSH | Mutual IP-spoofing UDP-pipe; ICMP/ICMPv6/UDP/TCP-SYN, XDP | [ParsaKSH](docs/wiki/ParsaKSH.md) |
 | Kernel/network | WireGuard, TUN, GRE/IPsec, GRE6, IP6IP6, VXLAN, VXLAN/IPsec, DC6, Geneve/IPsec | [Network tunnels](docs/wiki/Kernel-Tunnels.md) |
 | Web/DNS | WS, HTTP CONNECT, HTTPS CONNECT, Slipstream | [Web and DNS](docs/wiki/Web-and-DNS.md) |
 | Packet processing | Five experimental managed profiles; other displayed entries disabled | [Packet profiles](docs/wiki/Packet-Profiles.md) |

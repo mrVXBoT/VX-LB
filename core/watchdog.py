@@ -72,17 +72,12 @@ class TelemetryWatchdog:
         atomic_update(_updater)
 
     def analyze_node_health(self, pool_name: str, node: dict, client_ports: Optional[List[str]] = None) -> Tuple[str, str, List[str], Dict[str, dict]]:
-        """
-        Inspects user connection telemetry (/var/log/vxlb-user-connections.log)
-        and live sockets strictly across client ports belonging to this specific pool.
-        Requires multi-client consensus for filtering, avoids marking idle nodes as filtered,
-        and provides canary recovery after cooldown.
-        """
+        """Dispatch to the engine-specific health probe, or the generic BackPack monitor."""
         if node.get('engine') == 'spoof' and node.get('spoof'):
             from core.spoof_transport import health
-            status, reason, details = health(pool_name,node,client_ports or [])
-            self.save_node_telemetry(pool_name,node['ip'],status,reason,[],details)
-            return status,reason,[],details
+            status, reason, details = health(pool_name, node, client_ports or [])
+            self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
+            return status, reason, [], details
         if node.get('engine') in ('http', 'https'):
             from core.http_transport import health
             status, reason, details = health(pool_name, node, client_ports or [])
@@ -143,7 +138,51 @@ class TelemetryWatchdog:
             status, reason, details = health(pool_name, node, client_ports or [])
             self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
             return status, reason, [], details
+        if node.get('engine') == 'gost':
+            from core.gost_engine import health
+            status, reason, details = health(pool_name, node, client_ports or [])
+            self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
+            return status, reason, [], details
+        if node.get('engine') == 'frp':
+            from core.frp_engine import health
+            status, reason, details = health(pool_name, node, client_ports or [])
+            self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
+            return status, reason, [], details
+        if node.get('engine') == 'hedioum':
+            from core.hedioum_engine import health
+            status, reason, details = health(pool_name, node, client_ports or [])
+            self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
+            return status, reason, [], details
+        if node.get('engine') == 'rathole':
+            from core.rathole_engine import health
+            status, reason, details = health(pool_name, node, client_ports or [])
+            self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
+            return status, reason, [], details
+        if node.get('engine') == 'paqet':
+            from core.paqet_engine import health
+            status, reason, details = health(pool_name, node, client_ports or [])
+            self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
+            return status, reason, [], details
+        if node.get('engine') == 'candy-spoof' or node.get('transport') == 'candy-spoof':
+            from core.candy_spoof_transport import health
+            status, reason, details = health(pool_name, node, client_ports or [])
+            self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
+            return status, reason, [], details
+        if node.get('engine') == 'parsaksh' or node.get('transport') == 'parsaksh':
+            from core.parsaksh_transport import health
+            status, reason, details = health(pool_name, node, client_ports or [])
+            self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
+            return status, reason, [], details
+        status, reason, _, details = self._analyze_backpack_health(pool_name, node, client_ports)
+        return status, reason, [], details
 
+    def _analyze_backpack_health(self, pool_name: str, node: dict, client_ports: Optional[List[str]] = None) -> Tuple[str, str, List[str], Dict[str, dict]]:
+        """
+        Inspects user connection telemetry (/var/log/vxlb-user-connections.log)
+        and live sockets strictly across client ports belonging to this specific pool.
+        Requires multi-client consensus for filtering, avoids marking idle nodes as filtered,
+        and provides canary recovery after cooldown.
+        """
         ip = node["ip"]
         # Security: ports flow into a shell filter expression below -- accept
         # digits only so a poisoned pool record cannot inject shell commands.

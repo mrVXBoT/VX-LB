@@ -196,7 +196,8 @@ def test_creation_worker_requires_every_node_to_be_ready(state):
 ENGINE_TRANSPORTS = {
     'backpack': ('tcp', 'stealth', 'pck', 'kcp', 'wss', 'quic', 'ws'),
     **{name: (name,) for name in ('waterwall', 'gost', 'frp', 'hedioum', 'rathole', 'paqet',
-        'gre', 'gre6', 'ip6ip6', 'tun', 'dc6', 'wireguard', 'vxlan', 'vxlan_ipsec', 'slipstream', 'http', 'https')},
+        'gre', 'gre6', 'ip6ip6', 'tun', 'dc6', 'wireguard', 'vxlan', 'vxlan_ipsec', 'slipstream', 'http', 'https',
+        'candy-spoof', 'parsaksh')},
     'geneve': ('geneve_ipsec',),
     'spoof': ('fake-sni', 'split-tls', 'hop-ttl-injection', 'tcp-state-desync', 'l3-ip-spoof',
         'l7-header-mutation', 'udp-raw-spoof', 'dns-spoof', 'spoof-tcp-syn', 'spoof-udp-raw',

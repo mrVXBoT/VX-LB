@@ -820,6 +820,12 @@ function getTransportTagLabel(p) {
     const map = { noise: "Noise", tcp: "TCP", tls: "TLS", websocket: "WebSocket" };
     return map[rtr] || rtr.toUpperCase();
   }
+  if (eng === "candy-spoof" || tr === "candy-spoof") {
+    return "Candy-Spoof";
+  }
+  if (eng === "parsaksh" || tr === "parsaksh") {
+    return "ParsaKSH";
+  }
   if (eng === "paqet" || tr === "paqet") {
     const km = p.paqet_kcp_mode || p.camouflage?.kcp_mode || "fast";
     return `Paqet · KCP ${km.toUpperCase()}`;
@@ -841,6 +847,14 @@ function getPoolProtoTag(p) {
     const rTr = (p.rathole_transport || p.camouflage?.transport || "tcp").toUpperCase();
     const rPr = (p.rathole_proto || p.camouflage?.proto || "tcp").toUpperCase();
     return `${rTr} / ${rPr}`;
+  }
+  if (eng === "candy-spoof" || tr === "candy-spoof") {
+    const dp = p.camouflage?.data_port || p.nodes?.[0]?.candy?.data_port || "51820";
+    return `CANDY / UDP ${dp}`;
+  }
+  if (eng === "parsaksh" || tr === "parsaksh") {
+    const pp = p.camouflage?.transport || p.nodes?.[0]?.parsaksh?.transport || "udp";
+    return `PARSAKSH / ${pp.toUpperCase()}`;
   }
   if (eng === "paqet" || tr === "paqet") {
     const km = (p.paqet_kcp_mode || p.camouflage?.kcp_mode || "fast").toUpperCase();
@@ -940,6 +954,14 @@ function getEngineBadge(engine, transport, pool) {
     cls = "engine-paqet";
     const km = pool?.paqet_kcp_mode || pool?.camouflage?.kcp_mode || "fast";
     label = `Paqet · KCP ${km}`;
+  } else if (eng === "candy-spoof" || tr === "candy-spoof") {
+    cls = "engine-spoof";
+    const sip = pool?.camouflage?.client_spoofed_ip || pool?.nodes?.[0]?.candy?.client_spoofed_ip || "8.8.4.4";
+    label = `Candy-Spoof · ${sip}`;
+  } else if (eng === "parsaksh" || tr === "parsaksh") {
+    cls = "engine-spoof";
+    const pkTr = pool?.camouflage?.transport || pool?.nodes?.[0]?.parsaksh?.transport || "udp";
+    label = `ParsaKSH · ${pkTr.toUpperCase()}`;
   } else if (eng === "spoof" || MANAGED_PACKET_TRANSPORTS.includes(tr) || tr.startsWith("spoof")) {
     cls = "engine-spoof";
     label = `پردازش بسته · ${getTransportTagLabel({transport: tr})}`;
@@ -1156,6 +1178,8 @@ function renderPools(pools) {
             ${(n.engine === 'gre6' || p.transport === 'gre6') ? `<div class="gre-private-route"><span>لینک GRE6:</span><bdi dir="ltr">${escapeHtml(n.gre6?.local_private || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.gre6?.remote_private || p.kharej_ip)}</bdi><span>(اینترفیس ${escapeHtml(n.gre6?.interface || n.node_name || "-")}) · <strong style="color:var(--amber, #f59e0b);">بدون رمزنگاری (Cleartext)</strong></span></div>` : ''}
             ${(n.engine === 'ip6ip6' || p.transport === 'ip6ip6') ? `<div class="gre-private-route"><span>لینک IP6IP6:</span><bdi dir="ltr">${escapeHtml(n.ip6ip6?.local_private || n.ip)}</bdi><span>به</span><bdi dir="ltr">${escapeHtml(n.ip6ip6?.remote_private || p.kharej_ip)}</bdi><span>(اینترفیس ${escapeHtml(n.ip6ip6?.interface || n.node_name || "-")} · اختصاصی IPv6) · <strong style="color:var(--amber, #f59e0b);">بدون رمزنگاری (Cleartext)</strong></span></div>` : ''}
             ${(n.engine === 'rathole' || p.transport === 'rathole' || p.engine === 'rathole') ? `<div class="gre-private-route"><span>مسیر Rathole:</span><bdi dir="ltr">${escapeHtml(n.ip)}:${escapeHtml(String(n.rathole?.port || n.tunnel_port || p.camouflage?.port || 2333))}</bdi><span>(سرور ایران) &larr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}</bdi><span>(کلاینت خارج) · انتقال: <strong style="color:var(--text-main);">${escapeHtml(String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport || "tcp").toUpperCase())}</strong></span></div>` : ''}
+            ${(n.engine === 'candy-spoof' || p.transport === 'candy-spoof' || p.engine === 'candy-spoof') ? `<div class="gre-private-route"><span>مسیر Candy-Spoof:</span><bdi dir="ltr">${escapeHtml(n.ip)}:${escapeHtml(String(n.candy?.socks5_port || p.camouflage?.socks5_port || 1080))}</bdi><span>(SOCKS5 ایران) &rarr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}</bdi><span>(سرور خارج) · UDP ${escapeHtml(String(n.candy?.data_port || p.camouflage?.data_port || 51820))}</span></div>` : ''}
+            ${(n.engine === 'parsaksh' || p.transport === 'parsaksh' || p.engine === 'parsaksh') ? `<div class="gre-private-route"><span>مسیر ParsaKSH:</span><bdi dir="ltr">${escapeHtml(n.ip)}:${escapeHtml(String(n.parsaksh?.client_udp_port || p.camouflage?.client_udp_port || 51820))}</bdi><span>(UDP ایران) &rarr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}</bdi><span>(سرور خارج) · فوروارد ${escapeHtml(String(n.parsaksh?.forward_target || p.camouflage?.forward_target || "-"))}</span></div>` : ''}
             ${(n.engine === 'paqet' || p.engine === 'paqet' || p.transport === 'paqet') ? `<div class="gre-private-route"><span>مسیر Paqet KCP:</span><bdi dir="ltr">${escapeHtml(n.ip)}</bdi><span>(کلاینت ایران) &rarr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}:${escapeHtml(String(n.paqet?.port || p.camouflage?.port || 8888))}</bdi><span>(سرور خارج) · حالت: <strong style="color:var(--text-main);">${escapeHtml(String(n.paqet?.kcp_mode || p.camouflage?.kcp_mode || "fast").toUpperCase())}</strong></span></div>` : ''}
             <div class="node-dns-line"><span class="status-badge ${dns.verified ? (dns.ips.includes(n.ip) ? 'healthy' : 'idle') : 'unknown'}">${dns.verified ? (dns.ips.includes(n.ip) ? (p.dns_scope === 'all_subdomains' ? 'آی‌پی در همهٔ ساب‌دامین‌ها ثبت است' : 'آی‌پی در DNS ثبت است') : (p.dns_scope === 'all_subdomains' ? 'آی‌پی در همهٔ ساب‌دامین‌ها ثبت نیست' : 'آی‌پی در DNS نیست')) : 'وضعیت DNS تأیید نشده'}</span><span>${dns.source}</span></div>
               </div>
@@ -1923,8 +1947,33 @@ async function submitCreatePool(e) {
                   hostname: document.getElementById('rathole-hostname')?.value || '',
                   ws_tls: document.getElementById('rathole-ws-tls')?.checked || false
                 }
-              } :
-              transport === 'paqet' ? {
+               } :
+               transport === 'candy-spoof' ? {
+                 engine: 'candy-spoof',
+                 camouflage: {
+                   data_port: document.getElementById('candy-data-port')?.value || '51820',
+                   icmp_id: document.getElementById('candy-icmp-id')?.value || String(Math.floor(Math.random() * 65536)),
+                   pre_shared_key: (document.getElementById('candy-pre-shared-key')?.value || '').trim() || genSecret(24),
+                   client_spoofed_ip: document.getElementById('candy-client-sip')?.value || '8.8.4.4',
+                   server_spoofed_ip: document.getElementById('candy-server-sip')?.value || '1.2.3.4',
+                   tunnel_count: document.getElementById('candy-tunnel-count')?.value || '4',
+                   mtu: document.getElementById('candy-mtu')?.value || '1380',
+                   interface: (document.getElementById('candy-interface')?.value || '').trim()
+                 }
+               } :
+               transport === 'parsaksh' ? {
+                 engine: 'parsaksh',
+                 camouflage: {
+                   transport: document.getElementById('parsaksh-transport')?.value || 'udp',
+                   data_port: document.getElementById('parsaksh-data-port')?.value || '8090',
+                   recv_port: document.getElementById('parsaksh-recv-port')?.value || '5001',
+                   spoof_port: document.getElementById('parsaksh-spoof-port')?.value || '443',
+                   spoof_ip: document.getElementById('parsaksh-client-sip')?.value || '8.8.4.4',
+                   server_spoof_ip: document.getElementById('parsaksh-server-sip')?.value || '1.2.3.4',
+                   forward_target: (document.getElementById('parsaksh-forward')?.value || '').trim()
+                 }
+               } :
+               transport === 'paqet' ? {
                 engine: 'paqet',
                 camouflage: {
                   mode: 'forward',
@@ -2752,6 +2801,18 @@ const ENGINE_TRANSPORTS = {
       { value: "paqet", mode: "forward", label: "Paqet · انتقال پورت", hint: "انتقال پورت‌های کلاینت از ایران به خارج با KCP روی بسته‌های خام؛ نیازمند تنظیم رابط شبکه." }
     ]
   },
+  candy: {
+    label: "Candy-Spoof",
+    transports: [
+      { value: "candy-spoof", label: "Candy-Spoof", hint: "تونل جعل دوطرفه آدرس مبدا؛ کلاینت SOCKS5 روی ایران و نقاط خروجی خارج؛ نیازمند CAP_NET_RAW/root و باینری x86_64." }
+    ]
+  },
+  parsaksh: {
+    label: "ParsaKSH",
+    transports: [
+      { value: "parsaksh", label: "ParsaKSH Spoof Tunnel", hint: "جعل دوطرفه IP (Go/Rust)؛ کلاینت UDP روی ایران و سرور فوروارد در خارج؛ پروتکل‌های ICMP/ICMPv6/UDP/TCP-SYN." }
+    ]
+  },
   kernel: {
     label: "تونل‌های شبکه و کرنل",
     transports: [
@@ -3412,6 +3473,28 @@ function updateGreCreateFields() {
     ['paqet-port', 'paqet-key', 'paqet-kcp-mode', 'paqet-conn', 'paqet-mtu'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.disabled = !isPaqet;
+    });
+  }
+
+  // Candy-Spoof
+  const candyDiv = document.getElementById('candy-create-fields');
+  if (candyDiv) {
+    const isCandy = mode === 'candy-spoof';
+    candyDiv.classList.toggle('hidden', !isCandy);
+    ['candy-data-port', 'candy-icmp-id', 'candy-pre-shared-key', 'candy-client-sip', 'candy-server-sip', 'candy-tunnel-count', 'candy-mtu', 'candy-interface'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !isCandy;
+    });
+  }
+
+  // ParsaKSH
+  const parsakshDiv = document.getElementById('parsaksh-create-fields');
+  if (parsakshDiv) {
+    const isParsaksh = mode === 'parsaksh';
+    parsakshDiv.classList.toggle('hidden', !isParsaksh);
+    ['parsaksh-transport', 'parsaksh-data-port', 'parsaksh-recv-port', 'parsaksh-spoof-port', 'parsaksh-client-sip', 'parsaksh-server-sip', 'parsaksh-forward'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !isParsaksh;
     });
   }
 

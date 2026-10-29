@@ -151,6 +151,12 @@ class LoadBalancerManager:
         if transport == 'rathole':
             from core.rathole_engine import create
             return create(pool_name, kharej_server, iran_servers, client_ports, camouflage, callback)
+        if transport == 'candy-spoof':
+            from core.candy_spoof_transport import create as candy_create
+            return candy_create(pool_name, kharej_server, iran_servers, client_ports, camouflage, callback)
+        if transport == 'parsaksh':
+            from core.parsaksh_transport import create as pk_create
+            return pk_create(pool_name, kharej_server, iran_servers, client_ports, camouflage, callback)
         if transport == 'paqet':
             from core.paqet_engine import create
             return create(pool_name, kharej_server, iran_servers, client_ports, camouflage, callback)
@@ -427,6 +433,12 @@ class LoadBalancerManager:
         if pool.get('engine') == 'rathole':
             from core.rathole_engine import add
             return add(pool_name, new_iran_server, callback)
+        if pool.get('engine') == 'candy-spoof':
+            from core.candy_spoof_transport import add as candy_add
+            return candy_add(pool_name, new_iran_server, callback)
+        if pool.get('engine') == 'parsaksh':
+            from core.parsaksh_transport import add as pk_add
+            return pk_add(pool_name, new_iran_server, callback)
         if pool.get('engine') == 'paqet':
             from core.paqet_engine import add
             return add(pool_name, new_iran_server, callback)
@@ -622,6 +634,12 @@ class LoadBalancerManager:
         if pool.get('engine') == 'rathole':
             from core.rathole_engine import remove
             return remove(pool_name, iran_ip, callback)
+        if pool.get('engine') == 'candy-spoof':
+            from core.candy_spoof_transport import remove as candy_remove
+            return candy_remove(pool_name, iran_ip, callback)
+        if pool.get('engine') == 'parsaksh':
+            from core.parsaksh_transport import remove as pk_remove
+            return pk_remove(pool_name, iran_ip, callback)
         if pool.get('engine') == 'paqet':
             from core.paqet_engine import remove
             return remove(pool_name, iran_ip, callback)
@@ -767,6 +785,12 @@ class LoadBalancerManager:
         if pool.get('engine') == 'rathole':
             from core.rathole_engine import remove_pool
             return remove_pool(pool_name, callback)
+        if pool.get('engine') == 'candy-spoof':
+            from core.candy_spoof_transport import remove_pool as candy_remove_pool
+            return candy_remove_pool(pool_name, callback)
+        if pool.get('engine') == 'parsaksh':
+            from core.parsaksh_transport import remove_pool as pk_remove_pool
+            return pk_remove_pool(pool_name, callback)
         if pool.get('engine') == 'paqet':
             from core.paqet_engine import remove_pool
             return remove_pool(pool_name, callback)
@@ -880,7 +904,7 @@ class LoadBalancerManager:
             if set(map(str, ports)) == set(map(str, pool.get('client_ports', []))):
                 return False, 'No port change was requested'
             return change_ports(pool_name, ports)
-        if pool.get('transport') == 'gre' or pool.get('engine') in ('waterwall', 'gost', 'frp', 'hedioum', 'rathole', 'paqet'):
+        if pool.get('transport') == 'gre' or pool.get('engine') in ('waterwall', 'gost', 'frp', 'hedioum', 'rathole', 'paqet', 'candy-spoof', 'parsaksh'):
             if pool.get('engine') == 'waterwall':
                 from core.waterwall import change_ports
             elif pool.get('engine') == 'gost':
@@ -891,6 +915,10 @@ class LoadBalancerManager:
                 from core.hedioum_engine import change_ports
             elif pool.get('engine') == 'rathole':
                 from core.rathole_engine import change_ports
+            elif pool.get('engine') == 'candy-spoof':
+                from core.candy_spoof_transport import change_ports
+            elif pool.get('engine') == 'parsaksh':
+                from core.parsaksh_transport import change_ports
             elif pool.get('engine') == 'paqet':
                 from core.paqet_engine import change_ports
             else:
@@ -1055,7 +1083,7 @@ class LoadBalancerManager:
             if set(map(str, ports)) == set(map(str, pool.get('client_ports', []))):
                 return False, 'No port change was requested'
             return change_ports(pool_name, ports)
-        if pool.get('transport') == 'gre' or pool.get('engine') in ('waterwall', 'gost', 'frp', 'hedioum', 'rathole', 'paqet'):
+        if pool.get('transport') == 'gre' or pool.get('engine') in ('waterwall', 'gost', 'frp', 'hedioum', 'rathole', 'paqet', 'candy-spoof', 'parsaksh'):
             if pool.get('engine') == 'waterwall':
                 from core.waterwall import change_ports
             elif pool.get('engine') == 'gost':
@@ -1066,6 +1094,10 @@ class LoadBalancerManager:
                 from core.hedioum_engine import change_ports
             elif pool.get('engine') == 'rathole':
                 from core.rathole_engine import change_ports
+            elif pool.get('engine') == 'candy-spoof':
+                from core.candy_spoof_transport import change_ports
+            elif pool.get('engine') == 'parsaksh':
+                from core.parsaksh_transport import change_ports
             elif pool.get('engine') == 'paqet':
                 from core.paqet_engine import change_ports
             else:

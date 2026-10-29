@@ -239,6 +239,26 @@
         }
       ]
     },
+    "candy": {
+      "label": "Candy-Spoof",
+      "transports": [
+        {
+          "value": "candy-spoof",
+          "label": "Candy-Spoof",
+          "hint": "تونل جعل دوطرفه آدرس مبدا؛ کلاینت SOCKS5 روی ایران و نقاط خروجی خارج؛ نیازمند CAP_NET_RAW/root و باینری x86_64."
+        }
+      ]
+    },
+    "parsaksh": {
+      "label": "ParsaKSH",
+      "transports": [
+        {
+          "value": "parsaksh",
+          "label": "ParsaKSH Spoof Tunnel",
+          "hint": "جعل دوطرفه IP (Go/Rust)؛ کلاینت UDP روی ایران و سرور فوروارد در خارج؛ پروتکل‌های ICMP/ICMPv6/UDP/TCP-SYN."
+        }
+      ]
+    },
     "kernel": {
       "label": "تونل‌های شبکه و کرنل",
       "transports": [
@@ -399,6 +419,7 @@
     "anycast",
     "backhaul",
     "backpack",
+    "candy-spoof",
     "dc6",
     "dns-spoof",
     "eoip",
@@ -428,6 +449,7 @@
     "l3-ip-spoof",
     "l7-header-mutation",
     "paqet",
+    "parsaksh",
     "qs-dns-hybrid",
     "rathole",
     "sit",

@@ -899,8 +899,10 @@
               <option value="hedioum">Hedioum</option>
               <option value="rathole">Rathole</option>
               <option value="paqet">Paqet</option>
+              <option value="candy">Candy-Spoof</option>
+              <option value="parsaksh">ParsaKSH</option>
               <option value="kernel">تونل‌های شبکه و کرنل</option>
-               <option value="spoof">پردازش بسته (DPI Spoof)</option>
+              <option value="spoof">پردازش بسته (DPI Spoof)</option>
               <option value="other">وب و تونل DNS</option>
             </select>
           </div>
@@ -979,6 +981,81 @@
             <div class="input-group"><label class="field-label" for="paqet-kcp-mode">حالت KCP</label><select id="paqet-kcp-mode" class="field-input select-styled" disabled><option value="normal">normal</option><option value="fast" selected>fast</option><option value="fast2">fast2</option><option value="fast3">fast3</option></select></div>
             <div class="input-group"><label class="field-label" for="paqet-conn">اتصال‌های موازی KCP</label><input id="paqet-conn" class="field-input" value="1" type="number" min="1" max="64" dir="ltr" disabled></div>
             <div class="input-group"><label class="field-label" for="paqet-mtu">MTU کانال KCP (1280-1500)</label><input id="paqet-mtu" class="field-input" value="1280" type="number" min="1280" max="1500" dir="ltr" disabled></div>
+          </div>
+          <div id="candy-create-fields" class="input-group hidden">
+            <p class="field-hint" style="color: var(--accent, #6366f1);">
+              Candy-Spoof: تونل جعل دوطرفهٔ آدرس مبدا (Rust). کلاینت SOCKS5 روی نود ایران اجرا می‌شود و کاربران برنامهٔ خود را به پورت SOCKS5 (همان اولین پورت سرویس) متصل می‌کنند. نیازمند root / CAP_NET_RAW و باینری Linux x86_64.
+            </p>
+            <div class="input-group">
+              <label class="field-label" for="candy-data-port">پورت UDP کانال داده (مشترک دو سمت)</label>
+              <input type="number" id="candy-data-port" class="field-input" value="51820" min="1" max="65535" dir="ltr" disabled required>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="candy-icmp-id">شناسهٔ ICMP Echo (مشترک دو سمت، 0-65535)</label>
+              <input type="number" id="candy-icmp-id" class="field-input" value="4321" min="0" max="65535" dir="ltr" disabled required>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="candy-pre-shared-key">کلید پیش‌مشترک (PSK، حداقل ۱۶ نویسه)</label>
+              <input type="text" id="candy-pre-shared-key" class="field-input" dir="ltr" placeholder="خالی = تولید خودکار" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="candy-client-sip">آی‌پی جعلی مبدأ کلاینت (لبهٔ ایران)</label>
+              <input type="text" id="candy-client-sip" class="field-input" value="8.8.4.4" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="candy-server-sip">آی‌پی جعلی مبدأ سرور (خروجی خارج)</label>
+              <input type="text" id="candy-server-sip" class="field-input" value="1.2.3.4" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="candy-tunnel-count">تعداد تونل‌های موازی (1-32)</label>
+              <input type="number" id="candy-tunnel-count" class="field-input" value="4" min="1" max="32" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="candy-mtu">MTU (576-9000)</label>
+              <input type="number" id="candy-mtu" class="field-input" value="1380" min="576" max="9000" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="candy-interface">رابط شبکه (خالی = تشخیص خودکار)</label>
+              <input type="text" id="candy-interface" class="field-input" placeholder="eth0" dir="ltr" disabled>
+            </div>
+          </div>
+          <div id="parsaksh-create-fields" class="input-group hidden">
+            <p class="field-hint" style="color: var(--accent, #6366f1);">
+              ParsaKSH: تانل جعل دوطرفهٔ IP (Go/Rust). کلاینت UDP روی ایران (پورت سرویس کاربران) گوش میدهد و به سرور خارج تونل میکند؛ سرور به forward_target فوروارد میکند. نیازمند root / CAP_NET_RAW و عبور جعل (BCP38) در هر دو جهت.
+            </p>
+            <div class="input-group">
+              <label class="field-label" for="parsaksh-transport">پروتکل تونل</label>
+              <select id="parsaksh-transport" class="field-input select-styled" disabled>
+                <option value="udp" selected>UDP</option>
+                <option value="icmp">ICMP Echo</option>
+                <option value="icmpv6">ICMPv6</option>
+                <option value="tcp">TCP-SYN</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="parsaksh-data-port">پورت UDP تونل (سرور، دو سمت)</label>
+              <input type="number" id="parsaksh-data-port" class="field-input" value="8090" min="1" max="65535" dir="ltr" disabled required>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="parsaksh-recv-port">پورت دریافت کلاینت (دو سمت)</label>
+              <input type="number" id="parsaksh-recv-port" class="field-input" value="5001" min="1" max="65535" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="parsaksh-spoof-port">پورت سورس جعلشده</label>
+              <input type="number" id="parsaksh-spoof-port" class="field-input" value="443" min="1" max="65535" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="parsaksh-client-sip">آی‌پی جعلی مبدأ کلاینت (ایران)</label>
+              <input type="text" id="parsaksh-client-sip" class="field-input" value="8.8.4.4" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="parsaksh-server-sip">آی‌پی جعلی مبدأ سرور (خارج)</label>
+              <input type="text" id="parsaksh-server-sip" class="field-input" value="1.2.3.4" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="parsaksh-forward">مقصد فوروارد سرور (host:port؛ خالی = خودکار)</label>
+              <input type="text" id="parsaksh-forward" class="field-input" placeholder="127.0.0.1:51820" dir="ltr" disabled>
+            </div>
           </div>
           <div id="tun-create-fields" class="input-group hidden">
             <p class="field-hint">اینترفیس واقعی TUN لینوکس با حامل UDP/Noise در BackPack L3 و محدودسازی MSS اختصاصی؛ انتقال TCP/UDP پیش از فعال‌شدن بررسی می‌شود.</p>
@@ -1236,6 +1313,8 @@
               <option value="hedioum">Hedioum</option>
               <option value="rathole">Rathole</option>
               <option value="paqet">Paqet</option>
+              <option value="candy">Candy-Spoof</option>
+              <option value="parsaksh">ParsaKSH</option>
               <option value="kernel">تونل‌های شبکه و کرنل</option>
               <option value="spoof" disabled>پردازش بسته — استخر جداگانه بسازید</option>
               <option value="other">وب و تونل DNS</option>

@@ -272,6 +272,10 @@ def get_engine_for_transport(transport: str) -> str:
         return 'hedioum'
     if t == 'rathole':
         return 'rathole'
+    if t == 'candy-spoof':
+        return 'candy-spoof'
+    if t == 'parsaksh':
+        return 'parsaksh'
     if t == 'paqet':
         return 'paqet'
     if t == 'wireguard':
@@ -337,6 +341,8 @@ def _engine_module(engine):
         'frp': 'core.frp_engine',
         'hedioum': 'core.hedioum_engine',
         'rathole': 'core.rathole_engine',
+        'candy-spoof': 'core.candy_spoof_transport',
+        'parsaksh': 'core.parsaksh_transport',
         'paqet': 'core.paqet_engine',
         'slipstream': 'core.slipstream_adapter',
         'spoof': 'core.spoof_adapter',

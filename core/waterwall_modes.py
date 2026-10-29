@@ -69,23 +69,35 @@ def _connector(name, address, port, udp=False):
     return {"name": name, "type": "UdpConnector" if udp else "TcpConnector", "settings": settings}
 
 
-def _backend_tail(allowed_ports, target_port, tcp_only=False):
+def _backend_tail(allowed_ports, target_port, tcp_only=False, fixed_port=False):
     """Shared Kharej egress: Router -> BlackHole + per-destination connectors.
 
     Each allowed destination port is forwarded to the same port on loopback
     (dest_context->port), preserving the client/backend port mapping for every
     port in the chain (client ports + optional dedicated probe port).
+
+    ``fixed_port`` routes every destination to the fixed ``target_port`` on
+    loopback instead of the original destination port. Some node types (e.g.
+    HalfDuplexServer/Bgp4Server) drop data when the backend connector uses the
+    dynamic ``dest_context->port``, so those modes pass ``fixed_port=True``.
     """
     allowed = allowed_ports[0] if len(allowed_ports) == 1 else allowed_ports
     rules = [{"network": "tcp", "destination-port": allowed, "target": "tcp-connector-backend"}]
+    if fixed_port:
+        connector_cfg = {"address": "127.0.0.1", "port": int(target_port), "nodelay": True,
+                         "large-send-buffer": True, "large-recv-buffer": True}
+    else:
+        connector_cfg = {"address": "127.0.0.1", "port": "dest_context->port", "nodelay": True,
+                         "large-send-buffer": True, "large-recv-buffer": True}
     nodes = [
         _router("backend-router", rules, "blackhole-reject"),
         _blackhole("blackhole-reject"),
-        _connector("tcp-connector-backend", "127.0.0.1", "dest_context->port"),
+        {"name": "tcp-connector-backend", "type": "TcpConnector", "settings": connector_cfg},
     ]
     if not tcp_only:
         rules.insert(0, {"network": "udp", "destination-port": allowed, "target": "udp-connector-backend"})
-        nodes.append(_connector("udp-connector-backend", "127.0.0.1", "dest_context->port", udp=True))
+        udp_cfg = dict(connector_cfg)
+        nodes.append({"name": "udp-connector-backend", "type": "UdpConnector", "settings": udp_cfg})
     return nodes
 
 
@@ -219,6 +231,7 @@ def _iran_reverse(prof, ports_list, port_cfg, kharej_ip, outer, node):
             "next": "tcp-connector",
         },
         _kp_connector(kharej_ip, outer),
+        _blackhole("blackhole-iran-reverse"),
     ]
     return {"name": f"iran-reverse-{node['node_name']}", "nodes": iran_nodes}
 
@@ -244,6 +257,7 @@ def _iran_halfduplex(prof, ports_list, port_cfg, kharej_ip, outer, node):
             "next": "tcp-connector",
         },
         _kp_connector(kharej_ip, outer),
+        _blackhole("blackhole-iran-halfduplex"),
     ]
     return {"name": f"iran-halfduplex-{node['node_name']}", "nodes": iran_nodes}
 
@@ -271,6 +285,7 @@ def _iran_bgp4(prof, ports_list, port_cfg, kharej_ip, outer, node):
             "next": "tcp-connector",
         },
         _kp_connector(kharej_ip, outer),
+        _blackhole("blackhole-iran-bgp4"),
     ]
     return {"name": f"iran-bgp4-{node['node_name']}", "nodes": iran_nodes}
 
@@ -379,10 +394,10 @@ def _kharej_halfduplex(prof, outer, allowed, target_port, node):
             "name": "halfduplex-server",
             "type": "HalfDuplexServer",
             "settings": {},
-            "next": "backend-router",
+            "next": "tcp-connector-backend",
         },
+        _connector("tcp-connector-backend", "127.0.0.1", int(target_port)),
     ]
-    nodes += _backend_tail(allowed, target_port)
     return {"name": f"kharej-halfduplex-{node['node_name']}", "nodes": nodes}
 
 
@@ -398,10 +413,10 @@ def _kharej_bgp4(prof, outer, allowed, target_port, node):
             "name": "bgp4-server",
             "type": "Bgp4Server",
             "settings": {"password": prof.get("password", "")},
-            "next": "backend-router",
+            "next": "tcp-connector-backend",
         },
+        _connector("tcp-connector-backend", "127.0.0.1", int(target_port)),
     ]
-    nodes += _backend_tail(allowed, target_port)
     return {"name": f"kharej-bgp4-{node['node_name']}", "nodes": nodes}
 
 

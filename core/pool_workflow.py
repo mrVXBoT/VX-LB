@@ -1,5 +1,6 @@
 """Shared admission, readiness and reconstruction rules for pool workflows."""
 import copy
+import ipaddress
 from functools import wraps
 
 from core.validation import validate_pool_name, validate_ports, validate_port, validate_transport
@@ -62,6 +63,33 @@ def validate_options(transport, options):
     if transport == 'rathole' and camouflage.get('transport') == 'tls':
         if not camouflage.get('pkcs12') or not camouflage.get('pkcs12_password'):
             raise ValueError('Rathole TLS requires a PKCS#12 path and password')
+    if transport == 'candy-spoof':
+        if 'client_spoofed_ip' in camouflage and camouflage['client_spoofed_ip'] is not None:
+            ipaddress.IPv4Address(str(camouflage['client_spoofed_ip']))
+        if 'server_spoofed_ip' in camouflage and camouflage['server_spoofed_ip'] is not None:
+            ipaddress.IPv4Address(str(camouflage['server_spoofed_ip']))
+        for key in ('data_port', 'socks5_port'):
+            if key in camouflage and camouflage[key] is not None:
+                validate_port(camouflage[key])
+        if 'icmp_id' in camouflage and camouflage['icmp_id'] is not None:
+            if not 0 <= int(camouflage['icmp_id']) <= 65535:
+                raise ValueError('ICMP identifier must be a 16-bit value (0-65535)')
+        if 'pre_shared_key' in camouflage and isinstance(camouflage['pre_shared_key'], str):
+            if len(camouflage['pre_shared_key']) < 16:
+                raise ValueError('Candy-Spoof pre-shared key must contain at least 16 characters')
+    if transport == 'parsaksh':
+        for key in ('data_port', 'recv_port', 'spoof_port'):
+            if key in camouflage and camouflage[key] is not None:
+                validate_port(camouflage[key])
+        if 'transport' in camouflage and camouflage['transport'] is not None:
+            if str(camouflage['transport']) not in ('udp', 'icmp', 'icmpv6', 'tcp'):
+                raise ValueError('Invalid ParsaKSH transport')
+        for key in ('spoof_ip', 'server_spoof_ip'):
+            if key in camouflage and camouflage[key] is not None:
+                ipaddress.IPv4Address(str(camouflage[key]))
+        if 'forward_target' in camouflage and camouflage['forward_target']:
+            if ':' not in str(camouflage['forward_target']):
+                raise ValueError('forward_target must be host:port')
     if transport == 'waterwall' and camouflage.get('tls'):
         if not camouflage.get('certificate') or not camouflage.get('key'):
             raise ValueError('WaterWall TLS requires certificate and key paths')
@@ -117,7 +145,10 @@ def operation_options(body, transport):
             'wireguard_port', 'tunnel_port', 'enable_psk', 'ipv4_subnet', 'domain', 'resolvers',
             'dns_port', 'rate_limit', 'is_production', 'allow_experimental', 'fake_sni',
             'auto_ttl_delta', 'spoof_ips', 'peer_spoof_ip', 'dns_resolvers', 'send_domains',
-            'fake_send_ip', 'fake_send_port', 'info_encryption_pass', 'knock_key', 'mode')
+            'fake_send_ip', 'fake_send_port', 'info_encryption_pass', 'knock_key', 'mode',
+            'data_port', 'icmp_id', 'pre_shared_key', 'tunnel_count', 'initial_cwnd',
+            'interface', 'client_spoofed_ip', 'server_spoofed_ip', 'spoofed_ip_pool',
+            'recv_port', 'spoof_port', 'forward_target')
     result = {key: copy.deepcopy(body[key]) for key in keys if key in body}
     for source, target in (('server_name', 'server_name'), ('port', 'port')):
         if source in body:
