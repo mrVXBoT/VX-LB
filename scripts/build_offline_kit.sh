@@ -35,7 +35,7 @@ TMP="$(mktemp "${OUT}.XXXXXX")"
 trap 'rm -f "$TMP"' EXIT
 tar --exclude='__pycache__' --exclude='*.pyc' --exclude='node_modules' \
     -czf "$TMP" \
-    main.py daemon.py vx-lb run.sh install.sh requirements.txt \
+    main.py daemon.py vx-lb run.sh install.sh VERSION requirements.txt \
     requirements-offline.lock offline-manifest.json \
     core web bin wheelhouse scripts systemd README.md docs banner.png vx-lb-logo-assets
 chmod 644 "$TMP"
