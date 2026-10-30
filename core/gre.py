@@ -315,19 +315,45 @@ def health(pool_name,node,ports):
         iran=connect(node);sessions.append(iran);kharej=connect(pool['kharej_server']);sessions.append(kharej)
         verify(iran,kharej,node);verify_relay(iran,node,ports)
         script='''import socket,json,sys
-result={}
+host=sys.argv[1];result={}
 for port in json.loads(sys.argv[2]):
+ item={"tcp":False,"udp":"silent"}
  try:
-  with socket.create_connection((sys.argv[1],int(port)),timeout=2):pass
-  result[str(port)]=True
- except OSError:result[str(port)]=False
+  with socket.create_connection((host,int(port)),timeout=2):item["tcp"]=True
+ except OSError:item["tcp"]=False
+ sock=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);sock.settimeout(1)
+ try:
+  sock.connect((host,int(port)));sock.send(b"vxlb")
+  try:
+   sock.recv(64);item["udp"]="reply"
+  except socket.timeout:item["udp"]="silent"
+ except ConnectionRefusedError:item["udp"]="closed"
+ except OSError:item["udp"]="error"
+ finally:sock.close()
+ result[str(port)]=item
 print(json.dumps(result))
 '''
         out=execute(iran,'python3 -c '+shlex.quote(script)+' '+shlex.quote(node['gre']['remote_private'])+' '+shlex.quote(json.dumps(ports)))
         availability=json.loads(out)
-        details={p:{'status':'HEALTHY' if live else 'DOWN','reason':'GRE TCP/UDP path verified; TCP destination reachable' if live else 'TCP destination is not listening/reachable; GRE path passed','last_success_epoch':time.time() if live else None} for p,live in availability.items()}
-        live=sum(availability.values())
-        return ('HEALTHY' if live==len(ports) and live else 'DEGRADED' if live else 'DOWN'), 'GRE data path verified; '+str(live)+'/'+str(len(ports))+' TCP destinations reachable; UDP application health is not inferred',details
+        details={}
+        for port, item in availability.items():
+            tcp=bool(item.get('tcp')) if isinstance(item, dict) else bool(item)
+            udp=item.get('udp', 'unverified') if isinstance(item, dict) else 'unverified'
+            if tcp and udp=='reply':
+                reason='GRE tunnel TCP/UDP verified; destination TCP and UDP replied'
+            elif tcp and udp=='closed':
+                reason='GRE tunnel TCP/UDP verified; destination TCP is up and destination UDP is closed'
+            elif tcp:
+                reason='GRE tunnel TCP/UDP verified; destination TCP is up; destination UDP did not reply'
+            else:
+                reason='GRE tunnel passed; TCP destination is not listening'
+            details[port]={'status':'HEALTHY' if tcp else 'DOWN','reason':reason,'destination_tcp':tcp,'udp_application':udp,'last_success_epoch':time.time() if tcp else None}
+        live=sum(item['status']=='HEALTHY' for item in details.values())
+        closed=sum(item.get('udp_application')=='closed' for item in details.values())
+        summary='GRE data path verified; %s/%s TCP destinations reachable' % (live, len(ports))
+        if closed:
+            summary += '; %s destination UDP port(s) closed' % closed
+        return ('HEALTHY' if live==len(ports) and live else 'DEGRADED' if live else 'DOWN'), summary, details
     except Exception as error:return 'DOWN','GRE verification failed: '+str(error),{}
     finally:
         for ssh in sessions:ssh.close()

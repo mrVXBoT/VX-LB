@@ -76,15 +76,42 @@ class BackPackAdapter(BaseTunnelAdapter):
             "status": "UP" if is_active else "DOWN"
         }
 
-    def probe(self, endpoint_ir: dict, endpoint_kh: dict, ports: List[int]) -> dict:
-        from core.tunnel_probe import TunnelProbe
-        # Use existing TunnelProbe for end-to-end verification
-        probe_runner = TunnelProbe(endpoint_ir.get("ip", ""), ports)
-        result = probe_runner.probe_tcp()
+    @staticmethod
+    def _session(endpoint):
+        if hasattr(endpoint, "execute"):
+            return endpoint
+        if isinstance(endpoint, dict):
+            return endpoint.get("ssh")
+        return None
+
+    def probe(self, endpoint_ir: dict, endpoint_kh: dict, ports: List[int] = None, **kwargs) -> dict:
+        """Restart both sides only long enough to prove control and a nonce round-trip."""
+        iran = self._session(endpoint_ir)
+        kharej = self._session(endpoint_kh)
+        if iran is None or kharej is None:
+            return {"passed": False, "error": "BackPack probe needs SSH sessions for both endpoints", "latency_ms": None}
+        name = kwargs.get("node_name") or (endpoint_ir.get("node_name") if isinstance(endpoint_ir, dict) else None)
+        unit = kwargs.get("unit") or (f"backpack-{name}.service" if name else None)
+        path = kwargs.get("path") or (f"/etc/backpack/{name}.toml" if name else None)
+        contents = kwargs.get("contents")
+        if contents is None and path:
+            try:
+                from core.transport_change import check
+                contents = [check(iran, "cat -- " + shlex.quote(path)), check(kharej, "cat -- " + shlex.quote(path))]
+            except Exception as error:
+                return {"passed": False, "error": str(error), "latency_ms": None}
+        if not unit or not path or not contents or len(contents) != 2:
+            return {"passed": False, "error": "BackPack probe needs the service unit and both config files", "latency_ms": None}
+        from core.transport_change import install_and_verify
+        diagnostics = []
+        try:
+            passed = bool(install_and_verify(iran, kharej, unit, path, contents, diagnostics=diagnostics))
+        except Exception as error:
+            return {"passed": False, "error": str(error), "latency_ms": None}
         return {
-            "passed": result.get("all_passed", False),
-            "details": result,
-            "latency_ms": result.get("latency_ms", 0.0),
+            "passed": passed,
+            "error": "" if passed else (diagnostics[-1] if diagnostics else "control channel or data probe failed"),
+            "latency_ms": None,
         }
 
     def modify(self, pool_name: str, updates: dict) -> Tuple[bool, str]:
@@ -97,7 +124,21 @@ class BackPackAdapter(BaseTunnelAdapter):
             return False, str(e)
 
     def rollback(self, pool_name: str, previous_state: dict) -> Tuple[bool, str]:
-        return True, "Rollback handled by transport change state machine"
+        from core.storage import get_pools
+        from core.transport_change import rollback as restore
+        pool = get_pools().get(pool_name)
+        if not pool:
+            return False, "Pool not found"
+        job = previous_state if isinstance(previous_state, dict) and previous_state.get("changed") else pool.get("transport_change")
+        if not isinstance(job, dict) or not job.get("changed"):
+            return False, "No BackPack snapshot is available to restore"
+        try:
+            restored = bool(restore(pool_name, pool, job))
+        except Exception as error:
+            return False, str(error)
+        if restored:
+            return True, "Previous BackPack settings restored and the data probe passed"
+        return False, "BackPack rollback did not verify the previous tunnel"
 
     def clean(self, ssh: SSHManager, identifier: str) -> Tuple[bool, str]:
         svc = f"backpack-{identifier}.service" if not identifier.endswith(".service") else identifier

@@ -96,6 +96,9 @@ window.panelCopy = {
               .replace('independent clients and', 'کاربر مستقل و')
               .replace('checks; cause unverified', 'بررسی متوالی؛ علت نامشخص');
     }
+    if (s.startsWith('Control channel is up and no impairment was observed')) {
+      return 'کانال کنترل بالاست و اختلالی دیده نشد؛ تا رسیدن ترافیک کاربر در DNS می‌ماند.';
+    }
     if (s.startsWith('No fresh bidirectional flow or failure evidence; health unverified')) {
       return 'بدون ترافیک دوطرفه جدید؛ نیازمند اتصال کاربر برای تأیید سلامت';
     }

@@ -17,6 +17,7 @@ import secrets
 import shlex
 import time
 from pathlib import Path
+from urllib.parse import quote
 from core.storage import get_pools, save_pool, delete_pool, atomic_update
 from core.validation import validate_pool_name, validate_ports, validate_port, validate_tunnel_name
 from core.transport_change import connect
@@ -27,18 +28,29 @@ BINARY_DEFAULT = '/usr/local/bin/gost'
 
 PROFILES = {
     'shadowsocks-tcp': {'transport': 'ss', 'params': 'aes-256-gcm', 'proto': 'tcp'},
-    'shadowsocks-udp': {'transport': 'ssu', 'params': 'aes-256-gcm', 'proto': 'udp'},
+    # Plain ssu rejects a TCP listener ("network tcp is unsupported"). relay+ssu
+    # keeps Shadowsocks UDP as the hop and still delivers the client TCP port.
+    'shadowsocks-udp': {'transport': 'relay+ssu', 'params': 'aes-256-gcm', 'proto': 'tcp'},
     'shadowsocks-tls': {'transport': 'ss+tls', 'params': 'aes-256-gcm', 'proto': 'tcp', 'tls': True},
     'shadowsocks-ws': {'transport': 'ss+ws', 'params': 'aes-256-gcm', 'proto': 'tcp', 'tls': True},
     'obfs4': {'transport': 'relay+obfs4', 'params': 'iat-mode=0', 'proto': 'tcp'},
     'obfs4-tls': {'transport': 'relay+obfs4+tls', 'params': 'iat-mode=0', 'proto': 'tcp', 'tls': True},
     'grpc': {'transport': 'relay+grpc', 'params': 'keepalive=true&ping=30', 'proto': 'tcp'},
     'grpc-tls': {'transport': 'relay+grpc+tls', 'params': 'keepalive=true', 'proto': 'tcp', 'tls': True},
-    'ssh': {'transport': 'forward+ssh', 'params': 'ping=60', 'proto': 'tcp'},
-    'kcp-obfs4': {'transport': 'relay+kcp+obfs4', 'params': 'mode=fast3&crypt=chacha20&mtu=1350&sndwnd=2048&rcvwnd=2048&iat-mode=0', 'proto': 'udp'},
-    'web-tunnel': {'transport': 'http+mwss', 'params': 'keepalive=true&ping=30&path=/ws', 'proto': 'tcp', 'tls': True},
-    'gaming-socks5-kcp': {'transport': 'socks5+kcp', 'params': 'mode=fast3&crypt=aes-128-gcm', 'proto': 'udp'},
-    'quic-socks5': {'transport': 'socks5+quic', 'params': 'keepalive=true&timeout=60', 'proto': 'udp'},
+    # forward+ssh ignores the client target and dials tcp :0. relay+ssh keeps the
+    # destination port, which is what the published TCP listener is forwarding.
+    'ssh': {'transport': 'relay+ssh', 'params': 'ping=60', 'proto': 'tcp'},
+    # KCP+obfs4 is the hop. The client port stays TCP so the same user config can connect.
+    'kcp-obfs4': {'transport': 'relay+kcp+obfs4', 'params': 'mode=fast3&crypt=chacha20&mtu=1350&sndwnd=2048&rcvwnd=2048&iat-mode=0', 'proto': 'tcp'},
+    # Bundled gost 3.0.0-rc10 answers mwss with a raw mux header, so the TLS
+    # listener resets the hop. http+wss is the chain that actually carries bytes.
+    'web-tunnel': {'transport': 'http+wss', 'params': 'keepalive=true&ping=30&path=/ws', 'proto': 'tcp', 'tls': True, 'http_auth': True},
+    # The hop is KCP, but the published client port stays TCP. A UDP listener
+    # never accepts the user's TCP config, and this gost build disables SOCKS5 UDP relay.
+    'gaming-socks5-kcp': {'transport': 'socks5+kcp', 'params': 'mode=fast3&crypt=aes-128-gcm', 'proto': 'tcp'},
+    # QUIC stays the hop. The client port is TCP, same reason as SOCKS5+KCP:
+    # the user's config connects with TCP, and a UDP listener never accepts it.
+    'quic-socks5': {'transport': 'socks5+quic', 'params': 'keepalive=true&timeout=60', 'proto': 'tcp'},
 }
 
 PROFILE_LABELS = {
@@ -52,7 +64,7 @@ PROFILE_LABELS = {
     'grpc-tls': 'gRPC + TLS',
     'ssh': 'SSH Tunnel',
     'kcp-obfs4': 'KCP + obfs4',
-    'web-tunnel': 'Web-Tunnel (HTTP + MWSS)',
+    'web-tunnel': 'Web-Tunnel (HTTP + WSS)',
     'gaming-socks5-kcp': 'SOCKS5 + KCP',
     'quic-socks5': 'QUIC + SOCKS5',
 }
@@ -90,27 +102,36 @@ def install_gost(ssh, binary=None):
     return True, 'GOST binary verified'
 
 
+def _http_userinfo(profile, password):
+    if not PROFILES[profile].get('http_auth'):
+        return ''
+    return 'vxlb:' + quote(str(password), safe='') + '@'
+
+
 def _server_listen_url(profile, port, password, tls_files=None):
     info = PROFILES[profile]
-    transport = info['transport']
     params = info['params']
     if info.get('tls') and tls_files:
-        params = (params + '&' if params else '') + f'cert={tls_files[0]}&key={tls_files[1]}'
-    url = f'{transport}://:{port}'
+        cert = quote(tls_files[0], safe='/')
+        key = quote(tls_files[1], safe='/')
+        params = (params + '&' if params else '') + f'certFile={cert}&keyFile={key}'
+    userinfo = _http_userinfo(profile, password)
+    url = f"{info['transport']}://{userinfo}:{port}"
     if params:
         url += '?' + params
-    url += '&key=' + password
+    if not userinfo:
+        url += ('&' if params else '?') + 'key=' + quote(str(password), safe='')
     return url
 
 
 def _client_forward_url(profile, remote_ip, port, password):
     info = PROFILES[profile]
-    transport = info['transport']
-    params = info['params']
-    url = f'{transport}://{remote_ip}:{port}'
-    if params:
-        url += '?' + params
-    url += '&key=' + password
+    userinfo = _http_userinfo(profile, password)
+    url = f"{info['transport']}://{userinfo}{remote_ip}:{port}"
+    if info['params']:
+        url += '?' + info['params']
+    if not userinfo:
+        url += ('&' if info['params'] else '?') + 'key=' + quote(str(password), safe='')
     return url
 
 
@@ -366,7 +387,7 @@ def change_ports(name, ports, recovery=False):
                 cmd = _cmd(ssh, node, 'client' if role == 'iran' else 'server',
                            outside_ip=pool['kharej_server']['ip'], ports=ports)
                 write(ssh, f'/etc/systemd/system/{svc}', _unit(node, cmd))
-                execute(ssh, f'systemctl restart {shlex.quote(svc)}')
+                execute(ssh, f'systemctl daemon-reload && systemctl restart {shlex.quote(svc)}')
         def commit(data):
             data['pools'][name]['client_ports'] = ports
         atomic_update(commit)

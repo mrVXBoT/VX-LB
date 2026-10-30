@@ -57,7 +57,8 @@ for kind in (socket.SOCK_STREAM,socket.SOCK_DGRAM):
     if iface:sock.setsockopt(socket.SOL_SOCKET,socket.SO_BINDTODEVICE,iface.encode()+b'\0')
     sock.connect((host,port))
     for i in range(4):
-     size=65536 if kind==socket.SOCK_STREAM and i==0 else 1024
+     # UDP is not segmented. 64 bytes plus the nonce stays under a 576-byte tunnel MTU.
+     size=65536 if kind==socket.SOCK_STREAM and i==0 else 64
      data=nonce+str(i).encode()+secrets.token_bytes(size)
      sock.sendall(data)
      result=b''
@@ -113,13 +114,28 @@ import socket,subprocess,sys,json
 host=sys.argv[1];service=sys.argv[2];ports=json.loads(sys.argv[3])
 pid=subprocess.check_output(['systemctl','show','--property=MainPID','--value',service],text=True).strip()
 rows=subprocess.check_output(['ss','-H','-lntup'],text=True).splitlines();result={}
+def port_of(addr):
+ text=str(addr).rsplit(':',1)[-1]
+ return text if text.isdigit() else ''
 for port in ports:
- owned=pid.isdecimal() and int(pid)>0 and all(any(r.split()[0]==proto and r.split()[4].endswith(':'+str(port)) and ('pid='+pid+',') in r for r in rows) for proto in ('tcp','udp'))
+ owned=pid.isdecimal() and int(pid)>0 and all(any(len(parts)>=5 and parts[0]==proto and port_of(parts[4])==str(port) and ('pid='+pid+',') in r for r in rows for parts in [r.split()]) for proto in ('tcp','udp'))
  reachable=False
  try:
   with socket.create_connection((host,int(port)),timeout=2):reachable=True
  except OSError:pass
- result[str(port)]={'relay_owned':owned,'destination_tcp':reachable}
+ udp='silent'
+ family=socket.AF_INET6 if ':' in host else socket.AF_INET
+ sock=socket.socket(family, socket.SOCK_DGRAM)
+ sock.settimeout(1)
+ try:
+  sock.connect((host,int(port)));sock.send(b'vxlb')
+  try:
+   sock.recv(64);udp='reply'
+  except socket.timeout:udp='silent'
+ except ConnectionRefusedError:udp='closed'
+ except OSError:udp='error'
+ finally:sock.close()
+ result[str(port)]={'relay_owned':owned,'destination_tcp':reachable,'destination_udp':udp}
 print(json.dumps(result))
 '''
 
@@ -146,7 +162,18 @@ def health(pool_name,node,ports):
         for port in ports:
             result=results.get(str(port),{})
             good=result.get('relay_owned') is True and result.get('destination_tcp') is True
-            details[str(port)]={'status':'HEALTHY' if good else 'DOWN','reason':'مسیر خصوصی TCP/UDP و دسترسی TCP مقصد تأیید شدند؛ سلامت برنامهٔ UDP بررسی نشده' if good else 'مسیر خصوصی تأیید شد؛ رله یا سرویس TCP مقصد آماده نیست','path_verified':True,'relay_verified':result.get('relay_owned',False),'destination_tcp':result.get('destination_tcp',False),'udp_application':'UNVERIFIED','latency_ms':path_result['latency_ms'],'last_success_epoch':time.time() if good else None}
+            udp_application={'reply':'VERIFIED','closed':'CLOSED','silent':'SILENT','error':'ERROR'}.get(result.get('destination_udp'), 'UNVERIFIED')
+            if not good:
+                reason='مسیر خصوصی تأیید شد؛ رله یا سرویس TCP مقصد آماده نیست'
+            elif udp_application=='VERIFIED':
+                reason='مسیر خصوصی و پاسخ TCP و UDP مقصد تأیید شد'
+            elif udp_application=='CLOSED':
+                reason='مسیر خصوصی و TCP مقصد تأیید شد؛ پورت UDP مقصد بسته است'
+            elif udp_application=='SILENT':
+                reason='مسیر خصوصی و TCP مقصد تأیید شد؛ UDP مقصد پاسخی نداد'
+            else:
+                reason='مسیر خصوصی TCP/UDP و دسترسی TCP مقصد تأیید شدند؛ سلامت برنامهٔ UDP بررسی نشده'
+            details[str(port)]={'status':'HEALTHY' if good else 'DOWN','reason':reason,'path_verified':True,'relay_verified':result.get('relay_owned',False),'destination_tcp':result.get('destination_tcp',False),'udp_application':udp_application,'latency_ms':path_result['latency_ms'],'last_success_epoch':time.time() if good else None}
         count=sum(v['status']=='HEALTHY' for v in details.values())
         return ('HEALTHY' if count==len(ports) else 'DEGRADED' if count else 'DOWN'),f'{count}/{len(ports)} TCP destinations ready; private TCP/UDP path verified',details
     except Exception:

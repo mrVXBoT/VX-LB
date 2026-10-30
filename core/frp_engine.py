@@ -77,14 +77,15 @@ def _server_config(port, token):
 
 
 def _client_config(kh_ip, port, token, mode, client_ports):
+    # The published client port is the user's TCP entry on every mode. UDP mode
+    # also forwards UDP; without the TCP proxy that port accepts no TCP connection.
     blocks = []
     for p in client_ports:
         p = int(p)
-        if mode in ('tcp', 'dual'):
-            blocks.append(
-                f'[[proxies]]\nname = "p{p}"\ntype = "tcp"\nlocalIP = "127.0.0.1"\n'
-                f'localPort = {p}\nremotePort = {p}\n'
-            )
+        blocks.append(
+            f'[[proxies]]\nname = "p{p}"\ntype = "tcp"\nlocalIP = "127.0.0.1"\n'
+            f'localPort = {p}\nremotePort = {p}\n'
+        )
         if mode in ('udp', 'dual'):
             blocks.append(
                 f'[[proxies]]\nname = "p{p}u"\ntype = "udp"\nlocalIP = "127.0.0.1"\n'

@@ -10,9 +10,9 @@ Topology (as designed by the project):
   - Iran hub: `setup-iran --token <TOKEN> --socks-port N ...`.
 
 Modes:
-  socks    : SOCKS5 on the first client port (socks-bind 0.0.0.0).
-  tun      : expose an OS-level TUN interface (+ optional :53 DNS forwarder).
-  gateway  : transparent L3 gateway for a whole LAN (implies TUN).
+  socks    : SOCKS5 on 127.0.0.1:19080; each client port is a raw TCP forward to Kharej.
+  tun      : same TCP forward, plus an OS-level TUN interface (+ optional :53 DNS).
+  gateway  : same TCP forward, plus a transparent L3 gateway (implies TUN).
 """
 import ipaddress
 import os
@@ -27,6 +27,10 @@ from core.gre import write
 
 BINARY = '/usr/local/bin/hedioum-tunnel'
 SERVICE = 'hedioum.service'
+# The user's TCP port cannot be the SOCKS listener: Hedioum blocks CONNECT to
+# 127.0.0.1, and a raw client does not speak SOCKS. SOCKS stays on loopback and
+# a forwarder publishes each client port to the Kharej address on that same port.
+LOCAL_SOCKS_PORT = 19080
 
 MODES = ('socks', 'tun', 'gateway')
 
@@ -97,9 +101,10 @@ def setup_foreign(ssh, persona='auto', domain=None, move_ssh=False, mimics=None)
 
 
 def _command(mode, alias, token, socks_port, tun_dns=False):
+    del socks_port
     cmd = (f'mkdir -p /etc/hedioum && cd /etc/hedioum && {BINARY} setup-iran --alias {shlex.quote(alias)} '
            f'--token {shlex.quote(token)} '
-           f'--socks-port {int(socks_port)} --socks-bind 0.0.0.0')
+           f'--socks-port {LOCAL_SOCKS_PORT} --socks-bind 127.0.0.1')
     if mode == 'tun':
         cmd += ' --tun'
         if tun_dns:
@@ -132,6 +137,112 @@ def setup_iran(ssh, alias, token, socks_port, mode, tun_dns=False):
 
 def _alias(node):
     return node['hedioum']['alias']
+
+
+def _bridge_service(alias):
+    return f'vxlb-hedioum-tcp-{alias}.service'
+
+
+def _bridge_program(kharej_ip, ports):
+    port_list = ','.join(str(int(port)) for port in ports)
+    return f'''import socket, threading
+socks_port = {LOCAL_SOCKS_PORT}
+kharej = {kharej_ip!r}
+ports = [{port_list}]
+
+def read_exact(sock, size):
+    data = b""
+    while len(data) < size:
+        chunk = sock.recv(size - len(data))
+        if not chunk:
+            raise ConnectionError("short read")
+        data += chunk
+    return data
+
+def pipe(src, dst):
+    try:
+        while True:
+            data = src.recv(65536)
+            if not data:
+                break
+            dst.sendall(data)
+    except OSError:
+        pass
+    finally:
+        for sock in (src, dst):
+            try:
+                sock.close()
+            except OSError:
+                pass
+
+def handle(client, port):
+    remote = None
+    try:
+        remote = socket.create_connection(("127.0.0.1", socks_port), 5)
+        remote.sendall(b"\\x05\\x01\\x00")
+        if read_exact(remote, 2) != b"\\x05\\x00":
+            return
+        ip = bytes(int(part) for part in kharej.split("."))
+        remote.sendall(b"\\x05\\x01\\x00\\x01" + ip + int(port).to_bytes(2, "big"))
+        reply = read_exact(remote, 4)
+        if reply[1] != 0:
+            return
+        if reply[3] == 1:
+            read_exact(remote, 6)
+        elif reply[3] == 4:
+            read_exact(remote, 18)
+        else:
+            length = read_exact(remote, 1)[0]
+            read_exact(remote, length + 2)
+        threading.Thread(target=pipe, args=(client, remote), daemon=True).start()
+        pipe(remote, client)
+    except OSError:
+        pass
+    finally:
+        for sock in (client, remote):
+            if sock is not None:
+                try:
+                    sock.close()
+                except OSError:
+                    pass
+
+def serve(port):
+    server = socket.socket()
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("0.0.0.0", port))
+    server.listen(128)
+    while True:
+        client, _ = server.accept()
+        threading.Thread(target=handle, args=(client, port), daemon=True).start()
+
+for port in ports:
+    threading.Thread(target=serve, args=(port,), daemon=True).start()
+threading.Event().wait()
+'''
+
+
+def publish_tcp_bridge(ssh, alias, kharej_ip, ports):
+    ipaddress.IPv4Address(kharej_ip)
+    ports = [int(port) for port in ports]
+    script = f'/etc/vxlb/hedioum/tcp-{alias}.py'
+    unit = _bridge_service(alias)
+    execute(ssh, 'mkdir -p /etc/vxlb/hedioum')
+    write(ssh, script, _bridge_program(kharej_ip, ports))
+    write(ssh, f'/etc/systemd/system/{unit}', f'''[Unit]
+Description=VX-LB Hedioum TCP forward
+After=hedioum.service
+Wants=hedioum.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 {script}
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+''')
+    execute(ssh, f'systemctl daemon-reload && systemctl enable --now {shlex.quote(unit)} && systemctl restart {shlex.quote(unit)}')
 
 
 def create(name, kharej, servers, ports, settings, callback=None):
@@ -211,6 +322,7 @@ def add(name, server, callback=None):
                               move_ssh=prof.get('move_ssh'))
         socks_port = int(validate_port(prof['socks_port'] or pool['client_ports'][0]))
         setup_iran(iran, alias, token, socks_port, prof['mode'], tun_dns=prof.get('tun_dns'))
+        publish_tcp_bridge(iran, alias, pool['kharej_server']['ip'], pool['client_ports'])
 
         # Ensure hedioum daemon is running and enabled on both servers
         execute(kharej, f'systemctl daemon-reload && systemctl enable --now {shlex.quote(SERVICE)}')
@@ -264,6 +376,7 @@ def remove(name, ip, callback=None):
         alias = _alias(node)
         for ssh in sessions:
             try:
+                execute(ssh, f'systemctl disable --now {shlex.quote(_bridge_service(alias))} 2>/dev/null || true', timeout=20)
                 execute(ssh, f'{BINARY} remove-node --alias {shlex.quote(alias)} 2>/dev/null || true', timeout=60)
             except Exception:
                 execute(ssh, f'systemctl stop {SERVICE} 2>/dev/null || true', timeout=20)
@@ -299,6 +412,11 @@ def health(name, node, ports):
         for ssh in sessions:
             code, _, _ = ssh.execute(f'systemctl is-active --quiet {SERVICE}')
             ok = ok and code == 0
+        if ok:
+            code, _, _ = sessions[0].execute(f'systemctl is-active --quiet {shlex.quote(_bridge_service(_alias(node)))}')
+            ok = code == 0
+            if not ok:
+                return 'DOWN', 'فوروارد TCP هدیوم روی ایران فعال نیست', {}
         if not ok:
             return 'DOWN', 'سرویس Hedioum در یکی از سرورها فعال نیست', {}
         details = {p: {'status': 'HEALTHY', 'reason': 'سرویس Hedioum فعال است'} for p in ports}
@@ -319,16 +437,19 @@ def change_ports(name, ports, recovery=False):
             raise ValueError('حداقل یک پورت باید باقی بماند')
         socks_port = int(ports[0])
         for node in pool['nodes']:
-            kh_ssh = connect(pool['kharej_server'])
-            sessions.append(kh_ssh)
-            # Only the hub's SOCKS port changes; foreign node untouched.
+            iran = connect(node)
+            sessions.append(iran)
             if node.get('hedioum'):
-                node['hedioum']['socks_port'] = socks_port
-            node['tunnel_port'] = socks_port
+                publish_tcp_bridge(iran, _alias(node), pool['kharej_server']['ip'], ports)
         def commit(data):
             data['pools'][name]['client_ports'] = ports
+            data['pools'][name].setdefault('camouflage', {})['socks_port'] = socks_port
+            for node in data['pools'][name]['nodes']:
+                if node.get('hedioum'):
+                    node['hedioum']['socks_port'] = socks_port
+                node['tunnel_port'] = socks_port
         atomic_update(commit)
-        return True, 'پورت‌ها به‌روزرسانی شدند (SOCKS پورت جدید روی نودها پس از بازآرایی اعمال می‌شود)'
+        return True, 'پورت‌های TCP هدیوم به‌روزرسانی شدند'
     except Exception as failure:
         return False, str(failure)
     finally:

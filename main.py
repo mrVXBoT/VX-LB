@@ -419,7 +419,14 @@ def create_pool_flow():
         tr_choice = Prompt.ask("Select protocol number", choices=list(SUPPORTED_TRANSPORTS.keys()), default="3")
         selected_transport = SUPPORTED_TRANSPORTS[tr_choice][0]
     
-    console.print(f"[bold green]Selected Transport: {selected_transport}[/bold green]\n")
+    backpack_carriers = {
+        "tcp": "TCP", "stealth": "Stealth (Noise)", "pck": "PCK (Raw TCP)",
+        "kcp": "KCP", "wss": "WSS (WebSocket + TLS)", "quic": "QUIC",
+    }
+    if selected_transport in backpack_carriers:
+        console.print(f"[bold green]Selected: BackPack · {backpack_carriers[selected_transport]}[/bold green]\n")
+    else:
+        console.print(f"[bold green]Selected Transport: {selected_transport}[/bold green]\n")
     gre_options = {"gre_mtu": Prompt.ask("GRE MTU (576-1400)", default="1400")} if selected_transport == "gre" else {}
 
     if selected_transport == 'waterwall':
@@ -433,7 +440,8 @@ def create_pool_flow():
         mode = mode_choices[wmode]
         settings = default_settings(mode)
         settings['mode'] = mode
-        settings['port'] = Prompt.ask("Preferred outer port on Kharej", default=str(settings.get('port', 443)))
+        port_prompt = "Preferred carrier port on Iran (Kharej dials this)" if mode == 'reverse' else "Preferred outer port on Kharej"
+        settings['port'] = Prompt.ask(port_prompt, default=str(settings.get('port', 443)))
         settings['binary'] = Prompt.ask("WaterWall binary path on both servers", default=settings.get('binary'))
         if mode == 'trojan':
             settings['password'] = Prompt.ask("Trojan shared password (min 8 chars)", default=_secrets.token_hex(8))

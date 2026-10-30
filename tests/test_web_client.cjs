@@ -51,6 +51,10 @@ const originalApiFetch = context.apiFetch;
   assert.equal(element('health-warn').textContent, '1');
   assert.equal(element('health-bad').textContent, '2');
   assert.equal(element('hero-status-pill-text').textContent, context.window.panelCopy.issue);
+  run(`updateHeroMetrics({pools: [{nodes: [{status:'READY'}]}]})`);
+  assert.equal(element('health-warn').textContent, '1');
+  assert.equal(element('health-bad').textContent, '0');
+  assert.equal(element('hero-status-pill-text').textContent, context.window.panelCopy.waiting);
   run(`renderPools([{name:'test', engine:'backpack', transport:'pck', nodes:[{name:'unknown', ip:'192.0.2.1', status:'NEW_STATUS', latency_ms:24.6}]}])`);
   assert.match(element('pools-container').innerHTML, /status-badge unknown/);
   assert.doesNotMatch(element('pools-container').innerHTML, /status-badge healthy/);
@@ -58,6 +62,12 @@ const originalApiFetch = context.apiFetch;
   assert.match(element('pools-container').innerHTML, /pool-nodes-summary/);
   assert.match(element('pools-container').innerHTML, /node-latency-pill/);
   assert.match(element('pools-container').innerHTML, /25 ms/);
+  const readyReason = 'Control channel is up and no impairment was observed; kept in DNS while waiting for user traffic';
+  run(`renderPools([{name:'tset', engine:'backpack', transport:'kcp', nodes:[{name:'ir', ip:'45.38.41.189', status:'READY', reason:${JSON.stringify(readyReason)}}]}])`);
+  assert.match(element('pools-container').innerHTML, /status-badge idle"><span class="pulse-dot"><\/span>منتظر ترافیک/);
+  assert.match(element('pools-container').innerHTML, /کانال کنترل بالاست/);
+  assert.doesNotMatch(element('pools-container').innerHTML, /status-badge unknown"><span class="pulse-dot"><\/span>نامشخص/);
+  assert.equal(context.window.panelCopy.translateReason(readyReason), 'کانال کنترل بالاست و اختلالی دیده نشد؛ تا رسیدن ترافیک کاربر در DNS می‌ماند.');
   run(`renderDomainRoutes({pools:[
     {name:'pool-one', subdomain:'first.example.com', cf_enabled:true},
     {name:'pool-two', subdomain:'second.example.com', cf_enabled:false},
@@ -193,6 +203,15 @@ const originalApiFetch = context.apiFetch;
     assert.equal(element('app-tabbar').attributes['aria-modal'],undefined);
     assert.equal(element('body').classList.contains('drawer-open'),false);
   }
+  run(`renderPools([{name:'one',nodes:[{ip:'192.0.2.1'}],transport_change:{status:'changing',from:'paqet',to:'kcp',from_engine:'paqet',to_engine:'backpack',completed:0,total:1,message:'در حال تغییر'}}])`);
+  assert.match(element('pools-container').innerHTML, /از <bdi dir="ltr">Paqet<\/bdi> به <bdi dir="ltr">BackPack · KCP<\/bdi>/);
+  assert.doesNotMatch(element('pools-container').innerHTML, /به <bdi dir="ltr">kcp<\/bdi>/);
+  run(`lastRenderedPools=''; renderPools([{name:'kcp-pool',engine:'backpack',transport:'kcp',nodes:[{ip:'192.0.2.9',status:'HEALTHY'}]}])`);
+  assert.match(element('pools-container').innerHTML, /BACKPACK \/ KCP/);
+  assert.match(element('pool-engine-filter').innerHTML, /value="backpack">BackPack</);
+  run(`cachedStatus={pools:[{name:'kcp-pool',engine:'backpack',transport:'kcp',nodes:[]}]}; openTransportModal('kcp-pool')`);
+  assert.match(element('transport-summary').innerHTML, /موتور فعلی: <bdi dir="ltr">BackPack<\/bdi>/);
+  assert.match(element('transport-summary').innerHTML, /نوع فعلی: <bdi dir="ltr">KCP<\/bdi>/);
   run(`renderPools([{name:'one',nodes:[],node_removals:{a:{ip:'193.148.253.149',status:'succeeded',message:'نود از استخر حذف شد'}},transport_change:{status:'succeeded',from:'pck',to:'tcp',completed:2,total:2,message:'تمام شد'}}])`);
   const completedHtml = element('pools-container').innerHTML;
   assert.match(completedHtml, /<details class="operation-history"[^>]*><summary>سوابق عملیات/);
@@ -344,6 +363,9 @@ const topologyContext = vm.createContext({console, AbortController,
 });
 vm.runInContext(script[1].replace(/^load\(false\);$/m,''), topologyContext);
 vm.runInContext(`showDetail({type:'kharej',ip:'192.0.2.1',pool:'sample'}); hideDetail()`, topologyContext);
+assert.equal(topologyContext.tunnelCaption('backpack', 'kcp'), 'BackPack · KCP');
+assert.equal(topologyContext.tunnelCaption('kcp', 'kcp'), 'BackPack · KCP');
+assert.equal(topologyContext.tunnelCaption('wireguard', 'wireguard'), 'WIREGUARD');
 const svg = new EventTarget(); svg.style = {};
 let transforms = 0;
 topologyContext.svg = svg;

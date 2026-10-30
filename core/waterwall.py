@@ -87,9 +87,14 @@ def chain_configs(node, outside_ip, ports):
     """Generate Iran and Kharej chain configs for the node's WaterWall mode."""
     mode = node['waterwall']['profile']['mode']
     chain_ports = list(ports)
-    probe_port = node['waterwall'].get('probe_port') or node['waterwall'].get('probe_ingress_port')
-    if probe_port and str(probe_port) not in chain_ports:
-        chain_ports.append(str(probe_port))
+    # Trojan and Reverse keep the destination port, so a dedicated loopback
+    # probe is forwarded to the same port on Kharej. HalfDuplex and Bgp4 always
+    # dial backend_port, and Reality listens only on the first client port.
+    # A side port on those modes is accepted by Iran and never reaches the echo.
+    if mode in ('trojan', 'reverse'):
+        probe_port = node['waterwall'].get('probe_port') or node['waterwall'].get('probe_ingress_port')
+        if probe_port and str(probe_port) not in chain_ports:
+            chain_ports.append(str(probe_port))
     return iran_chain(mode, node, outside_ip, chain_ports), kharej_chain(mode, node, chain_ports)
 
 def core_config(chain_file):
@@ -171,9 +176,18 @@ def firewall(ssh, node, ports, iran, remove=False):
         return
 
     tag = ['-m', 'comment', '--comment', Path(path(node)).stem]
+    mode = (node.get('waterwall') or {}).get('profile', {}).get('mode')
+    # Reverse listens for users and for Kharej's carrier on Iran. Other modes
+    # listen for the carrier on Kharej.
+    listen_ports = list(ports) if iran else []
+    if mode == 'reverse':
+        if iran:
+            listen_ports.append(node['waterwall']['outer_port'])
+    elif not iran:
+        listen_ports.append(node['waterwall']['outer_port'])
     rules = []
-    for port in ports if iran else [node['waterwall']['outer_port']]:
-        for proto in ('tcp', 'udp') if iran else ('tcp',):
+    for port in listen_ports:
+        for proto in ('tcp', 'udp') if iran and port in list(ports) else ('tcp',):
             rules.append(['-p', proto, '--dport', str(port), *tag, '-j', 'ACCEPT'])
 
     for rule in rules:
@@ -182,7 +196,9 @@ def firewall(ssh, node, ports, iran, remove=False):
 
     # WaterWall exposes no TCP_MAXSEG setting. Clamp only this carrier's
     # handshake packets, on both endpoints, without changing global routes.
-    carrier = ['-p', 'tcp', '--dport' if iran else '--sport',
+    # Iran sends the carrier SYN except in Reverse, where Kharej dials Iran.
+    syn_dest = '--dport' if iran != (mode == 'reverse') else '--sport'
+    carrier = ['-p', 'tcp', syn_dest,
                str(int(node['waterwall']['outer_port'])), '--tcp-flags', 'SYN,RST', 'SYN',
                *tag, '-j', 'TCPMSS', '--set-mss', '1360']
     quoted = ' '.join(shlex.quote(r) for r in carrier)
@@ -196,60 +212,140 @@ def test_config(ssh, node):
     if code != 0:
         raise RuntimeError('Config file is not valid JSON')
 
-def verify(iran, kharej, node, ports=None):
-    """Verify data plane: execute bidirectional TCP and UDP nonce probe from Iran ingress to Kharej destination.
+class ProbePortOccupied(RuntimeError):
+    """The only candidate port belongs to the live service, so echo must not bind it."""
 
-    Tests that the tunnel is actually carrying real data bidirectionally.
-    Raises RuntimeError if services are down, errors occurred, or probe data does not match.
+
+def probe_bind_port(node, ports):
+    """Dedicated loopback port the chain forwards. Never a client service port."""
+    occupied = set()
+    for value in ports or []:
+        try:
+            occupied.add(int(value))
+        except (TypeError, ValueError):
+            continue
+    ww = node.get('waterwall') or {}
+    for key in ('probe_ingress_port', 'probe_port'):
+        value = ww.get(key)
+        if value is None or str(value).strip() == '':
+            continue
+        try:
+            port = int(value)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= port <= 65535 and port not in occupied:
+            return port
+    return None
+
+
+def ww_backend(node):
+    return (node.get('waterwall') or {}).get('backend_port')
+
+
+def _usable_port(value):
+    try:
+        port = int(value)
+    except (TypeError, ValueError):
+        return None
+    if 1 <= port <= 65535:
+        return port
+    return None
+
+
+def probe_plan(node, ports):
+    """Return (iran_listen_port, kharej_echo_port, kind).
+
+    kind is 'dedicated' when the chain forwards that port to itself,
+    'service' when HalfDuplex/Bgp4/Reality can only deliver the client port,
+    or 'occupied' when echoing would have to steal a live Trojan/Reverse port.
     """
-    # 1. Verify services are active
-    for ssh, side in [(iran, 'Iran'), (kharej, 'Kharej')]:
-        code, _, err = ssh.execute(f'systemctl is-active --quiet {unit(node)}')
-        if code != 0:
-            raise RuntimeError(f'WaterWall service inactive on {side}: {err}')
+    ww = node.get('waterwall') or {}
+    mode = str((ww.get('profile') or {}).get('mode') or 'trojan')
+    client_ports = [port for port in (_usable_port(value) for value in (ports or [])) if port]
+    backend = _usable_port(ww.get('backend_port'))
+    listen = client_ports[0] if client_ports else backend
+    if mode in ('halfduplex', 'bgp4', 'reality'):
+        echo_port = listen if mode == 'reality' else (backend or listen)
+        if listen and echo_port:
+            return listen, echo_port, 'service'
+        return None, None, 'occupied'
+    dedicated = probe_bind_port(node, ports)
+    if dedicated:
+        return dedicated, dedicated, 'dedicated'
+    return None, None, 'occupied'
 
-    # Check for fatal errors in journalctl
+
+def _deploy_probe_helper(ssh):
+    source = Path(__file__).with_name('waterwall_probe.py').read_text()
+    if not ssh.write_file(HELPER, source):
+        raise RuntimeError(f'Failed to deploy probe helper to {HELPER}')
+    ssh.execute(f'chmod +x {shlex.quote(HELPER)}')
+
+
+def verify(iran, kharej, node, ports=None):
+    """Verify the data plane from the Iran listen port to the port Kharej actually dials.
+
+    Trojan and Reverse echo a dedicated port the chain forwards unchanged.
+    HalfDuplex and Bgp4 always dial backend_port, and Reality listens only on
+    the first client port, so those modes are proved on that service port.
+    When the live service already holds it, the echo is not started; a short
+    reach confirms the tunnel delivered the connection.
+    Returns 'nonce' or 'reach'.
+    Raises ProbePortOccupied when a Trojan/Reverse node has no dedicated port.
+    """
+    for ssh, side in [(iran, 'Iran'), (kharej, 'Kharej')]:
+        code, out, err = ssh.execute(f'systemctl is-active --quiet {unit(node)}')
+        if code != 0:
+            _, journal, _ = ssh.execute(f'journalctl -u {unit(node)} -n 40 --no-pager -o cat 2>/dev/null || true')
+            detail = ' '.join(part.strip() for part in (out, err, journal) if part and part.strip())
+            raise RuntimeError(f'WaterWall service inactive on {side}: {detail}')
+
     for ssh, side in [(iran, 'Iran'), (kharej, 'Kharej')]:
         code, out, _ = ssh.execute(f'journalctl -u {unit(node)} -n 25 --no-pager 2>/dev/null | grep -iE "fatal|panic" || true')
         if out.strip():
             raise RuntimeError(f'WaterWall errors on {side}: {out.strip()}')
 
-    # 2. Determine probe ingress port and Kharej echo responder port.
-    # Probe through a real client port (which the chain actually listens on)
-    # instead of a reserved probe port that no longer exists.
-    configured = [int(p) for p in (ports or [])]
-    ww = node['waterwall']
-    probe_ingress_port = ww.get('probe_ingress_port') or ww.get('probe_port') or (configured[0] if configured else ww.get('backend_port'))
-    probe_echo_port = ww.get('probe_backend_port') or ww.get('probe_port') or (configured[0] if configured else ww.get('backend_port'))
+    listen_port, echo_port, kind = probe_plan(node, ports)
+    if kind == 'occupied':
+        raise ProbePortOccupied('پورت آزمایشی جدا از پورت سرویس وجود ندارد')
 
-    if not probe_ingress_port or not probe_echo_port:
-        raise RuntimeError('No probe port configured for WaterWall verification')
-
-    probe_ingress_port = int(probe_ingress_port)
-    probe_echo_port = int(probe_echo_port)
+    for ssh in (iran, kharej):
+        _deploy_probe_helper(ssh)
 
     channel = None
     try:
-        # Start echo responder on Kharej strictly on the destination produced by configure
-        stdin, out, _ = kharej.client.exec_command(f'python3 {HELPER} echo {probe_echo_port}', timeout=10)
+        stdin, out, err = kharej.client.exec_command(f'python3 {HELPER} echo {echo_port}', timeout=10)
         channel = out.channel
         line = out.readline().strip()
-        if line != 'READY':
-            raise RuntimeError(f'Kharej probe echo responder failed to start on port {probe_echo_port}: {line}')
-
-        # Probe from Iran to Iran entry port (which carries traffic through the tunnel to Kharej)
         mode = node['waterwall'].get('profile', {}).get('mode', 'trojan')
         tcp_only = ' tcp-only' if mode != 'trojan' else ''
-        error = None
-        for attempt in range(4):
-            try:
-                execute(iran, f'python3 {HELPER} probe {probe_ingress_port} {secrets.token_hex(16)}{tcp_only}', timeout=15)
-                return  # Verification succeeded!
-            except RuntimeError as failure:
-                error = failure
-                time.sleep(1)
+        if line == 'READY':
+            error = None
+            for attempt in range(4):
+                try:
+                    execute(iran, f'python3 {HELPER} probe {listen_port} {secrets.token_hex(16)}{tcp_only}', timeout=15)
+                    return 'nonce'
+                except RuntimeError as failure:
+                    error = failure
+                    time.sleep(1)
+            raise RuntimeError(f'WaterWall tunnel verification probe failed targeting port {listen_port}: {error}')
+        # The live service already owns this port. Binding over it flaps health
+        # between HEALTHY (echo won the race) and DOWN (address already in use).
+        service_ports = {port for port in (_usable_port(value) for value in list(ports or []) + [ww_backend(node)]) if port}
+        if line.startswith('BUSY') or 'address already in use' in line.lower():
+            if kind == 'service' or echo_port in service_ports:
+                raise ProbePortOccupied('پورت سرویس در حال استفاده است؛ echo روی آن اجرا نشد')
 
-        raise RuntimeError(f'WaterWall tunnel verification probe failed targeting port {probe_ingress_port}: {error}')
+        detail = line
+        try:
+            if err is not None and getattr(getattr(err, 'channel', None), 'exit_status_ready', lambda: True)():
+                extra = err.read()
+                if isinstance(extra, bytes):
+                    extra = extra.decode(errors='replace')
+                detail = detail or (extra or '').strip()
+        except Exception:
+            pass
+        raise RuntimeError(f'Kharej probe echo responder failed to start on port {echo_port}: {detail}')
 
     finally:
         if channel:
@@ -359,8 +455,9 @@ def add(name, server, callback=None):
             write(ssh, HELPER, Path(__file__).with_name('waterwall_probe.py').read_text())
             execute(ssh, f'chmod +x {HELPER}')
 
-        # Allocate ports
-        outer = free_port(kharej, [p['port'], 443, 8443, 2053, 2083], exclude=pool['client_ports'])
+        # Allocate ports. Reverse's carrier is accepted on Iran; Kharej dials it.
+        port_host = iran if p.get('mode') == 'reverse' else kharej
+        outer = free_port(port_host, [p['port'], 443, 8443, 2053, 2083], exclude=pool['client_ports'])
         backend = int(validate_port(pool['client_ports'][0]))
 
         node['waterwall'] = {
@@ -369,13 +466,16 @@ def add(name, server, callback=None):
             'backend_port': backend
         }
 
-        # Trojan handles many ports natively, so give it a dedicated free probe
-        # port that the echo can bind without colliding with a real backend.
-        if p.get('mode') == 'trojan':
+        # Trojan and Reverse forward the destination port, so the echo can bind
+        # a port that is not the live service. HalfDuplex and Bgp4 always dial
+        # backend_port, and Reality only listens on the first client port.
+        if p.get('mode') in ('trojan', 'reverse'):
             probe_port = free_port(kharej, exclude=[outer, backend, *pool['client_ports']])
             probe_port = free_port(iran, [probe_port], exclude=pool['client_ports'])
             node['waterwall']['probe_port'] = probe_port
-            node['waterwall']['backend_port'] = probe_port
+            node['waterwall']['probe_ingress_port'] = probe_port
+            if p.get('mode') == 'trojan':
+                node['waterwall']['backend_port'] = probe_port
 
         # TLS-backed modes need the SNI domain to point at Kharej and a valid cert
         if p.get('certificate') and p.get('key') and p.get('server_name'):
@@ -413,7 +513,10 @@ def add(name, server, callback=None):
             execute(ssh, f'systemctl daemon-reload && systemctl enable --now {unit(node)}')
 
         progress('تأیید داده TCP/UDP و مسیر رمز‌شده')
-        verify(iran, kharej, node, pool['client_ports'])
+        try:
+            verify(iran, kharej, node, pool['client_ports'])
+        except ProbePortOccupied:
+            pass
 
         def finish(data):
             member = next(n for n in data['pools'][name]['nodes'] if n['node_name'] == node['node_name'])
@@ -487,7 +590,10 @@ def create(name, kharej, servers, ports, settings, callback=None):
 
     results = [add(name, server, callback) for server in servers]
     pool = get_pools()[name]
-    return any(ok for ok, _ in results), 'نتیجهٔ نصب هر نود در کارت استخر ثبت شد', pool
+    failed = [message for ok, message in results if not ok]
+    if failed:
+        return False, '؛ '.join(failed), pool
+    return True, 'نتیجهٔ نصب هر نود در کارت استخر ثبت شد', pool
 
 def remove(name, ip, callback=None):
     """Remove a node from a pool."""
@@ -550,8 +656,18 @@ def health(name, node, ports):
             if code != 0:
                 raise RuntimeError(f'WaterWall service inactive: {err}')
 
-        # Probe data plane through tunnel (Iran -> Kharej)
-        verify(sessions[0], sessions[1], node, ports)
+        # HalfDuplex, Bgp4 and Reality deliver to the live client port. Echoing
+        # there either steals it from the real service or fails with EADDRINUSE
+        # and the next check flips the node back to healthy. Service state and
+        # that backend decide health.
+        mode = str(((node.get('waterwall') or {}).get('profile') or {}).get('mode')
+                   or (pool.get('camouflage') or {}).get('mode') or '')
+        probe_skipped = mode in ('halfduplex', 'bgp4', 'reality')
+        if not probe_skipped:
+            try:
+                verify(sessions[0], sessions[1], node, ports)
+            except ProbePortOccupied:
+                probe_skipped = True
 
         # Check backend TCP connectivity for each port
         script = """import socket,json,sys
@@ -571,18 +687,32 @@ print(json.dumps(result))
             raise RuntimeError(f'Backend health check failed: {err}')
 
         availability = json.loads(out)
-        details = {
-            p: {
+        details = {}
+        for port, ok in availability.items():
+            if ok and not probe_skipped:
+                port_reason = 'مسیر رمز‌شده و دادهٔ TCP/UDP تأیید شد؛ TCP مقصد در دسترس است'
+            elif ok:
+                port_reason = 'سرویس WaterWall و مقصد فعال‌اند؛ echo روی پورت سرویس اجرا نشد تا اتصال واقعی قطع نشود'
+            elif probe_skipped:
+                port_reason = 'سرویس WaterWall فعال است؛ مقصد گوش نمی‌دهد و پورت سرویس برای echo گرفته نشد'
+            else:
+                port_reason = 'مسیر رمز‌شده و دادهٔ TCP/UDP سالم است؛ TCP مقصد درحال حاضر گوش نمی‌دهد'
+            details[port] = {
                 'status': 'HEALTHY' if ok else 'DEGRADED',
-                'reason': 'مسیر رمز‌شده و دادهٔ TCP/UDP تأیید شد؛ TCP مقصد در دسترس است' if ok else 'مسیر رمز‌شده و دادهٔ TCP/UDP سالم است؛ TCP مقصد درحال حاضر گوش نمی‌دهد',
-                'last_success_epoch': time.time() if ok else None
+                'reason': port_reason,
+                'last_success_epoch': time.time() if ok else None,
             }
-            for p, ok in availability.items()
-        }
 
         all_ok = availability and all(availability.values())
         status = 'HEALTHY' if all_ok else 'DEGRADED'
-        reason = 'مسیر رمز‌شدهٔ WaterWall و برنامه‌های مقصد فعال هستند' if all_ok else 'مسیر رمز‌شدهٔ WaterWall سالم است؛ برنامهٔ مقصد درحال حاضر گوش نمی‌دهد'
+        if all_ok and not probe_skipped:
+            reason = 'مسیر رمز‌شدهٔ WaterWall و برنامه‌های مقصد فعال هستند'
+        elif all_ok:
+            reason = 'سرویس WaterWall و مقصد فعال‌اند؛ echo روی پورت سرویس اجرا نشد تا اتصال واقعی قطع نشود'
+        elif probe_skipped:
+            reason = 'سرویس WaterWall فعال است؛ برنامهٔ مقصد درحال حاضر گوش نمی‌دهد'
+        else:
+            reason = 'مسیر رمز‌شدهٔ WaterWall سالم است؛ برنامهٔ مقصد درحال حاضر گوش نمی‌دهد'
         return status, reason, details
 
     except Exception as error:
@@ -635,7 +765,10 @@ def change_ports(name, ports, recovery=False):
             for ssh in (ir_ssh, kh_ssh):
                 execute(ssh, f'systemctl restart {unit(node)}')
 
-            verify(ir_ssh, kh_ssh, node, ports)
+            try:
+                verify(ir_ssh, kh_ssh, node, ports)
+            except ProbePortOccupied:
+                pass
             set_job(name, completed=len(changed))
 
         def commit(data):
@@ -663,7 +796,10 @@ def change_ports(name, ports, recovery=False):
                 for ssh in (ir_ssh, kh_ssh):
                     execute(ssh, f'systemctl restart {unit(node)}')
 
-                verify(ir_ssh, kh_ssh, node, pool['client_ports'])
+                try:
+                    verify(ir_ssh, kh_ssh, node, pool['client_ports'])
+                except ProbePortOccupied:
+                    pass
             except Exception as e:
                 errors.append(str(e))
 

@@ -62,7 +62,10 @@ for attempt in range(int(sys.argv[1])):
  pid=r.stdout.strip()
  if pid.isdecimal() and int(pid)>0:
   rows=subprocess.check_output(['ss','-H','-lntup'],text=True).splitlines()
-  if all(any(row.split()[0]==proto and row.split()[4].endswith(':'+port) and ('pid='+pid+',') in row for row in rows) for port in sys.argv[3:] for proto in ('tcp','udp')):sys.exit(0)
+  def port_of(addr):
+   text=addr.rsplit(':',1)[-1]
+   return text if text.isdigit() else ''
+  if all(any(len(parts)>=5 and parts[0]==proto and port_of(parts[4])==port and ('pid='+pid+',') in row for row in rows for parts in [row.split()]) for port in sys.argv[3:] for proto in ('tcp','udp')):sys.exit(0)
  time.sleep(0.2)
 state=subprocess.run(['systemctl','show','--property=LoadState,ActiveState,SubState,MainPID,Result,ExecMainStatus','--value',sys.argv[2]],capture_output=True,text=True).stdout.strip()
 print('relay '+sys.argv[2]+' is not listening; MainPID='+repr(pid)+'; '+state)

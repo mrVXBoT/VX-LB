@@ -27,13 +27,65 @@ class GostProfileTests(unittest.TestCase):
         self.assertIn("key=secret-pass-1234", url)
         tls_url = gost._server_listen_url("obfs4-tls", 8443, "secret-pass-1234",
                                            ("/etc/vxlb/gost/x.crt", "/etc/vxlb/gost/x.key"))
-        self.assertIn("cert=/etc/vxlb/gost/x.crt", tls_url)
-        self.assertIn("key=/etc/vxlb/gost/x.key", tls_url)
+        self.assertIn("certFile=/etc/vxlb/gost/x.crt", tls_url)
+        self.assertIn("keyFile=/etc/vxlb/gost/x.key", tls_url)
+        self.assertIn("key=secret-pass-1234", tls_url)
+
+    def test_web_tunnel_uses_wss_and_http_auth(self):
+        url = gost._server_listen_url("web-tunnel", 8443, "secret-pass-1234",
+                                       ("/etc/vxlb/gost/x.crt", "/etc/vxlb/gost/x.key"))
+        self.assertTrue(url.startswith("http+wss://vxlb:secret-pass-1234@:8443?"))
+        self.assertIn("path=/ws", url)
+        self.assertIn("certFile=/etc/vxlb/gost/x.crt", url)
+        self.assertIn("keyFile=/etc/vxlb/gost/x.key", url)
+        self.assertNotIn("key=secret-pass-1234", url)
+        self.assertNotIn("mwss", url)
+        forward = gost._client_forward_url("web-tunnel", "203.0.113.5", 8443, "secret-pass-1234")
+        self.assertTrue(forward.startswith("http+wss://vxlb:secret-pass-1234@203.0.113.5:8443?"))
 
     def test_client_forward_url(self):
         url = gost._client_forward_url("grpc-tls", "203.0.113.5", 8443, "secret-pass-1234")
         self.assertTrue(url.startswith("relay+grpc+tls://203.0.113.5:8443?"))
         self.assertIn("key=secret-pass-1234", url)
+
+    def test_gaming_kcp_publishes_tcp_port(self):
+        node = {"gost": {"profile": "gaming-socks5-kcp", "port": 8443, "password": "secret-pass-1234",
+                          "binary": "/usr/local/bin/gost", "host": "/etc/vxlb/gost/xyz"}}
+        cmd = gost._cmd(object(), node, "client", outside_ip="203.0.113.5", ports=["2255"])
+        self.assertIn("tcp://:2255/127.0.0.1:2255", cmd)
+        self.assertNotIn("udp://:2255/127.0.0.1:2255", cmd)
+        forward = next(part for part in cmd if part.startswith("socks5+kcp://"))
+        self.assertIn("mode=fast3", forward)
+        self.assertIn("key=secret-pass-1234", forward)
+
+    def test_kcp_obfs4_publishes_tcp_port(self):
+        node = {"gost": {"profile": "kcp-obfs4", "port": 8443, "password": "secret-pass-1234",
+                          "binary": "/usr/local/bin/gost", "host": "/etc/vxlb/gost/xyz"}}
+        cmd = gost._cmd(object(), node, "client", outside_ip="203.0.113.5", ports=["2255"])
+        self.assertIn("tcp://:2255/127.0.0.1:2255", cmd)
+        forward = next(part for part in cmd if part.startswith("relay+kcp+obfs4://"))
+        self.assertIn("iat-mode=0", forward)
+
+    def test_quic_socks5_publishes_tcp_port(self):
+        node = {"gost": {"profile": "quic-socks5", "port": 8443, "password": "secret-pass-1234",
+                          "binary": "/usr/local/bin/gost", "host": "/etc/vxlb/gost/xyz"}}
+        cmd = gost._cmd(object(), node, "client", outside_ip="203.0.113.5", ports=["2255"])
+        self.assertIn("tcp://:2255/127.0.0.1:2255", cmd)
+        self.assertNotIn("udp://:2255/127.0.0.1:2255", cmd)
+        forward = next(part for part in cmd if part.startswith("socks5+quic://"))
+        self.assertIn("timeout=60", forward)
+        self.assertIn("key=secret-pass-1234", forward)
+
+    def test_ssh_uses_relay_and_every_tcp_profile_publishes_tcp(self):
+        url = gost._server_listen_url("ssh", 8443, "secret-pass-1234")
+        self.assertTrue(url.startswith("relay+ssh://:8443?"))
+        self.assertNotIn("forward+ssh", url)
+        for name, info in gost.PROFILES.items():
+            node = {"gost": {"profile": name, "port": 8443, "password": "secret-pass-1234",
+                              "binary": "/usr/local/bin/gost", "host": "/etc/vxlb/gost/xyz"}}
+            cmd = gost._cmd(object(), node, "client", outside_ip="203.0.113.5", ports=["2255"])
+            self.assertIn("tcp://:2255/127.0.0.1:2255", cmd, name)
+            self.assertFalse(any(str(part).startswith("forward+") for part in cmd), name)
 
     def test_cmd_client_has_port_forward(self):
         node = {"gost": {"profile": "shadowsocks-tcp", "port": 8443, "password": "secret-pass-1234",

@@ -173,8 +173,36 @@ class TelemetryWatchdog:
             status, reason, details = health(pool_name, node, client_ports or [])
             self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
             return status, reason, [], details
+        other = self._health_for_other_engine(pool_name, node, client_ports)
+        if other is not None:
+            return other
         status, reason, _, details = self._analyze_backpack_health(pool_name, node, client_ports)
         return status, reason, [], details
+
+    def _health_for_other_engine(self, pool_name: str, node: dict, client_ports: Optional[List[str]]) -> Optional[Tuple[str, str, List[str], Dict[str, dict]]]:
+        """Keep non-BackPack engines out of the BackPack journal check."""
+        from core.tunnel import NON_BACKPACK_TRANSPORTS, SUPPORTED_TRANSPORTS
+        engine = str(node.get('engine') or '').strip().lower()
+        transport = str(node.get('transport') or '').strip().lower()
+        identity = engine or transport
+        backpack_names = {value[0] for value in SUPPORTED_TRANSPORTS.values()} - set(NON_BACKPACK_TRANSPORTS)
+        if identity in ('', 'backpack') or identity in backpack_names:
+            return None
+        meta_key = None
+        for key in (engine, transport, 'wireguard'):
+            meta = node.get(key)
+            if isinstance(meta, dict) and meta.get('local_private') and meta.get('remote_private') and (meta.get('interface') or meta.get('iface')):
+                meta_key = key
+                break
+        if meta_key:
+            probed = dict(node, engine=meta_key)
+            from core.private_link_health import health as check_health
+            status, reason, details = check_health(pool_name, probed, client_ports or [])
+            self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
+            return status, reason, [], details
+        reason = "Engine '%s' is not a BackPack tunnel; missing control-channel logs were not treated as failure" % identity
+        self.save_node_telemetry(pool_name, node['ip'], 'UNMONITORED', reason, [], {})
+        return 'UNMONITORED', reason, [], {}
 
     def _analyze_backpack_health(self, pool_name: str, node: dict, client_ports: Optional[List[str]] = None) -> Tuple[str, str, List[str], Dict[str, dict]]:
         """
@@ -210,12 +238,14 @@ class TelemetryWatchdog:
             self.save_node_telemetry(pool_name, ip, "DOWN", reason, [], {})
             return "DOWN", reason, [], {}
 
+        control_ready = False
         if node.get('node_name'):
             if not control_connected(ssh, 'backpack-'+node['node_name']+'.service'):
                 ssh.close()
                 reason = 'Tunnel control channel is disconnected; service active does not mean traffic can pass'
                 self.save_node_telemetry(pool_name, ip, 'DOWN', reason, [], {})
                 return 'DOWN', reason, [], {}
+            control_ready = True
 
         # Read the time window, including the rotated file; busy ports must not
         # push successful sessions out of an arbitrary tail-of-lines sample.
@@ -429,6 +459,12 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
                 # Untested node: NOT FILTERED! It is IDLE and eligible for traffic
                 status = "IDLE"
                 reason = f"No recent traffic across pool ports {', '.join(ports)} (Awaiting connections)"
+            if status == "IDLE" and control_ready:
+                # The control channel is up and nothing has stalled. Dropping this
+                # node from strict DNS would prevent the user traffic that could
+                # ever make it HEALTHY again.
+                status = "READY"
+                reason = "Control channel is up and no impairment was observed; kept in DNS while waiting for user traffic"
 
         self.save_node_telemetry(pool_name, ip, status, reason, recent_log_lines[-5:], port_results)
         return status, reason, recent_log_lines[-5:], port_results
@@ -492,9 +528,11 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
                     }
                     aggregated_nodes[f"{pool_name}:{ip}"] = node_results[ip]
 
-                    if status in ("HEALTHY", "CANARY"):
+                    if status in ("HEALTHY", "CANARY", "READY"):
                         all_healthy_ips.add(ip)
                         log(f"  ✅ [{status}] {ip}: {reason}")
+                    elif status == "UNMONITORED":
+                        log(f"  ⚪ [UNMONITORED] {ip}: {reason}")
                     elif status == "DEGRADED":
                         log(f"  ⚠️ [DEGRADED] {ip}: {reason}")
                     elif status == "IDLE":
@@ -513,6 +551,8 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
             # 4. IDLE nodes: untested nodes without failure proof (must be in DNS to receive initial traffic).
             # 5. FILTERED nodes: confirmed multi-client stalls (excluded from DNS).
             healthy_ips = [ip for ip, r in node_results.items() if r["status"] == "HEALTHY"]
+            ready_ips = [ip for ip, r in node_results.items() if r["status"] == "READY"]
+            unmonitored_ips = [ip for ip, r in node_results.items() if r["status"] == "UNMONITORED"]
             canary_ips = [ip for ip, r in node_results.items() if r["status"] == "CANARY"]
             degraded_ips = [ip for ip, r in node_results.items() if r["status"] == "DEGRADED"]
             idle_ips = [ip for ip, r in node_results.items() if r["status"] == "IDLE"]
@@ -523,9 +563,18 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
             # or explicitly configured 'permissive' for legacy trial routing.
             dns_policy = pool.get("dns_policy", "strict")
             standby_ip = pool.get("standby_ip")
-            backend_state = "HEALTHY" if healthy_ips else "NO_VERIFIED_BACKEND"
+            if healthy_ips:
+                backend_state = "HEALTHY"
+            elif ready_ips:
+                backend_state = "READY"
+            elif unmonitored_ips:
+                backend_state = "UNMONITORED"
+            else:
+                backend_state = "NO_VERIFIED_BACKEND"
             if dns_policy == "strict":
-                active_dns_ips = sorted(list(set(healthy_ips)))
+                # READY still has a live control channel. UNMONITORED must stay
+                # published so a missing checker cannot delete a working tunnel.
+                active_dns_ips = sorted(set(healthy_ips + ready_ips + unmonitored_ips))
                 if not active_dns_ips:
                     if standby_ip:
                         active_dns_ips = [standby_ip]
@@ -533,10 +582,10 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
                     else:
                         log(f"  ⚠️ [Strict 6.10 Policy] No node in pool '{pool_name}' has confirmed complete path health; DNS failover suspended to prevent unverified routing.")
             else:
-                if healthy_ips:
-                    active_dns_ips = sorted(list(set(healthy_ips + canary_ips + degraded_ips)))
-                elif idle_ips or degraded_ips or canary_ips:
-                    active_dns_ips = sorted(list(set(idle_ips + degraded_ips + canary_ips)))
+                if healthy_ips or ready_ips:
+                    active_dns_ips = sorted(set(healthy_ips + ready_ips + canary_ips + degraded_ips + unmonitored_ips))
+                elif idle_ips or degraded_ips or canary_ips or unmonitored_ips:
+                    active_dns_ips = sorted(set(idle_ips + degraded_ips + canary_ips + unmonitored_ips))
                 else:
                     fallback_ip = standby_ip or (nodes[0]["ip"] if nodes else "")
                     if not fallback_ip:

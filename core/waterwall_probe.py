@@ -30,10 +30,14 @@ async def echo(port):
         loop.add_reader(sys.stdin.fileno(), done.set)
     except Exception:
         pass
-    server = await asyncio.start_server(handle, '127.0.0.1', port)
-    transport, _ = await loop.create_datagram_endpoint(
-        lambda: Echo(), local_addr=('127.0.0.1', port)
-    )
+    try:
+        server = await asyncio.start_server(handle, '127.0.0.1', port)
+        transport, _ = await loop.create_datagram_endpoint(
+            lambda: Echo(), local_addr=('127.0.0.1', port)
+        )
+    except OSError as error:
+        print(f'BUSY {error}', flush=True)
+        return
     print('READY', flush=True)
     try:
         await done.wait()
@@ -41,6 +45,28 @@ async def echo(port):
         server.close()
         await server.wait_closed()
         transport.close()
+
+def reach(port):
+    """Prove the live backend accepted the tunnel connection without binding its port.
+
+    A banner, or a peer that stays open, means the service is there. An immediate
+    close is the same failure as a nonce that comes back empty.
+    """
+    with socket.create_connection(('127.0.0.1', port), timeout=5) as sock:
+        sock.settimeout(2)
+        try:
+            sock.sendall(b'\x00')
+        except OSError as error:
+            raise RuntimeError(f'WaterWall reach write failed on port {port}: {error}') from error
+        try:
+            data = sock.recv(16)
+        except socket.timeout:
+            print('WATERWALL_PROBE_OK')
+            return
+        if data:
+            print('WATERWALL_PROBE_OK')
+            return
+    raise RuntimeError(f'WaterWall reach closed on port {port}: got 0 bytes')
 
 def probe(port, nonce, protocols=('tcp', 'udp')):
     payload = (nonce.encode() * 1024)[:32768]
@@ -80,5 +106,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 4 and sys.argv[4] == 'tcp-only':
             protocols = ('tcp',)
         probe(int(sys.argv[2]), sys.argv[3], protocols)
+    elif sys.argv[1] == 'reach':
+        reach(int(sys.argv[2]))
     else:
         raise ValueError(f'Unknown action: {sys.argv[1]}')

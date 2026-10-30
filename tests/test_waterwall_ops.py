@@ -251,6 +251,96 @@ class WaterWallOpsTests(unittest.TestCase):
                 status, reason, details = waterwall.health(self.pool_name, self.node, [self.backend_port])
             self.assertEqual(status, 'DOWN')
 
+    def test_live_client_port_is_not_reported_as_tunnel_down(self):
+        """A working backend on the client port must not be replaced by the echo probe."""
+        node = copy.deepcopy(self.node)
+        node['waterwall'].pop('probe_port', None)
+        node['waterwall'].pop('probe_ingress_port', None)
+        node['waterwall'].pop('probe_backend_port', None)
+        ir_ssh = LocalMockSSH(service_active=True)
+        kh_ssh = LocalMockSSH(service_active=True)
+        with socket.socket() as app_server:
+            app_server.bind(('127.0.0.1', self.backend_port))
+            app_server.listen(1)
+            with patch('core.waterwall.connect', side_effect=[ir_ssh, kh_ssh]):
+                status, reason, details = waterwall.health(self.pool_name, node, [self.backend_port])
+        self.assertEqual(status, 'HEALTHY')
+        self.assertNotIn('failed to start', reason)
+        self.assertIn('پورت سرویس', reason)
+        echo_cmds = [c for c in kh_ssh.executed_commands if ' echo ' in f' {c} ']
+        self.assertEqual(echo_cmds, [])
+        self.assertEqual(details[str(self.backend_port)]['status'], 'HEALTHY')
+
+    def test_halfduplex_probe_uses_the_backend_the_chain_dials(self):
+        """HalfDuplex always dials backend_port. A side probe port returns 0 bytes."""
+        node = copy.deepcopy(self.node)
+        node['waterwall']['profile'] = waterwall.profile('halfduplex', {
+            'password': 'x', 'port': self.outer_port, 'binary': '/tmp/waterwall-bin/Waterwall'
+        })
+        node['waterwall']['backend_port'] = self.backend_port
+        side = 55379 if self.backend_port != 55379 else 55380
+        node['waterwall']['probe_port'] = side
+        node['waterwall']['probe_ingress_port'] = side
+        iran_ssh = LocalMockSSH(service_active=True)
+        kharej_ssh = LocalMockSSH(service_active=True)
+
+        waterwall.verify(iran_ssh, kharej_ssh, node, ports=[str(self.backend_port)])
+
+        echo_cmds = [c for c in kharej_ssh.executed_commands if ' echo ' in f' {c} ']
+        probe_cmds = [c for c in iran_ssh.executed_commands if ' probe ' in f' {c} ']
+        self.assertTrue(echo_cmds)
+        self.assertIn(str(self.backend_port), echo_cmds[0])
+        self.assertNotIn(str(side), echo_cmds[0])
+        self.assertTrue(probe_cmds)
+        self.assertIn(str(self.backend_port), probe_cmds[0])
+        self.assertNotIn(str(side), probe_cmds[0])
+        self.assertNotIn(' reach ', f" {probe_cmds[0]} ")
+
+    def test_reality_busy_service_port_stays_healthy(self):
+        """Monitoring must not report the live Reality backend as a dead tunnel."""
+        node = copy.deepcopy(self.node)
+        node['waterwall']['profile'] = waterwall.profile('reality', {
+            'password': 'secret', 'server_name': 'www.microsoft.com',
+            'port': self.outer_port, 'binary': '/tmp/waterwall-bin/Waterwall'
+        })
+        node['waterwall']['backend_port'] = self.backend_port
+        node['waterwall'].pop('probe_port', None)
+        node['waterwall'].pop('probe_ingress_port', None)
+        self.pool['camouflage'] = node['waterwall']['profile']
+        self.storage_data['pools'][self.pool_name] = copy.deepcopy(self.pool)
+        self.storage_data['pools'][self.pool_name]['nodes'] = [node]
+        ir_ssh = LocalMockSSH(service_active=True)
+        kh_ssh = LocalMockSSH(service_active=True)
+        with socket.socket() as app_server:
+            app_server.bind(('127.0.0.1', self.backend_port))
+            app_server.listen(1)
+            with patch('core.waterwall.connect', side_effect=[ir_ssh, kh_ssh]):
+                status, reason, details = waterwall.health(self.pool_name, node, [self.backend_port])
+        self.assertEqual(status, 'HEALTHY')
+        self.assertNotIn('failed to start', reason)
+        self.assertNotIn('BUSY', reason)
+        self.assertIn('پورت سرویس', reason)
+        echo_cmds = [c for c in kh_ssh.executed_commands if ' echo ' in f' {c} ']
+        self.assertEqual(echo_cmds, [])
+        self.assertEqual(details[str(self.backend_port)]['status'], 'HEALTHY')
+
+    def test_create_reports_the_node_failure(self):
+        saved = {}
+
+        def save_pool(name, pool):
+            saved[name] = pool
+
+        with patch('core.waterwall.save_pool', side_effect=save_pool), \
+             patch('core.waterwall.get_pools', side_effect=lambda: saved), \
+             patch('core.load_balancer.LoadBalancerManager.check_port_conflicts', return_value=(True, '')), \
+             patch('core.waterwall.add', return_value=(False, 'WaterWall tunnel verification probe failed targeting port 55379')):
+            ok, message, _pool = waterwall.create(
+                'wwprobe', {'ip': '203.0.113.10', 'name': 'kharej'},
+                [{'ip': '203.0.113.20', 'name': 'iran'}], ['2255'], {'mode': 'halfduplex'})
+        self.assertFalse(ok)
+        self.assertIn('55379', message)
+        self.assertNotIn('نتیجهٔ نصب هر نود در کارت استخر ثبت شد', message)
+
     def test_change_ports_success(self):
         """Test changing ports across the pool: updates configs, firewall, verifies, and commits."""
         ir_ssh = LocalMockSSH(service_active=True)

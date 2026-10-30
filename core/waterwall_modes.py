@@ -7,7 +7,7 @@ fixed VLESS+TLS+Mux+cert shape.
 Modes:
   - trojan      : TrojanClient/TrojanServer (password-based; TLS optional)
   - reality     : RealityClient/RealityServer (fake-SNI camouflage, no cert)
-  - reverse     : ReverseClient/ReverseServer (Iran dials out to Kharej)
+  - reverse     : ReverseServer on Iran, ReverseClient on Kharej (Kharej dials Iran)
   - halfduplex  : HalfDuplexClient/HalfDuplexServer (separate up/down paths)
   - bgp4       : Bgp4Client/Bgp4Server (BGP-shaped framing, no real BGP)
 
@@ -28,7 +28,7 @@ MODE_LABELS = {
 
 MODE_HINTS = {
     "halfduplex": "Separate upload and download channels",
-    "reverse": "Iran initiates the connection to Kharej",
+    "reverse": "Kharej dials Iran; users still enter on the Iran ports",
     "trojan": "Shared-password authentication; optional TLS requires certificates",
     "bgp4": "BGP-shaped framing; does not provide BGP routing",
     "reality": "Reality mode with configurable SNI; no public server certificate required",
@@ -200,7 +200,20 @@ def _iran_reality(prof, ports_list, port_cfg, kharej_ip, outer, node):
     return {"name": f"iran-reality-{node['node_name']}", "nodes": iran_nodes}
 
 
+def _reverse_secret(prof):
+    return {
+        "reverse-secret-length": int(prof.get("secret_length", 640)),
+        "reverse-secret": str(prof.get("secret") or "vxlb-waterwall-reverse"),
+    }
+
+
 def _iran_reverse(prof, ports_list, port_cfg, kharej_ip, outer, node):
+    """Users enter on Iran. Kharej's ReverseClient dials the peer listener.
+
+    ReverseServer is the side that can accept connections. Putting ReverseClient
+    on Iran feeds a listener into a node that treats upstream Init as fatal, so
+    the Iran process exits and systemd reports the service inactive.
+    """
     iran_nodes = [
         {
             "name": "tcp-listener",
@@ -212,26 +225,35 @@ def _iran_reverse(prof, ports_list, port_cfg, kharej_ip, outer, node):
                 "large-send-buffer": True,
                 "large-recv-buffer": True,
             },
+            "next": "port-header",
+        },
+        {
+            "name": "port-header",
+            "type": "HeaderClient",
+            "settings": {"data": "src_context->port"},
+            "next": "bridge-users",
+        },
+        {"name": "bridge-users", "type": "Bridge", "settings": {"pair": "bridge-reverse"}},
+        {"name": "bridge-reverse", "type": "Bridge", "settings": {"pair": "bridge-users"}},
+        {
+            "name": "reverse-server",
+            "type": "ReverseServer",
+            "settings": _reverse_secret(prof),
             "next": "bridge-reverse",
         },
         {
-            "name": "bridge-reverse",
-            "type": "Bridge",
-            "settings": {},
-            "next": "reverse-client",
-        },
-        {
-            "name": "reverse-client",
-            "type": "ReverseClient",
+            "name": "peer-listener",
+            "type": "TcpListener",
             "settings": {
-                "minimum-unused": 16,
-                "reverse-secret-length": prof.get("secret_length", 640),
-                "reverse-secret": prof.get("secret", "vxlb-waterwall-reverse"),
+                "address": "0.0.0.0",
+                "port": int(outer),
+                "nodelay": True,
+                "large-send-buffer": True,
+                "large-recv-buffer": True,
+                "whitelist": [f"{kharej_ip}/32"],
             },
-            "next": "tcp-connector",
+            "next": "reverse-server",
         },
-        _kp_connector(kharej_ip, outer),
-        _blackhole("blackhole-iran-reverse"),
     ]
     return {"name": f"iran-reverse-{node['node_name']}", "nodes": iran_nodes}
 
@@ -339,6 +361,13 @@ def _kharej_trojan(prof, outer, allowed, target_port, node):
 
 
 def _kharej_reality(prof, outer, allowed, target_port, node):
+    """Dial the backend port directly after RealityServer.
+
+    A destination-port router never matches this connection: the accepted
+    socket is the outer carrier, not the Iran client port. The blackhole then
+    closes it and the probe reads zero bytes. Reality already has one backend
+    port, so the server node connects there itself.
+    """
     sni = prof.get("server_name") or "www.microsoft.com"
     nodes = [
         {
@@ -351,34 +380,57 @@ def _kharej_reality(prof, outer, allowed, target_port, node):
             "name": "reality-server",
             "type": "RealityServer",
             "settings": {"destination": "visitor-site", "password": prof["password"]},
-            "next": "backend-router",
+            "next": "tcp-connector-backend",
         },
         _connector("visitor-site", sni, 443),
+        _connector("tcp-connector-backend", "127.0.0.1", int(target_port)),
     ]
-    nodes += _backend_tail(allowed, target_port, tcp_only=True)
     return {"name": f"kharej-reality-{node['node_name']}", "nodes": nodes}
 
 
 def _kharej_reverse(prof, outer, allowed, target_port, node):
+    """Kharej dials Iran, then connects the recovered user port on loopback."""
+    iran_ip = node.get("ip")
+    if not iran_ip:
+        raise ValueError("Reverse needs the Iran server address")
     nodes = [
         {
-            "name": "tcp-listener",
-            "type": "TcpListener",
-            "settings": {"address": "0.0.0.0", "port": outer, "nodelay": True, "large-send-buffer": True, "large-recv-buffer": True},
-            "next": "reverse-server",
+            "name": "tcp-connector-backend",
+            "type": "TcpConnector",
+            "settings": {
+                "address": "127.0.0.1",
+                "port": "dest_context->port",
+                "nodelay": True,
+                "large-send-buffer": True,
+                "large-recv-buffer": True,
+            },
         },
         {
-            "name": "reverse-server",
-            "type": "ReverseServer",
-            "settings": {
-                "reverse-secret-length": prof.get("secret_length", 640),
-                "reverse-secret": prof.get("secret", "vxlb-waterwall-reverse"),
-            },
-            "next": "bridge-reverse",
+            "name": "port-header",
+            "type": "HeaderServer",
+            "settings": {"override": "dest_context->port"},
+            "next": "tcp-connector-backend",
         },
-        {"name": "bridge-reverse", "type": "Bridge", "settings": {}, "next": "backend-router"},
+        {
+            "name": "bridge-local",
+            "type": "Bridge",
+            "settings": {"pair": "bridge-reverse"},
+            "next": "port-header",
+        },
+        {
+            "name": "bridge-reverse",
+            "type": "Bridge",
+            "settings": {"pair": "bridge-local"},
+            "next": "reverse-client",
+        },
+        {
+            "name": "reverse-client",
+            "type": "ReverseClient",
+            "settings": dict(_reverse_secret(prof), **{"minimum-unused": 16}),
+            "next": "tcp-connector",
+        },
+        _kp_connector(iran_ip, outer),
     ]
-    nodes += _backend_tail(allowed, target_port)
     return {"name": f"kharej-reverse-{node['node_name']}", "nodes": nodes}
 
 

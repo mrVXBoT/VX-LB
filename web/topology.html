@@ -617,7 +617,7 @@
   .st-DEGRADED { background: var(--status-warn-bg); color: var(--amber); }
   .st-FILTERED { background: var(--status-err-bg); color: var(--red); }
   .st-DOWN { background: rgba(107,114,128,0.2); color: #9ca3af; }
-  .st-IDLE { background: rgba(96,165,250,0.15); color: var(--blue); }
+  .st-IDLE, .st-READY { background: rgba(96,165,250,0.15); color: var(--blue); }
 
   @media(max-width: 768px) {
     .topo-header { padding: 10px 14px; gap: 8px; }
@@ -737,6 +737,18 @@ let nodePos = {};   // key -> {x, y} coordinates (persisted across polls!)
 let edgeSrc = {};   // edge key -> source node key (pools use "kharej"; links use "lkh:<ip>")
 let dragNode = null;
 let currentPoolName = "";
+const BACKPACK_CARRIERS = { tcp: "TCP", stealth: "Stealth", pck: "PCK", mux: "MUX", kcp: "KCP", wss: "WSS", quic: "QUIC" };
+function tunnelCaption(engine, transport) {
+  const carrierId = String(transport || "").toLowerCase();
+  const engineId = String(engine || "").toLowerCase();
+  const backpack = engineId === "backpack" ||
+    ((!engineId || engineId === carrierId) && Object.prototype.hasOwnProperty.call(BACKPACK_CARRIERS, carrierId));
+  if (backpack) {
+    const carrier = BACKPACK_CARRIERS[carrierId];
+    return carrier ? `BackPack · ${carrier}` : "BackPack";
+  }
+  return (carrierId || engineId || "tcp").toUpperCase();
+}
 let hasFitted = false;
 const NODE_W = 224, NODE_H = 80;
 const LINK_STATUS_COLOR = { HEALTHY: "var(--green)", DEGRADED: "var(--amber)", DOWN: "var(--red)", UNVERIFIED: "var(--gray)" };
@@ -744,11 +756,11 @@ const LINK_STATUS_FA = { HEALTHY: "سالم", DEGRADED: "ناپایدار", DOWN
 
 const STATUS_COLOR = {
   HEALTHY: "var(--green)", CANARY: "var(--amber)", DEGRADED: "var(--amber)", FILTERED: "var(--red)",
-  DOWN: "var(--gray)", IDLE: "var(--blue)"
+  DOWN: "var(--gray)", IDLE: "var(--blue)", READY: "var(--blue)"
 };
 const STATUS_FA = {
   HEALTHY: "سالم", CANARY: "آزمایشی", DEGRADED: "ناپایدار", FILTERED: "فیلترشده",
-  DOWN: "قطع", IDLE: "بی‌کار"
+  DOWN: "قطع", IDLE: "بی‌کار", READY: "منتظر ترافیک"
 };
 
 async function apiFetch(path) {
@@ -998,7 +1010,7 @@ function render(forceFit = false) {
   const sub = document.createElementNS(NS, "text");
   sub.setAttribute("x", W - 24); sub.setAttribute("y", 58);
   sub.setAttribute("direction", "ltr"); sub.setAttribute("text-anchor", "end"); sub.setAttribute("class", "pool-sub");
-  sub.textContent = `${pool.transport || "tcp"} · ${faNum(nodesCount(pool))} نود فعال`;
+  sub.textContent = `${tunnelCaption(pool.engine, pool.transport)} · ${faNum(nodesCount(pool))} نود فعال`;
   g.appendChild(sub);
 
   const nodes = pool.nodes || [];
@@ -1016,7 +1028,7 @@ function render(forceFit = false) {
   // Kharej hub node
   drawNode(g, NS, "kharej", {
     title: "سرور خارج (مقصد)", ip: pool.kharej_ip || "—",
-    sub: `${pool.transport || "tcp"} · هاب مرکزی`, color: "var(--accent)"
+    sub: `${tunnelCaption(pool.engine, pool.transport)} · هاب مرکزی`, color: "var(--accent)"
   }, { type: "kharej", ip: pool.kharej_ip, pool: pool.name });
 
   // Iran nodes & edges
@@ -1051,7 +1063,9 @@ function render(forceFit = false) {
     const lbl = document.createElementNS(NS, "text");
     lbl.setAttribute("class", "edge-label");
     lbl.setAttribute("text-anchor", "middle");
-    lbl.textContent = (n.transport || pool.transport || "tcp").toUpperCase();
+    const edgeCaption = tunnelCaption(n.engine || pool.engine, n.transport || pool.transport);
+    lbl.textContent = edgeCaption;
+    lblBg.setAttribute("width", String(Math.max(72, edgeCaption.length * 7 + 18)));
     lblGrp.appendChild(lblBg);
     lblGrp.appendChild(lbl);
     g.appendChild(lblGrp);
@@ -1183,7 +1197,7 @@ function renderLinks(forceFit = false) {
       const lbl = document.createElementNS(NS, "text");
       lbl.setAttribute("class", "edge-label");
       lbl.setAttribute("text-anchor", "middle");
-      lbl.textContent = `${(link.engine_id || "?").toUpperCase()} · MTU ${link.mtu || "—"} · ${telem.label}`;
+      lbl.textContent = `${tunnelCaption(link.engine_id, link.engine_id)} · MTU ${link.mtu || "—"} · ${telem.label}`;
       lblGrp.appendChild(lblBg); lblGrp.appendChild(lbl);
       g.appendChild(lblGrp);
 
@@ -1405,7 +1419,7 @@ function showDetail(d) {
     rows.innerHTML = `
       <div class="row"><span class="k">وضعیت لینک</span><span>${escHtml(link.status || "—")}</span></div>
       <div class="row"><span class="k">سلامت تله‌متری</span><span class="status-badge st-${escAttr(telem.raw)}">${escHtml(telem.label)}</span></div>
-      <div class="row"><span class="k">موتور</span><span class="val-mono">${escHtml(link.engine_id || "—")}</span></div>
+      <div class="row"><span class="k">موتور</span><span class="val-mono">${escHtml(tunnelCaption(link.engine_id, link.engine_id))}</span></div>
       <div class="row"><span class="k">ایران</span><span class="val-mono">${escHtml(link.iran_server?.ip || "—")}</span></div>
       <div class="row"><span class="k">خارج</span><span class="val-mono">${escHtml(link.kharej_server?.ip || "—")}</span></div>
       <div class="row"><span class="k">شبکه خصوصی</span><span class="val-mono">${escHtml(link.private_subnet || "—")}</span></div>

@@ -24,6 +24,7 @@ def make_node(mode):
     prof = waterwall.profile(mode, settings)
     return {
         "node_name": "ldw" + "a" * 16,
+        "ip": "192.0.2.10",
         "waterwall": {
             "profile": prof,
             "outer_port": 8443,
@@ -83,6 +84,20 @@ class WaterWallConfigTests(unittest.TestCase):
         for mode in MODES:
             node = make_node(mode)
             _, kharej_chain = waterwall.chain_configs(node, "192.0.2.1", ["443"])
+            if mode == "reality":
+                server = next(n for n in kharej_chain["nodes"] if n["type"] == "RealityServer")
+                connector = next(n for n in kharej_chain["nodes"] if n["name"] == "tcp-connector-backend")
+                self.assertEqual(server["next"], "tcp-connector-backend")
+                self.assertEqual(connector["settings"]["port"], 9443)
+                self.assertNotIn("backend-router", {n["name"] for n in kharej_chain["nodes"]})
+                continue
+            if mode == "reverse":
+                connector = next(n for n in kharej_chain["nodes"] if n["name"] == "tcp-connector-backend")
+                self.assertEqual(connector["settings"]["port"], "dest_context->port")
+                header = next(n for n in kharej_chain["nodes"] if n["type"] == "HeaderServer")
+                self.assertEqual(header["settings"]["override"], "dest_context->port")
+                self.assertEqual(header["next"], "tcp-connector-backend")
+                continue
             if mode in direct_backend_modes:
                 connector = next((n for n in kharej_chain["nodes"] if n["name"] == "tcp-connector-backend"), None)
                 self.assertIsNotNone(connector, mode)
@@ -110,27 +125,46 @@ class WaterWallConfigTests(unittest.TestCase):
         for mode, (client_type, server_type) in expectations.items():
             node = make_node(mode)
             iran_chain, kharej_chain = waterwall.chain_configs(node, "192.0.2.1", ["443"])
+            if mode == "reverse":
+                self.assertTrue(any(n["type"] == "ReverseServer" for n in iran_chain["nodes"]), mode)
+                self.assertTrue(any(n["type"] == "ReverseClient" for n in kharej_chain["nodes"]), mode)
+                continue
             self.assertTrue(any(n["type"] == client_type for n in iran_chain["nodes"]), mode)
             self.assertTrue(any(n["type"] == server_type for n in kharej_chain["nodes"]), mode)
 
     def test_reverse_and_bridge_adjacency(self):
         node = make_node("reverse")
-        iran_chain, kharej_chain = waterwall.chain_configs(node, "192.0.2.1", ["443"])
-        iran_types = [n["type"] for n in iran_chain["nodes"]]
-        kharej_types = [n["type"] for n in kharej_chain["nodes"]]
-        self.assertIn("Bridge", iran_types)
-        self.assertIn("ReverseClient", iran_types)
-        self.assertIn("Bridge", kharej_types)
-        self.assertIn("ReverseServer", kharej_types)
-        # Bridge must be immediately before ReverseClient on the client side
-        client_nodes = iran_chain["nodes"]
-        for i, n in enumerate(client_nodes):
-            if n["type"] == "ReverseClient":
-                self.assertEqual(client_nodes[i - 1]["type"], "Bridge")
-        server_nodes = kharej_chain["nodes"]
-        for i, n in enumerate(server_nodes):
-            if n["type"] == "ReverseServer":
-                self.assertEqual(server_nodes[i + 1]["type"], "Bridge")
+        iran_chain, kharej_chain = waterwall.chain_configs(node, "192.0.2.1", ["443", "2053"])
+        iran = {n["name"]: n for n in iran_chain["nodes"]}
+        kharej = {n["name"]: n for n in kharej_chain["nodes"]}
+        self.assertEqual(iran["reverse-server"]["type"], "ReverseServer")
+        self.assertEqual(iran["reverse-server"]["next"], "bridge-reverse")
+        self.assertEqual(iran["bridge-reverse"]["settings"]["pair"], "bridge-users")
+        self.assertEqual(iran["bridge-users"]["settings"]["pair"], "bridge-reverse")
+        self.assertNotIn("next", iran["bridge-users"])
+        self.assertEqual(iran["peer-listener"]["next"], "reverse-server")
+        self.assertEqual(iran["peer-listener"]["settings"]["whitelist"], ["192.0.2.1/32"])
+        self.assertEqual(iran["port-header"]["settings"]["data"], "src_context->port")
+        self.assertEqual(kharej["reverse-client"]["type"], "ReverseClient")
+        self.assertEqual(kharej["bridge-reverse"]["next"], "reverse-client")
+        self.assertEqual(kharej["bridge-reverse"]["settings"]["pair"], "bridge-local")
+        self.assertEqual(kharej["tcp-connector"]["settings"]["address"], "192.0.2.10")
+        self.assertEqual(kharej["tcp-connector"]["settings"]["port"], 8443)
+        self.assertNotIn("ReverseClient", {n["type"] for n in iran_chain["nodes"]})
+
+    def test_fixed_backend_modes_do_not_publish_a_side_probe_port(self):
+        for mode in ("halfduplex", "bgp4", "reality"):
+            node = make_node(mode)
+            node["waterwall"]["probe_port"] = 55379
+            node["waterwall"]["probe_ingress_port"] = 55379
+            iran_chain, kharej_chain = waterwall.chain_configs(node, "192.0.2.1", ["443", "2053"])
+            blob = json.dumps({"iran": iran_chain, "kharej": kharej_chain})
+            self.assertNotIn("55379", blob, mode)
+        for mode in ("trojan", "reverse"):
+            node = make_node(mode)
+            node["waterwall"]["probe_port"] = 55379
+            iran_chain, kharej_chain = waterwall.chain_configs(node, "192.0.2.1", ["443"])
+            self.assertIn("55379", json.dumps(iran_chain) + json.dumps(kharej_chain), mode)
 
     def test_trojan_password_carried(self):
         node = make_node("trojan")

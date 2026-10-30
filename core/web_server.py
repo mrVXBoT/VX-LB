@@ -705,7 +705,9 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                 svc = f"vxlb-frpc-{nnq}.service" if node_name else "vxlb-frp*.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} 2>/dev/null")
             elif eng == 'rathole':
-                svc = f"vxlb-ratholec-{nnq}.service" if node_name else "vxlb-rathole*.service"
+                # The log modal SSHes to Iran. Rathole's server unit is there;
+                # the client unit runs on Kharej and has no journal on this host.
+                svc = f"vxlb-ratholes-{nnq}.service" if node_name else "vxlb-ratholes*.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} 2>/dev/null")
             elif eng == 'candy-spoof':
                 svc = f"vxlb-candyc-{nnq}.service" if node_name else "vxlb-candy*.service"

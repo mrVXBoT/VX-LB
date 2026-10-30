@@ -56,8 +56,9 @@ eyJ2IjoyLCJpcCI6IjE0My4yNDYuMTM4LjI0NSIsImF1dGgiOiJhZTBmMDI2N2ViMmZmNjllMmJlZWZi
             h.setup_iran(ssh, "alias1", "tok", 2255, mode, tun_dns=True)
             cmd = ssh.execute.call_args[0][0]
             self.assertIn(f"--alias alias1", cmd)
-            self.assertIn("--socks-port 2255", cmd)
-            self.assertIn("--socks-bind 0.0.0.0", cmd)
+            self.assertIn(f"--socks-port {h.LOCAL_SOCKS_PORT}", cmd)
+            self.assertIn("--socks-bind 127.0.0.1", cmd)
+            self.assertNotIn("--socks-port 2255", cmd)
             if mode == "gateway":
                 self.assertIn("--gateway", cmd)
                 self.assertIn("--tun", cmd)
@@ -65,6 +66,14 @@ eyJ2IjoyLCJpcCI6IjE0My4yNDYuMTM4LjI0NSIsImF1dGgiOiJhZTBmMDI2N2ViMmZmNjllMmJlZWZi
                 self.assertIn("--tun", cmd)
             else:
                 self.assertNotIn("--tun", cmd)
+
+    def test_tcp_bridge_speaks_socks_to_kharej_public_ip(self):
+        program = h._bridge_program("31.57.24.207", [2255])
+        self.assertIn("kharej = '31.57.24.207'", program)
+        self.assertIn("ports = [2255]", program)
+        self.assertIn('b"\\x05\\x01\\x00"', program)
+        self.assertIn("127.0.0.1", program)
+        self.assertNotIn("0.0.0.0", program.split("bind", 1)[0])
 
     def test_setup_iran_recovers_stale_foreign_config(self):
         # A node previously provisioned as egress/foreign refuses setup-iran with

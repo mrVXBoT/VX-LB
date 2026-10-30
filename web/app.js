@@ -485,8 +485,15 @@ function setPoolSearch(q) { poolSearch = String(q || "").trim().toLowerCase(); i
 function setPoolEngineFilter(v) { poolEngineFilter = String(v || ""); if (cachedStatus) { lastRenderedPools = ""; renderPools(cachedStatus.pools || []); } }
 function setServerSearch(q) { serverSearch = String(q || "").trim().toLowerCase(); if (cachedServers) renderServers(cachedServers); }
 
+function poolEngineKey(pool) {
+  const engine = String(pool?.engine || "").toLowerCase();
+  const transport = String(pool?.transport || "").toLowerCase();
+  if (engine === "backpack" || ["tcp", "stealth", "pck", "mux", "kcp", "wss", "quic"].includes(transport)) return "backpack";
+  return engine || transport;
+}
+
 function poolMatchesFilters(p) {
-  if (poolEngineFilter && (p.engine || p.transport || "") !== poolEngineFilter) return false;
+  if (poolEngineFilter && poolEngineKey(p) !== poolEngineFilter) return false;
   if (!poolSearch) return true;
   const hay = [p.name, p.kharej_ip, p.subdomain, p.engine, p.transport, ...(p.nodes || []).flatMap(n => [n.ip, n.name])]
     .filter(Boolean).join(" ").toLowerCase();
@@ -596,7 +603,7 @@ function updateHeroMetrics(data) {
 
   const nodes = pools.flatMap(pool => pool.nodes || []);
   const healthy = nodes.filter(node => node.status === 'HEALTHY').length;
-  const pending = nodes.filter(node => ['IDLE', 'CANARY'].includes(node.status)).length;
+  const pending = nodes.filter(node => ['IDLE', 'CANARY', 'READY'].includes(node.status)).length;
   const issues = nodes.length - healthy - pending;
   document.getElementById('healthy-count').textContent = faNumber.format(healthy);
   document.getElementById('health-total-label').textContent = `از مجموع ${faNumber.format(nodes.length)} نود`;
@@ -684,6 +691,35 @@ function deletionRecoveryMarkup(pool, job, kind) {
     </div>
   </div>`;
 }
+function displayedCarrier(engineId, transportId) {
+  const transport = String(transportId || "").toLowerCase();
+  const engine = String(engineId || "").toLowerCase();
+  const resolved = engine === "backpack" || ["tcp", "stealth", "pck", "mux", "kcp", "wss", "quic"].includes(transport)
+    ? "backpack" : (engine || TRANSPORT_TO_ENGINE[transport] || "");
+  const family = ENGINE_TRANSPORTS[resolved];
+  const option = family?.transports?.find(item => item.value === transport);
+  return option?.label || transport.toUpperCase();
+}
+
+function changeEndpointLabel(engineId, transportId) {
+  const transport = String(transportId || "").toLowerCase();
+  const engine = String(engineId || "").toLowerCase();
+  const backpackTransport = transport && transport !== "backpack" &&
+    (engine === "backpack" || (!engine && TRANSPORT_TO_ENGINE[transport] === "backpack"));
+  if (backpackTransport) {
+    const option = ENGINE_TRANSPORTS.backpack.transports.find(item => item.value === transport);
+    return `BackPack · ${option ? option.label : transport.toUpperCase()}`;
+  }
+  const family = ENGINE_TRANSPORTS[engine];
+  if (family) {
+    if (!transport || transport === engine) return family.label;
+    const option = family.transports.find(item => item.value === transport);
+    if (option && option.value !== engine) return `${family.label} · ${option.label}`;
+    return family.label;
+  }
+  return transport || engine;
+}
+
 function operationMarkup(pool, job, kind) {
   const active = ['queued','running','preflight','changing','validating','rolling_back'].includes(job.status);
   const failed = ['failed','rollback_failed'].includes(job.status) || job.cleanup_pending === true;
@@ -694,7 +730,7 @@ function operationMarkup(pool, job, kind) {
     ? 'کلید هویت SSH سرور تغییر کرده است؛ پاک‌سازی متوقف شد. برای حذف همراه با پاک‌سازی، ابتدا هویت سرور و کلید جدید را بررسی کنید.'
     : deletionFailed ? 'پاک‌سازی کامل نشد. برای ادامه یکی از روش‌های زیر را انتخاب کنید.' : job.message;
   const targetId = kind === 'transport' ? '' : (job.ip || '');
-  const description = kind === 'task' ? `<span>${job.kind === 'delete' ? 'حذف سرویس‌ها و منابع استخر' : job.kind === 'slipstream_settings' ? 'تغییر دامنه، resolver یا QPS تونل DNS' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS و بررسی انتقال داده' : 'تغییر پورت‌های استخر'}</span>` : kind === 'creation' ? '<span>راه‌اندازی سرورها و تونل‌های استخر</span>' : kind === 'gre' ? '<span>تنظیمات لینک خصوصی و فوروارد پورت</span>' : kind === 'transport' ? `<span class="operation-route" dir="rtl">از <bdi dir="ltr">${escapeHtml(job.from)}</bdi> به <bdi dir="ltr">${escapeHtml(job.to)}</bdi><small style="color:var(--text-muted);font-size:10px;"> · ${faNumber.format(job.completed || 0)} از ${faNumber.format(job.total || 0)} نود</small></span>` : `<span class="op-ip-pill"><bdi dir="ltr">${escapeHtml(job.ip)}</bdi></span>`;
+  const description = kind === 'task' ? `<span>${job.kind === 'delete' ? 'حذف سرویس‌ها و منابع استخر' : job.kind === 'slipstream_settings' ? 'تغییر دامنه، resolver یا QPS تونل DNS' : job.kind === 'http_transport' ? 'تغییر HTTP/HTTPS و بررسی انتقال داده' : 'تغییر پورت‌های استخر'}</span>` : kind === 'creation' ? '<span>راه‌اندازی سرورها و تونل‌های استخر</span>' : kind === 'gre' ? '<span>تنظیمات لینک خصوصی و فوروارد پورت</span>' : kind === 'transport' ? `<span class="operation-route" dir="rtl">از <bdi dir="ltr">${escapeHtml(changeEndpointLabel(job.from_engine, job.from))}</bdi> به <bdi dir="ltr">${escapeHtml(changeEndpointLabel(job.to_engine, job.to))}</bdi><small style="color:var(--text-muted);font-size:10px;"> · ${faNumber.format(job.completed || 0)} از ${faNumber.format(job.total || 0)} نود</small></span>` : `<span class="op-ip-pill"><bdi dir="ltr">${escapeHtml(job.ip)}</bdi></span>`;
   const clearBtn = !active && job.status !== 'rollback_failed' ? `<button type="button" class="op-dismiss-btn" data-pool="${escapeHtml(pool.name)}" data-kind="${escapeHtml(kind)}" data-id="${escapeHtml(targetId)}" onclick="clearPoolOperation(this.dataset.pool, this.dataset.kind, this.dataset.id, this)" title="پاک کردن این پیام" aria-label="پاک کردن پیام">${uiIcon("close")}</button>` : '';
 
   const phaseLabels = {queued:'در صف اجرا', preparing:'آماده‌سازی', connecting:'اتصال به سرورها',
@@ -786,7 +822,7 @@ const GOST_PROFILE_TITLES = {
   "grpc-tls": "gRPC + TLS",
   "ssh": "SSH Tunnel",
   "kcp-obfs4": "KCP + obfs4",
-  "web-tunnel": "Web-Tunnel (HTTP + MWSS)",
+  "web-tunnel": "Web-Tunnel (HTTP + WSS)",
   "gaming-socks5-kcp": "SOCKS5 + KCP",
   "quic-socks5": "QUIC + SOCKS5"
 };
@@ -903,6 +939,10 @@ function getPoolProtoTag(p) {
   }
   if (tr === "http" || tr === "https") {
     return `${tr.toUpperCase()} / MTLS`;
+  }
+  if (eng === "backpack" || ["stealth", "pck", "mux", "kcp", "wss", "quic"].includes(tr) || (!eng && tr === "tcp")) {
+    const carriers = { tcp: "TCP", stealth: "STEALTH", pck: "PCK", mux: "MUX", kcp: "KCP", wss: "WSS", quic: "QUIC" };
+    return `BACKPACK / ${carriers[tr] || tr.toUpperCase()}`;
   }
   return tr.toUpperCase();
 }
@@ -1083,9 +1123,9 @@ function renderPools(pools) {
   // Populate engine filter options from observed engines/transports.
   const engineSel = document.getElementById("pool-engine-filter");
   if (engineSel) {
-    const engines = [...new Set(pools.map(p => p.engine || p.transport || "").filter(Boolean))].sort();
+    const engines = [...new Set(pools.map(poolEngineKey).filter(Boolean))].sort();
     const current = engineSel.value;
-    const html = '<option value="">همهٔ موتورها</option>' + engines.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join("");
+    const html = '<option value="">همهٔ موتورها</option>' + engines.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(changeEndpointLabel(e, e))}</option>`).join("");
     if (engineSel.dataset.lastHtml !== html) { engineSel.innerHTML = html; engineSel.dataset.lastHtml = html; }
     if (engineSel.options && [...engineSel.options].some(o => o.value === current)) engineSel.value = current;
   }
@@ -1124,7 +1164,7 @@ function renderPools(pools) {
     // Nodes with filter
     const filteredNodes = (p.nodes || []).filter(n => {
       if (nodeFilter === "HEALTHY") return n.status === "HEALTHY";
-      if (nodeFilter === "ISSUE") return n.status !== "HEALTHY";
+      if (nodeFilter === "ISSUE") return !["HEALTHY", "READY"].includes(n.status);
       return true;
     });
 
@@ -1138,6 +1178,7 @@ function renderPools(pools) {
       if (n.status === "CANARY") { stClass = "canary"; stLabel = "آزمایشی"; }
       else if (n.status === "FILTERED") { stClass = "filtered"; stLabel = "اختلال تأییدشده"; }
       else if (n.status === "IDLE") { stClass = "idle"; stLabel = "بدون ترافیک تازه"; }
+      else if (n.status === "READY") { stClass = "idle"; stLabel = "منتظر ترافیک"; }
 
       const latVal = typeof n.latency_ms === "number" && n.latency_ms > 0 ? n.latency_ms : (typeof n.ping_ms === "number" && n.ping_ms > 0 ? n.ping_ms : null);
       const latBadge = latVal !== null ? `<span class="node-latency-pill" title="پینگ / تأخیر پاسخ"><svg class="ui-icon" style="width:10px;height:10px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg><bdi>${Math.round(latVal)} ms</bdi></span>` : "";
@@ -2756,34 +2797,34 @@ const ENGINE_TRANSPORTS = {
     label: "GOST",
     transports: [
       { value: "gost", profile: "shadowsocks-tcp", label: "Shadowsocks TCP", hint: "انتقال TCP با Shadowsocks و رمزنگاری AES-256-GCM؛ کلاینت باید با این روش سازگار باشد." },
-      { value: "gost", profile: "shadowsocks-udp", label: "Shadowsocks UDP", hint: "رلهٔ UDP با Shadowsocks و رمزنگاری AES-256-GCM؛ نیازمند دسترسی UDP." },
+      { value: "gost", profile: "shadowsocks-udp", label: "Shadowsocks UDP", hint: "پورت کاربر TCP است. مسیر بین ایران و خارج Shadowsocks روی UDP است." },
       { value: "gost", profile: "shadowsocks-tls", label: "Shadowsocks + TLS", hint: "انتقال Shadowsocks روی TLS؛ نیازمند تنظیم گواهی در سمت سرور." },
       { value: "gost", profile: "shadowsocks-ws", label: "Shadowsocks + WebSocket", hint: "انتقال Shadowsocks در WebSocket؛ تنظیمات پراکسی و TLS باید با دو سمت هماهنگ باشند." },
       { value: "gost", profile: "obfs4", label: "obfs4", hint: "انتقال رله با مبهم‌سازی obfs4؛ استفاده از این پروفایل به معنی اتصال به شبکهٔ Tor نیست." },
       { value: "gost", profile: "obfs4-tls", label: "obfs4 + TLS", hint: "انتقال obfs4 روی TLS؛ نیازمند تنظیم گواهی در سمت سرور." },
       { value: "gost", profile: "grpc", label: "gRPC", hint: "انتقال رله روی gRPC؛ نتیجه به پشتیبانی مسیر و پراکسی از gRPC بستگی دارد." },
       { value: "gost", profile: "grpc-tls", label: "gRPC + TLS", hint: "انتقال gRPC روی TLS با گواهی سرور." },
-      { value: "gost", profile: "ssh", label: "SSH Tunnel", hint: "انتقال پورت‌ها در تونل SSH؛ نیازمند احراز هویت و دسترسی به سرویس SSH." },
-      { value: "gost", profile: "kcp-obfs4", label: "KCP + obfs4", hint: "ترکیب KCP در حالت Fast3 و مبهم‌سازی obfs4؛ نیازمند دسترسی UDP." },
-      { value: "gost", profile: "web-tunnel", label: "Web-Tunnel (HTTP + MWSS)", hint: "انتقال HTTP روی WebSocket امن و چندجریانی (MWSS)." },
+      { value: "gost", profile: "ssh", label: "SSH Tunnel", hint: "پورت کاربر TCP است. GOST آن را با SSH خودش به خارج می‌برد، نه با SSH مدیریت سرور." },
+      { value: "gost", profile: "kcp-obfs4", label: "KCP + obfs4", hint: "پورت کاربر TCP است. مسیر بین ایران و خارج KCP و obfs4 روی UDP است." },
+      { value: "gost", profile: "web-tunnel", label: "Web-Tunnel (HTTP + WSS)", hint: "انتقال HTTP روی WebSocket امن. باینری فعلی MWSS را رد می‌کند." },
       { value: "gost", profile: "gaming-socks5-kcp", label: "SOCKS5 + KCP", hint: "پراکسی SOCKS5 روی KCP؛ تأخیر و مصرف پهنای باند به شرایط مسیر وابسته‌اند." },
-      { value: "gost", profile: "quic-socks5", label: "QUIC + SOCKS5", hint: "پراکسی SOCKS5 روی QUIC؛ نیازمند دسترسی UDP." }
+      { value: "gost", profile: "quic-socks5", label: "QUIC + SOCKS5", hint: "پورت کاربر TCP است. مسیر بین ایران و خارج QUIC روی UDP است." }
     ]
   },
   frp: {
     label: "FRP",
     transports: [
       { value: "frp", mode: "tcp", label: "FRP · TCP", hint: "انتقال پورت‌های TCP از ایران به سرویس مقصد از طریق اتصال معکوس FRP." },
-      { value: "frp", mode: "udp", label: "FRP · UDP", hint: "انتقال پورت‌های UDP از ایران به سرویس مقصد از طریق اتصال معکوس FRP." },
+      { value: "frp", mode: "udp", label: "FRP · UDP", hint: "پورت کاربر TCP می‌ماند و همان پورت UDP هم فوروارد می‌شود." },
       { value: "frp", mode: "dual", label: "FRP · TCP + UDP", hint: "انتقال هم‌زمان TCP و UDP برای هر پورت انتخاب‌شده." }
     ]
   },
   hedioum: {
     label: "Hedioum",
     transports: [
-      { value: "hedioum", mode: "socks", label: "SOCKS5", hint: "ارائهٔ پراکسی SOCKS5؛ پورت پیش‌فرض از اولین پورت کلاینت گرفته می‌شود." },
-      { value: "hedioum", mode: "tun", label: "TUN", hint: "ایجاد رابط شبکهٔ TUN با امکان فعال‌سازی انتقال DNS." },
-      { value: "hedioum", mode: "gateway", label: "Gateway (L3)", hint: "دروازهٔ شفاف لایهٔ ۳ برای شبکهٔ محلی با استفاده از رابط TUN." }
+      { value: "hedioum", mode: "socks", label: "SOCKS5", hint: "پورت کاربر TCP خام است و به Xray خارج می‌رسد. SOCKS5 هدیوم فقط روی لوکال ایران می‌ماند." },
+      { value: "hedioum", mode: "tun", label: "TUN", hint: "رابط TUN روی ایران ساخته می‌شود. پورت کاربر همچنان TCP خام است و به Xray خارج می‌رسد." },
+      { value: "hedioum", mode: "gateway", label: "Gateway (L3)", hint: "دروازهٔ لایهٔ ۳ برای شبکهٔ محلی. پورت کاربر همچنان TCP خام است و به Xray خارج می‌رسد." }
     ]
   },
   rathole: {
@@ -2995,7 +3036,7 @@ function openTransportModal(name) {
 
   const summaryEl = document.getElementById('transport-summary');
   if (summaryEl) {
-    summaryEl.innerHTML = `<bdi dir="auto">${escapeHtml(name)}</bdi><span>موتور فعلی: <bdi dir="ltr">${escapeHtml(currentEngine)}</bdi></span><span>نوع فعلی: <bdi dir="ltr">${escapeHtml(currentTransport)}</bdi></span><span>${faNumber.format(pool.nodes?.length || 0)} نود</span>`;
+    summaryEl.innerHTML = `<bdi dir="auto">${escapeHtml(name)}</bdi><span>موتور فعلی: <bdi dir="ltr">${escapeHtml(changeEndpointLabel(currentEngine, currentEngine))}</bdi></span><span>نوع فعلی: <bdi dir="ltr">${escapeHtml(displayedCarrier(currentEngine, currentTransport))}</bdi></span><span>${faNumber.format(pool.nodes?.length || 0)} نود</span>`;
   }
 
   const engineSel = document.getElementById('transport-change-engine');

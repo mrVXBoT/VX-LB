@@ -73,6 +73,45 @@ def test_geneve_probe_cannot_succeed_without_connected_endpoints():
     assert verify_geneve_tunnel(object(),object())==(False,None)
 
 
+def test_relay_port_match_is_exact():
+    rows=['tcp LISTEN 0 128 0.0.0.0:8080 0.0.0.0:* users:(("relay",pid=9,fd=3))',
+          'udp UNCONN 0 0 0.0.0.0:443 0.0.0.0:* users:(("relay",pid=9,fd=4))',
+          'tcp LISTEN 0 128 [::]:80 [::]:* users:(("relay",pid=9,fd=5))']
+    def owns(port, proto):
+        def port_of(addr):
+            text=addr.rsplit(':',1)[-1]
+            return text if text.isdigit() else ''
+        return any(len(parts)>=5 and parts[0]==proto and port_of(parts[4])==str(port) and 'pid=9,' in row for row in rows for parts in [row.split()])
+    assert owns(8080,'tcp')
+    assert owns(80,'tcp')
+    assert not any(row.split()[4].rsplit(':',1)[-1]=='80' and '8080' in row.split()[4] for row in rows)
+    assert not owns(443,'tcp')
+    assert owns(443,'udp')
+
+
+def test_ready_control_channel_stays_in_strict_dns_while_idle_does_not():
+    from contextlib import nullcontext
+    from core.watchdog import TelemetryWatchdog
+    data={'cloudflare':{'enabled':True,'api_token':'test','zone_id':'zone','subdomain':'example.test'},
+          'pools':{'p':{'dns_policy':'strict','nodes':[{'ip':'192.0.2.1'},{'ip':'192.0.2.2'},{'ip':'192.0.2.9'}],'client_ports':['443']}}}
+    watchdog=TelemetryWatchdog()
+    with patch('core.watchdog.load_data',return_value=data),patch('core.watchdog.routing_lock',side_effect=nullcontext),patch.object(watchdog,'analyze_node_health',side_effect=[('READY','control up',[],{}),('HEALTHY','flow',[],{}),('IDLE','no proof',[],{})]),patch('core.watchdog.CloudflareManager') as manager:
+        manager.return_value.sync_subdomain.return_value={'added':[],'deleted':[],'kept':['192.0.2.1','192.0.2.2']}
+        manager.return_value.record_snapshot.return_value={}
+        watchdog.run_check_cycle()
+    manager.return_value.sync_subdomain.assert_called_once_with('example.test',['192.0.2.1','192.0.2.2'],proxied=False,ttl=60)
+
+
+def test_unmonitored_engine_is_not_scored_as_backpack():
+    from core.watchdog import TelemetryWatchdog
+    watchdog=TelemetryWatchdog()
+    with patch.object(watchdog,'save_node_telemetry') as save:
+        status,reason,_,_=watchdog.analyze_node_health('p',{'ip':'192.0.2.8','engine':'wireguard_hybrid'},['443'])
+    assert status=='UNMONITORED'
+    assert 'BackPack' in reason
+    assert save.call_args.args[2]=='UNMONITORED'
+
+
 def test_default_dns_policy_does_not_route_listener_only_idle_nodes():
     from contextlib import nullcontext
     from core.watchdog import TelemetryWatchdog

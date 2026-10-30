@@ -157,6 +157,15 @@ def setup_tunnel_node(
     if not iran_ssh.write_file(f"/etc/systemd/system/backpack-{tunnel_name}.service", iran_unit):
         return False, f"Failed to create systemd service on Iran server ({iran_ssh.ip})"
 
+    def abandon_partial_setup():
+        # Iran is started before Kharej. Any later failure must remove both
+        # sides so a half-created service does not keep the tunnel port.
+        for endpoint in (iran_ssh, kharej_ssh):
+            try:
+                stop_and_remove_tunnel(endpoint, tunnel_name)
+            except Exception:
+                pass
+
     iran_ssh.execute("systemctl daemon-reload")
     c_ir, _, err_ir = iran_ssh.execute("systemctl enable --now " + shquote("backpack-%s.service" % tunnel_name))
     if c_ir != 0:
@@ -167,14 +176,17 @@ def setup_tunnel_node(
     kharej_unit = build_systemd_unit(tunnel_name)
 
     if not kharej_ssh.write_file(f"/etc/backpack/{tunnel_name}.toml", kharej_cfg):
+        abandon_partial_setup()
         return False, f"Failed to write configuration on Kharej server ({kharej_ssh.ip})"
 
     if not kharej_ssh.write_file(f"/etc/systemd/system/backpack-{tunnel_name}.service", kharej_unit):
+        abandon_partial_setup()
         return False, f"Failed to create systemd service on Kharej server ({kharej_ssh.ip})"
 
     kharej_ssh.execute("systemctl daemon-reload")
     c_kh, _, err_kh = kharej_ssh.execute("systemctl enable --now " + shquote("backpack-%s.service" % tunnel_name))
     if c_kh != 0:
+        abandon_partial_setup()
         return False, f"Failed to start service on Kharej server: {err_kh}"
 
     # systemd active only proves that the process started. New membership must
@@ -188,9 +200,7 @@ def setup_tunnel_node(
         diagnostics.append("اجرای بررسی یا بازگردانی تنظیمات تونل ناموفق بود")
         ready = False
     if not ready:
-        for endpoint in (iran_ssh, kharej_ssh):
-            try: stop_and_remove_tunnel(endpoint, tunnel_name)
-            except Exception: pass
+        abandon_partial_setup()
         return False, (diagnostics[-1] if diagnostics else "کانال کنترل یا عبور دادهٔ تونل تأیید نشد") + "؛ نود فعال نشد و سرویس‌های این تلاش پاک شدند"
     return True, "Tunnel control channel and independent data flow verified on both servers"
 

@@ -25,6 +25,12 @@ class FrpEngineTests(unittest.TestCase):
         self.assertIn("remotePort = 2255", cfg)
         self.assertNotIn("udp", cfg)
 
+    def test_client_config_udp_keeps_tcp_port(self):
+        cfg = frp._client_config("203.0.113.5", 7000, "SECRET-token-1234", "udp", ["2255"])
+        self.assertIn('type = "tcp"', cfg)
+        self.assertIn('type = "udp"', cfg)
+        self.assertIn("remotePort = 2255", cfg)
+
     def test_client_config_dual(self):
         cfg = frp._client_config("203.0.113.5", 7000, "SECRET-token-1234", "dual", ["2255"])
         self.assertIn('type = "tcp"', cfg)

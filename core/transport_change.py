@@ -176,21 +176,14 @@ def verify_flow(iran, kharej, unit, ports, timeout=45):
     return False
 
 def verify_control(iran, kharej, unit, timeout=45):
-    """Require control establishment from each current process, never old logs."""
+    """Require each current process to show a live control channel, never old logs."""
+    from core.tunnel_readiness import control_connected
     deadline = time.monotonic() + timeout
     while True:
-        ready = True
-        for ssh in (iran, kharej):
-            if not active(ssh, unit): return False
-            pid = check(ssh, 'systemctl show -p MainPID --value ' + shlex.quote(unit)).strip()
-            if not pid.isdigit() or pid == '0': return False
-            started = check(ssh, 'systemctl show -p ExecMainStartTimestamp --value ' + shlex.quote(unit)).strip()
-            code, logs, _ = ssh.execute('journalctl -u ' + shlex.quote(unit) + ' _PID=' + pid + ' --since ' + shlex.quote(started) + ' --no-pager -o cat --grep control -n 100', timeout=15)
-            if code not in (0, 1): return False
-            events = [line for line in logs.splitlines() if re.search(r'control channel.*(?:established|closed)|failed.*control|failed to receive control', line, re.I)]
-            if not events or not re.search(r'control channel.*established', events[-1], re.I): ready = False
-        if ready: return True
-        if time.monotonic() >= deadline: return False
+        if all(control_connected(ssh, unit) for ssh in (iran, kharej)):
+            return True
+        if time.monotonic() >= deadline:
+            return False
         time.sleep(1)
 
 def write_and_restart(iran, kharej, unit, path, contents):
