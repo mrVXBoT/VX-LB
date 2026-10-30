@@ -59,7 +59,7 @@ class SessionTests(unittest.TestCase):
         client=MagicMock();client.connect.return_value=(True,'ok')
         with patch.object(change.subprocess,'check_output',return_value=b'[{"addr_info":[{"local":"95.211.93.38"}]}]'),patch.object(change,'SSHManager',return_value=client) as factory:
             change.connect({'ip':'95.211.93.38','port':2255,'username':'root','password':'fixture-only'})
-            factory.assert_called_once_with('127.0.0.1',2255,'root','fixture-only')
+            factory.assert_called_once_with('127.0.0.1',2255,'root','fixture-only',timeout=20)
 
     def test_execute_closes_channel_and_retries_transient_failure(self):
         ssh=SSHManager('192.0.2.1')

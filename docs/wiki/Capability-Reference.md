@@ -104,7 +104,7 @@
 - لایه: `L4`؛ پروتکل‌های ثبت‌شده: `tcp, udp`؛ خانواده آدرس: `ipv4, ipv6`.
 - رمزنگاری رجیستری: `chacha20-poly1305`؛ ماژول/نیازمندی: `raw_socket`.
 - MTU پیش‌فرض رجیستری: `1400`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1, N:1`.
-- دلیل وضعیت در منبع: WatTunnel 3.x carriers generated as wattun configs; ICMP needs CAP_NET_RAW and the signed binary in the offline depot
+- دلیل وضعیت در منبع: WatTunnel 3.1.2 carriers generated as wattun configs; direct N:1 shares one Kharej server; ICMP needs CAP_NET_RAW and the pinned release checksum
 
 ## `gost` — GOST
 

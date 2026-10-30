@@ -62,7 +62,6 @@ class DispatcherTests(unittest.TestCase):
     def test_backpack_uses_generic_fallback(self):
         nodes = [
             {'ip': '192.0.2.1', 'engine': 'backpack'},
-            {'ip': '192.0.2.2', 'engine': 'other'},
             {'ip': '192.0.2.3', 'engine': '', 'transport': 'tcp'},
             {'ip': '192.0.2.4', 'transport': 'wss'},
         ]
@@ -72,6 +71,14 @@ class DispatcherTests(unittest.TestCase):
             self.assertEqual(status, 'HEALTHY', f'{node} should use backpack fallback')
             self.assertEqual(reason, 'bp')
             w._analyze_backpack_health.assert_called_once()
+
+    def test_unknown_engine_identity_is_unmonitored_not_backpack(self):
+        node = {'ip': '192.0.2.2', 'engine': 'other'}
+        w = self._make_watchdog()
+        status, reason, _, _ = w.analyze_node_health('pool', node, ['8443'])
+        self.assertEqual(status, 'UNMONITORED')
+        self.assertIn('other', reason)
+        w._analyze_backpack_health.assert_not_called()
 
     def test_transport_change_keeps_the_previous_node_state(self):
         data = {'pools': {'t': {
@@ -117,12 +124,13 @@ class DispatcherTests(unittest.TestCase):
             self.assertEqual(status, 'HEALTHY')
             mock_health.assert_called_once()
 
-    def test_unknown_engine_falls_back_to_backpack(self):
+    def test_unknown_engine_is_unmonitored_instead_of_backpack(self):
         node = {'ip': '192.0.2.1', 'engine': 'totally-unknown'}
         w = self._make_watchdog()
-        status, _, _, _ = w.analyze_node_health('pool', node, ['8443'])
-        self.assertEqual(status, 'HEALTHY')
-        w._analyze_backpack_health.assert_called_once()
+        status, reason, _, _ = w.analyze_node_health('pool', node, ['8443'])
+        self.assertEqual(status, 'UNMONITORED')
+        self.assertIn('totally-unknown', reason)
+        w._analyze_backpack_health.assert_not_called()
 
 
 if __name__ == "__main__":
