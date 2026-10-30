@@ -13,7 +13,7 @@
   <link rel="alternate icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
   <link rel="stylesheet" href="font.css">
-  <link rel="stylesheet" href="style.css?v=settings-2.55">
+  <link rel="stylesheet" href="style.css?v=settings-2.56">
 </head>
 <body>
   <a class="skip-link" href="#tab-pools-view">رفتن به محتوای اصلی</a>
@@ -901,6 +901,7 @@
               <option value="paqet">Paqet</option>
               <option value="candy">Candy-Spoof</option>
               <option value="parsaksh">ParsaKSH</option>
+              <option value="wattunnel">WatTunnel</option>
               <option value="kernel">تونل‌های شبکه و کرنل</option>
               <option value="spoof">پردازش بسته (DPI Spoof)</option>
               <option value="other">وب و تونل DNS</option>
@@ -1055,6 +1056,71 @@
             <div class="input-group">
               <label class="field-label" for="parsaksh-forward">مقصد فوروارد سرور (host:port؛ خالی = خودکار)</label>
               <input type="text" id="parsaksh-forward" class="field-input" placeholder="127.0.0.1:51820" dir="ltr" disabled>
+            </div>
+          </div>
+          <div id="wattunnel-create-fields" class="input-group hidden">
+            <div class="input-group">
+              <label class="field-label" for="wattunnel-proto">پروتکل سرویس کاربران</label>
+              <select id="wattunnel-proto" class="field-input select-styled" disabled>
+                <option value="tcp" selected>tcp</option>
+                <option value="udp">udp</option>
+                <option value="both">tcp + udp</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="wattunnel-listen">پورت حامل (خالی = پیش‌فرض پروفایل)</label>
+              <input type="number" id="wattunnel-listen" class="field-input" min="1" max="65535" placeholder="4443" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="wattunnel-reverse">حالت معکوس: خارج به ایران وصل می‌شود</label>
+              <input id="wattunnel-reverse" type="checkbox" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="wattunnel-key">کلید مشترک (حداقل ۱۶ نویسه؛ خالی = تولید خودکار)</label>
+              <input id="wattunnel-key" class="field-input" type="password" dir="ltr" disabled autocomplete="off">
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="wattunnel-icmp-type">نوع ICMP</label>
+              <select id="wattunnel-icmp-type" class="field-input select-styled" disabled>
+                <option value="echo" selected>echo</option>
+                <option value="timestamp">timestamp</option>
+                <option value="info">info</option>
+                <option value="mask">mask</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="wattunnel-sni">SNI برای TLS</label>
+              <input id="wattunnel-sni" class="field-input" placeholder="www.cloudflare.com" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="wattunnel-fp">اثر انگشت ClientHello</label>
+              <select id="wattunnel-fp" class="field-input select-styled" disabled>
+                <option value="chrome" selected>chrome</option>
+                <option value="firefox">firefox</option>
+                <option value="safari">safari</option>
+                <option value="edge">edge</option>
+                <option value="random">random</option>
+                <option value="go">go</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="wattunnel-path">مسیر HTTP</label>
+              <input id="wattunnel-path" class="field-input" value="/wat" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="wattunnel-fake-sni">Fake SNI (خالی = خاموش)</label>
+              <input id="wattunnel-fake-sni" class="field-input" placeholder="www.cloudflare.com" dir="ltr" disabled>
+            </div>
+            <div class="input-group">
+              <label class="field-label" for="wattunnel-fake-mode">حالت Fake SNI</label>
+              <select id="wattunnel-fake-mode" class="field-input select-styled" disabled>
+                <option value="rst" selected>rst</option>
+                <option value="seq">seq</option>
+                <option value="ttl">ttl</option>
+                <option value="synrst">synrst</option>
+                <option value="paws">paws</option>
+                <option value="auto">auto</option>
+              </select>
             </div>
           </div>
           <div id="tun-create-fields" class="input-group hidden">
@@ -1315,8 +1381,9 @@
               <option value="paqet">Paqet</option>
               <option value="candy">Candy-Spoof</option>
               <option value="parsaksh">ParsaKSH</option>
+              <option value="wattunnel">WatTunnel</option>
               <option value="kernel">تونل‌های شبکه و کرنل</option>
-              <option value="spoof" disabled>پردازش بسته — استخر جداگانه بسازید</option>
+              <option value="spoof">پردازش بسته</option>
               <option value="other">وب و تونل DNS</option>
             </select>
           </div>
@@ -1678,6 +1745,6 @@
 
   <script src="hairline.js?v=2.29"></script>
   <script src="copy.fa.js?v=2.30"></script>
-  <script src="app.js?v=2.40"></script>
+  <script src="app.js?v=2.42"></script>
 </body>
 </html>

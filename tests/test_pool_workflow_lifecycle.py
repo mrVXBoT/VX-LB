@@ -159,8 +159,10 @@ def test_connect_engine_is_not_misclassified_as_backpack(target):
     assert change.get_engine_for_transport(target) == target
 
 
-def test_internal_call_cannot_bypass_packet_migration_policy(state):
-    assert not change.start_change('prod', 'fake-sni', background=False)[0]
+def test_internal_call_still_rejects_unfinished_packet_profiles(state):
+    ok, message = change.start_change('prod', 'l3-ip-spoof', background=False)
+    assert not ok and 'unavailable' in message
+    assert 'transport_change' not in state['pools']['prod']
 
 
 def test_worker_does_not_replay_finished_change(state):
@@ -197,7 +199,7 @@ ENGINE_TRANSPORTS = {
     'backpack': ('tcp', 'stealth', 'pck', 'kcp', 'wss', 'quic', 'ws'),
     **{name: (name,) for name in ('waterwall', 'gost', 'frp', 'hedioum', 'rathole', 'paqet',
         'gre', 'gre6', 'ip6ip6', 'tun', 'dc6', 'wireguard', 'vxlan', 'vxlan_ipsec', 'slipstream', 'http', 'https',
-        'candy-spoof', 'parsaksh')},
+        'candy-spoof', 'parsaksh', 'wattunnel')},
     'geneve': ('geneve_ipsec',),
     'spoof': ('fake-sni', 'split-tls', 'hop-ttl-injection', 'tcp-state-desync', 'l3-ip-spoof',
         'l7-header-mutation', 'udp-raw-spoof', 'dns-spoof', 'spoof-tcp-syn', 'spoof-udp-raw',
@@ -213,6 +215,48 @@ def test_every_catalog_transport_resolves_to_expected_engine(transport, engine):
 
 def test_engine_matrix_covers_the_entire_supported_catalog():
     assert {transport for transport, _ in MATRIX} == {item[0] for item in SUPPORTED_TRANSPORTS.values()}
+
+
+@pytest.mark.parametrize('transport', ['fake-sni', 'split-tls', 'hop-ttl-injection', 'tcp-state-desync', 'l7-header-mutation'])
+def test_managed_packet_profiles_can_be_selected(state, transport):
+    kwargs = {'engine': 'spoof'}
+    if transport in {'fake-sni', 'hop-ttl-injection'}:
+        kwargs['fake_sni'] = 'www.shaparak.ir'
+    if transport == 'hop-ttl-injection':
+        kwargs['auto_ttl_delta'] = 4
+    ok, message = change.start_change('prod', transport, background=False, **kwargs)
+    assert ok, message
+    job = state['pools']['prod']['transport_change']
+    assert job['to'] == transport and job['to_engine'] == 'spoof'
+
+
+def test_packet_rollback_keeps_the_profile_settings():
+    from core.pool_workflow import creation_options
+    hop = creation_options({'transport': 'hop-ttl-injection', 'fake_sni': 'cdn.example.com', 'ttl_delta': 4})
+    assert hop['fake_sni'] == 'cdn.example.com' and hop['auto_ttl_delta'] == 4
+    other = creation_options({'transport': 'split-tls', 'fake_sni': 'www.shaparak.ir', 'ttl_delta': 3})
+    assert other['fake_sni'] == 'www.shaparak.ir' and 'auto_ttl_delta' not in other
+
+
+def test_production_gate_uses_the_packet_profile_not_the_family(state):
+    ok, message = change.start_change('prod', 'split-tls', background=False, engine='spoof', is_production=True)
+    assert ok, message
+
+
+def test_packet_pool_can_change_to_another_engine(state):
+    state['pools']['prod'].update(engine='spoof', transport='fake-sni', fake_sni='cdn.example.com', ttl_delta=3)
+    ok, message = change.start_change('prod', 'tcp', background=False)
+    assert ok, message
+    assert state['pools']['prod']['transport_change']['to_engine'] == 'backpack'
+
+
+@pytest.mark.parametrize('transport', ['l3-ip-spoof', 'udp-raw-spoof', 'dns-spoof', 'spoof-tcp-syn',
+    'spoof-udp-raw', 'spoof-icmp', 'qs-dns-hybrid', 'hyperion-x'])
+def test_unfinished_packet_profiles_stay_rejected(state, transport):
+    ok, message = change.start_change('prod', transport, background=False, engine='spoof')
+    assert not ok
+    assert 'unavailable' in message
+    assert 'transport_change' not in state['pools']['prod']
 
 
 @pytest.mark.parametrize('transport,engine', [(t, e) for t, e in MATRIX if e not in {'spoof', 'http', 'https'}])

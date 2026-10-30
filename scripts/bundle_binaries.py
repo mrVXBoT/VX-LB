@@ -123,6 +123,20 @@ TARGETS = [
         "sha256": "caf08b3960d4eea72910fb0613a8893560a41f5b2f2e18f9a6c595c9ad7ea16c",
         "dest": "spoof",
     },
+    {
+        "name": "wattunnel",
+        "arch": "x86_64",
+        "url": "https://github.com/JohnWatsoon/WatTunnel/releases/download/v3.1.2/wattun-linux-amd64",
+        "sha256": "65cc6ea4ce3e418a4a395528a24a1b104d5acbf2b87b24a899630517193958a2",
+        "dest": "wattun",
+    },
+    {
+        "name": "wattunnel",
+        "arch": "aarch64",
+        "url": "https://github.com/JohnWatsoon/WatTunnel/releases/download/v3.1.2/wattun-linux-arm64",
+        "sha256": "6518ac89c2f9b5a898ad8e95968ca23bfcc7d91321eb98f8ea15f3023c15e9f6",
+        "dest": "wattun",
+    },
 ]
 
 def sha256_file(stream):

@@ -54,6 +54,27 @@ class ApiExtensionsTests(unittest.TestCase):
         cmd_executed = mock_ssh.execute.call_args[0][0]
         self.assertIn("waterwall", cmd_executed)
 
+    def test_api_logs_uses_the_iran_server_password_when_the_pool_node_has_none(self):
+        identity = "ab" * 16
+        fake_storage = {
+            "pools": {"test": {"nodes": [{
+                "ip": "192.0.2.50", "engine": "spoof", "node_name": "spoof-" + identity,
+                "http_connect": {"id": identity},
+            }]}},
+            "iran_servers": [{"ip": "192.0.2.50", "username": "root", "port": 22, "password": "stored-secret"}],
+        }
+        mock_ssh = MagicMock()
+        mock_ssh.connect.return_value = (True, "Connected")
+        mock_ssh.execute.return_value = (0, "nfq started", "")
+        self.handler.path = "/api/logs?ip=192.0.2.50&pool=test"
+        with patch("core.web_server.load_data", return_value=fake_storage), \
+             patch("core.kernel_relay_ports.load_data", return_value=fake_storage), \
+             patch("core.web_server.SSHManager", return_value=mock_ssh) as ctor:
+            self.handler.do_GET()
+        self.assertEqual(ctor.call_args.args[3], "stored-secret")
+        self.assertIn(f"vxlb-spoof-{identity}-nfq.service", mock_ssh.execute.call_args[0][0])
+        self.handler.send_response.assert_called_with(200)
+
     def test_api_pools_composition_get(self):
         fake_storage = {
             "pools": {

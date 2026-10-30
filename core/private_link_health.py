@@ -70,7 +70,9 @@ for kind in (socket.SOCK_STREAM,socket.SOCK_DGRAM):
      if result!=data:raise RuntimeError('Echo challenge mismatch')
    break
   except OSError as error:
-   if error.errno in (113,101,111) and time.monotonic()<deadline:
+   # TimeoutError has no errno. A fresh tunnel can accept TCP and still drop
+   # the first echo; retry until the deadline instead of aborting at 8s.
+   if (isinstance(error, TimeoutError) or error.errno in (110,113,101,111)) and time.monotonic()<deadline:
     time.sleep(0.4)
     continue
    raise

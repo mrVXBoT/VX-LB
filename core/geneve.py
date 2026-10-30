@@ -683,13 +683,20 @@ def health(pool_name: str, node: dict, ports: list):
         sessions.append(kharej)
         verify(iran, kharej, node)
         verify_relay(iran, node, ports)
-        script = """import socket,json,sys
+        script = """import socket,json,sys,time
 result={}
 for port in json.loads(sys.argv[2]):
+ start=time.monotonic()
+ item={"tcp":False,"ms":None}
  try:
-  with socket.create_connection((sys.argv[1],int(port)),timeout=2):pass
-  result[str(port)]=True
- except OSError:result[str(port)]=False
+  with socket.create_connection((sys.argv[1],int(port)),timeout=2):
+   item["tcp"]=True
+  item["ms"]=round((time.monotonic()-start)*1000,1)
+ except ConnectionRefusedError:
+  item["ms"]=round((time.monotonic()-start)*1000,1)
+ except OSError:
+  pass
+ result[str(port)]=item
 print(json.dumps(result))
 """
         out = execute(
@@ -702,19 +709,27 @@ print(json.dumps(result))
             + shlex.quote(json.dumps(ports)),
         )
         availability = json.loads(out)
+
+        def reached(item):
+            return bool(item.get("tcp")) if isinstance(item, dict) else bool(item)
+
+        def sample(item):
+            return item.get("ms") if isinstance(item, dict) else None
+
         details = {
             p: {
-                "status": "HEALTHY" if live else "DOWN",
+                "status": "HEALTHY" if reached(item) else "DOWN",
                 "reason": (
                     "Geneve TCP/UDP path verified; TCP destination reachable"
-                    if live
+                    if reached(item)
                     else "TCP destination is not listening/reachable; Geneve path passed"
                 ),
-                "last_success_epoch": time.time() if live else None,
+                "latency_ms": sample(item),
+                "last_success_epoch": time.time() if reached(item) else None,
             }
-            for p, live in availability.items()
+            for p, item in availability.items()
         }
-        live = sum(availability.values())
+        live = sum(reached(item) for item in availability.values())
         return (
             ("HEALTHY" if live == len(ports) and live else "DEGRADED" if live else "DOWN"),
             f"Geneve + IPsec data path verified; {live}/{len(ports)} TCP destinations reachable; UDP application health is not inferred",

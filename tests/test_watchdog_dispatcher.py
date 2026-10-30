@@ -3,6 +3,7 @@ monitor for every supported transport, instead of falling back to the generic
 BackPack path (which previously produced wrong / missing monitoring for several
 engines)."""
 import unittest
+from contextlib import nullcontext
 from unittest.mock import patch, MagicMock
 
 from core.watchdog import TelemetryWatchdog
@@ -31,6 +32,7 @@ ENGINE_MODULES = {
     'paqet': 'core.paqet_engine',
     'candy-spoof': 'core.candy_spoof_transport',
     'parsaksh': 'core.parsaksh_transport',
+    'wattunnel': 'core.wattunnel',
 }
 
 
@@ -70,6 +72,42 @@ class DispatcherTests(unittest.TestCase):
             self.assertEqual(status, 'HEALTHY', f'{node} should use backpack fallback')
             self.assertEqual(reason, 'bp')
             w._analyze_backpack_health.assert_called_once()
+
+    def test_transport_change_keeps_the_previous_node_state(self):
+        data = {'pools': {'t': {
+            'client_ports': ['2255'],
+            'nodes': [{'ip': '192.0.2.1', 'engine': 'spoof', 'spoof': {'profile': 'hop-ttl-injection'}}],
+            'transport_change': {'status': 'changing'},
+        }}}
+        w = self._make_watchdog()
+        w.analyze_node_health = MagicMock(return_value=('DOWN', 'Packet deployment/cleanup is incomplete', [], {}))
+        logs = []
+        with patch('core.watchdog.load_data', return_value=data), \
+             patch('core.private_link_monitor.schedule_cycle'):
+            w.run_check_cycle(callback=logs.append)
+        w.analyze_node_health.assert_not_called()
+        self.assertTrue(any('retaining the previous node state' in line for line in logs))
+
+    def test_provisioning_packet_node_does_not_replace_a_healthy_result(self):
+        w = self._make_watchdog()
+        w.get_node_telemetry = MagicMock(return_value={'status': 'HEALTHY', 'reason': 'kept', 'logs': [], 'port_details': {'2255': {'status': 'HEALTHY'}}})
+        status, reason, _, details = w.analyze_node_health('t', {'ip': '192.0.2.1', 'engine': 'spoof', 'spoof': {'profile': 'hop-ttl-injection'}, 'provisioning': True}, ['2255'])
+        self.assertEqual((status, reason), ('HEALTHY', 'kept'))
+        self.assertEqual(details['2255']['status'], 'HEALTHY')
+
+    def test_packet_health_without_a_port_reason_still_finishes_the_cycle(self):
+        data = {'pools': {'t': {'client_ports': ['2255'], 'nodes': [{'ip': '192.0.2.1'}], 'dns_policy': 'strict'}}}
+        w = self._make_watchdog()
+        w.analyze_node_health = MagicMock(return_value=('HEALTHY', 'ok', [], {'2255': {'status': 'HEALTHY'}}))
+        logs = []
+        with patch('core.watchdog.load_data', return_value=data), \
+             patch('core.private_link_monitor.schedule_cycle'), \
+             patch('core.dns_scheduler.sync_target_for_watchdog', side_effect=lambda _data, _name, ips: (ips, False)), \
+             patch('core.watchdog.routing_lock', nullcontext), \
+             patch('core.watchdog.effective_config', return_value={}):
+            report = w.run_check_cycle(callback=logs.append)
+        self.assertIn('192.0.2.1', report['healthy_ips'])
+        self.assertTrue(any('2255' in line and 'HEALTHY' in line for line in logs))
 
     def test_spoof_requires_engine_and_spoof_dict(self):
         node = {'ip': '192.0.2.1', 'engine': 'spoof', 'spoof': {'profile': 'fake-sni'}}

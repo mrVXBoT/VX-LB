@@ -363,6 +363,8 @@ def health(name, node, ports):
         if not ok:
             return 'DOWN', 'سرویس GOST در یکی از سرورها فعال نیست', {}
         details = {p: {'status': 'HEALTHY', 'reason': 'سرویس GOST فعال است'} for p in ports}
+        from core.link_latency import annotate
+        annotate(sessions[0], pool['kharej_server']['ip'], details)
         return 'HEALTHY', 'سرویس GOST فعال است', details
     except Exception as error:
         return 'DOWN', str(error), {}

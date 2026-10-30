@@ -41,11 +41,11 @@ SUPPORTED_TRANSPORTS = {
     "27": ("slipstream", "Slipstream (DNS) — fallback tunnel using a delegated DNS subdomain"),
     # Spoof Tunnel & DPI Desync Suite
     "28": ("fake-sni", "Fake SNI + MD5/BadSum — verified production packet-processing profile"),
-    "29": ("split-tls", "TLS Record + TCP Disorder — experimental packet-processing profile"),
-    "30": ("hop-ttl-injection", "Limited TTL Injection — experimental packet-processing profile"),
-    "31": ("tcp-state-desync", "RST + OOB — experimental packet-processing profile"),
+    "29": ("split-tls", "TLS Record + TCP Disorder — verified packet-processing profile"),
+    "30": ("hop-ttl-injection", "Limited TTL Injection — verified packet-processing profile"),
+    "31": ("tcp-state-desync", "RST + OOB — verified packet-processing profile"),
     "32": ("l3-ip-spoof", "L3 Source-IP Spoofing — unavailable in this release"),
-    "33": ("l7-header-mutation", "HTTP Host Header Mutation — experimental packet-processing profile"),
+    "33": ("l7-header-mutation", "HTTP Host Header Mutation — verified packet-processing profile"),
     "34": ("udp-raw-spoof", "Raw UDP / QUIC Spoofing — unavailable in this release"),
     "35": ("dns-spoof", "DNS Anti-Poisoning — unavailable in this release"),
     "36": ("spoof-tcp-syn", "TCP SYN Spoofing — unavailable in this release"),
@@ -56,6 +56,7 @@ SUPPORTED_TRANSPORTS = {
     "41": ("vxlan_ipsec", "VXLAN + IPsec — Layer 2 overlay protected by authenticated IPsec ESP"),
     "46": ("candy-spoof", "Candy-Spoof — bidirectional IP-spoofing tunnel (Rust, SOCKS5 + ICMP/UDP, PSK)"),
     "47": ("parsaksh", "ParsaKSH Spoof Tunnel — mutual IP-spoofing UDP-pipe (Go/Rust, ICMP/UDP/TCP-SYN, XDP)"),
+    "48": ("wattunnel", "WatTunnel — encrypted Iran/Kharej forwarding over ICMP, UDP, TCP, TLS, WebSocket, HTTP/2, gRPC or a bonded fortress"),
 }
 
 NON_BACKPACK_TRANSPORTS = {
@@ -65,7 +66,7 @@ NON_BACKPACK_TRANSPORTS = {
     "fake-sni", "split-tls", "hop-ttl-injection", "tcp-state-desync",
     "l3-ip-spoof", "l7-header-mutation", "udp-raw-spoof", "dns-spoof", "spoof",
     "spoof-tcp-syn", "spoof-udp-raw", "spoof-icmp", "qs-dns-hybrid", "hyperion-x",
-    "candy-spoof", "parsaksh"
+    "candy-spoof", "parsaksh", "wattunnel",
 }
 
 def generate_token(length: int = 64) -> str:

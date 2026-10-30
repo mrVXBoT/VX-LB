@@ -96,6 +96,16 @@
 - MTU پیش‌فرض رجیستری: `1280`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1, N:1`.
 - دلیل وضعیت در منبع: Raw-packet KCP engine (hanselime/paqet); awaiting operational validation on live endpoints
 
+## `wattunnel` — WatTunnel
+
+فوروارد رمزشدهٔ ایران/خارج روی ICMP، UDP، TCP، TLS، WebSocket، HTTP/2، gRPC یا پیوند Fortress
+
+- وضعیت: **آزمایشی**؛ مسیر راهنما: [WatTunnel](WatTunnel.md).
+- لایه: `L4`؛ پروتکل‌های ثبت‌شده: `tcp, udp`؛ خانواده آدرس: `ipv4, ipv6`.
+- رمزنگاری رجیستری: `chacha20-poly1305`؛ ماژول/نیازمندی: `raw_socket`.
+- MTU پیش‌فرض رجیستری: `1400`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1, N:1`.
+- دلیل وضعیت در منبع: WatTunnel 3.x carriers generated as wattun configs; ICMP needs CAP_NET_RAW and the signed binary in the offline depot
+
 ## `gost` — GOST
 
 زنجیره‌های پراکسی و سیزده پروفایل اختصاصی پنل
@@ -444,7 +454,7 @@ HTTPS CONNECT با TLS/mTLS؛ به معنی XHTTP یا HTTP/3 نیست
 - لایه: `L7`؛ پروتکل‌های ثبت‌شده: `tcp, udp`؛ خانواده آدرس: `ipv4`.
 - رمزنگاری رجیستری: `tls13`؛ ماژول/نیازمندی: `nfnetlink_queue, iptables`.
 - MTU پیش‌فرض رجیستری: `1400`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1, N:1`.
-- دلیل وضعیت در منبع: Managed mTLS TCP/UDP, owned NFQUEUE and required wire-effect verification; live acceptance pending
+- دلیل وضعیت در منبع: Managed packet family; deploy a concrete profile
 
 ## `fake-sni` — Fake SNI Injection
 
@@ -460,31 +470,31 @@ HTTPS CONNECT با TLS/mTLS؛ به معنی XHTTP یا HTTP/3 نیست
 
 تقسیم رکورد TLS و بی‌نظمی TCP در حامل احرازشده
 
-- وضعیت: **آزمایشی**؛ مسیر راهنما: [Packet-Profiles](Packet-Profiles.md).
+- وضعیت: **تأییدشده در رجیستری**؛ مسیر راهنما: [Packet-Profiles](Packet-Profiles.md).
 - لایه: `L7`؛ پروتکل‌های ثبت‌شده: `tcp, udp`؛ خانواده آدرس: `ipv4`.
 - رمزنگاری رجیستری: `tls13`؛ ماژول/نیازمندی: `nfnetlink_queue, iptables`.
 - MTU پیش‌فرض رجیستری: `1400`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1, N:1`.
-- دلیل وضعیت در منبع: Managed mTLS TCP/UDP, owned NFQUEUE and required wire-effect verification; live acceptance pending
+- دلیل وضعیت در منبع: Verified TLS record split with a 2-byte first record, managed mTLS TCP/UDP and owned NFQUEUE
 
 ## `hop-ttl-injection` — Hop-Count Windowing
 
 بسته جعلی با TTL محدود و برآورد مسیر
 
-- وضعیت: **آزمایشی**؛ مسیر راهنما: [Packet-Profiles](Packet-Profiles.md).
+- وضعیت: **تأییدشده در رجیستری**؛ مسیر راهنما: [Packet-Profiles](Packet-Profiles.md).
 - لایه: `L7`؛ پروتکل‌های ثبت‌شده: `tcp, udp`؛ خانواده آدرس: `ipv4`.
 - رمزنگاری رجیستری: `tls13`؛ ماژول/نیازمندی: `nfnetlink_queue, iptables`.
 - MTU پیش‌فرض رجیستری: `1400`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1, N:1`.
-- دلیل وضعیت در منبع: Managed mTLS TCP/UDP, owned NFQUEUE and required wire-effect verification; live acceptance pending
+- دلیل وضعیت در منبع: Verified bounded-TTL fake ClientHello with managed mTLS TCP/UDP and owned NFQUEUE
 
 ## `tcp-state-desync` — TCP State Desync
 
-تغییر آزمایشی وضعیت TCP با RST/OOB و پذیرش مبتنی بر شواهد
+تغییر وضعیت TCP با RST/OOB و پذیرش مبتنی بر شواهد
 
-- وضعیت: **آزمایشی**؛ مسیر راهنما: [Packet-Profiles](Packet-Profiles.md).
+- وضعیت: **تأییدشده در رجیستری**؛ مسیر راهنما: [Packet-Profiles](Packet-Profiles.md).
 - لایه: `L7`؛ پروتکل‌های ثبت‌شده: `tcp, udp`؛ خانواده آدرس: `ipv4`.
 - رمزنگاری رجیستری: `tls13`؛ ماژول/نیازمندی: `nfnetlink_queue, iptables`.
 - MTU پیش‌فرض رجیستری: `1400`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1, N:1`.
-- دلیل وضعیت در منبع: Managed mTLS TCP/UDP, owned NFQUEUE and required wire-effect verification; live acceptance pending
+- دلیل وضعیت در منبع: Verified urgent data and out-of-window RST with managed mTLS TCP/UDP and owned NFQUEUE
 
 ## `l3-ip-spoof` — L3 Source-IP Spoofing
 
@@ -500,11 +510,11 @@ HTTPS CONNECT با TLS/mTLS؛ به معنی XHTTP یا HTTP/3 نیست
 
 تغییر حروف نام هدر Host روی CONNECT
 
-- وضعیت: **آزمایشی**؛ مسیر راهنما: [Packet-Profiles](Packet-Profiles.md).
+- وضعیت: **تأییدشده در رجیستری**؛ مسیر راهنما: [Packet-Profiles](Packet-Profiles.md).
 - لایه: `L7`؛ پروتکل‌های ثبت‌شده: `tcp, udp`؛ خانواده آدرس: `ipv4`.
 - رمزنگاری رجیستری: `tls13`؛ ماژول/نیازمندی: `nfnetlink_queue, iptables`.
 - MTU پیش‌فرض رجیستری: `1400`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1, N:1`.
-- دلیل وضعیت در منبع: Managed mTLS TCP/UDP, owned NFQUEUE and required wire-effect verification; live acceptance pending
+- دلیل وضعیت در منبع: Verified Host header case mutation on CONNECT with managed TCP/UDP relay and owned NFQUEUE
 
 ## `udp-raw-spoof` — Raw UDP / QUIC Spoofing
 
@@ -575,3 +585,23 @@ HTTPS CONNECT با TLS/mTLS؛ به معنی XHTTP یا HTTP/3 نیست
 - رمزنگاری رجیستری: `noise`؛ ماژول/نیازمندی: `raw_socket, nftables`.
 - MTU پیش‌فرض رجیستری: `1400`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1, N:1`.
 - دلیل وضعیت در منبع: No managed bidirectional runtime and data verification implemented
+
+## `candy-spoof` — Candy-Spoof
+
+تونل جعل دوطرفهٔ آدرس مبدأ با SOCKS5 روی ایران
+
+- وضعیت: **آزمایشی**؛ مسیر راهنما: [Candy-Spoof](Candy-Spoof.md).
+- لایه: `L3`؛ پروتکل‌های ثبت‌شده: `tcp, udp`؛ خانواده آدرس: `ipv4`.
+- رمزنگاری رجیستری: `psk`؛ ماژول/نیازمندی: `raw_socket, cap_net_raw`.
+- MTU پیش‌فرض رجیستری: `1380`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1`.
+- دلیل وضعیت در منبع: Bidirectional source-IP spoofing tunnel with ARQ/AIMD and PSK authentication; live acceptance pending
+
+## `parsaksh` — ParsaKSH Spoof Tunnel
+
+جعل دوطرفهٔ IP با حامل UDP، ICMP، ICMPv6 یا TCP-SYN
+
+- وضعیت: **آزمایشی**؛ مسیر راهنما: [ParsaKSH](ParsaKSH.md).
+- لایه: `L3`؛ پروتکل‌های ثبت‌شده: `udp, tcp, icmp`؛ خانواده آدرس: `ipv4, ipv6`.
+- رمزنگاری رجیستری: `none`؛ ماژول/نیازمندی: `raw_socket, cap_net_raw`.
+- MTU پیش‌فرض رجیستری: `1400`؛ حداقل رجیستری: `1200`؛ توپولوژی ثبت‌شده: `1:1`.
+- دلیل وضعیت در منبع: Mutual IP-spoofing UDP-pipe; requires spoof-capable path and per-direction real validation; live acceptance pending

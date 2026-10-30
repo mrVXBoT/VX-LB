@@ -577,6 +577,8 @@ def health(name, node, ports):
             if not ok:
                 return 'DOWN', 'سرویس Paqet در یکی از سرورها فعال نیست', {}
             details = {p: {'status': 'HEALTHY', 'reason': 'سرویس Paqet فعال است'} for p in ports}
+            from core.link_latency import annotate
+            annotate(iran, pool['kharej_server']['ip'], details)
             return 'HEALTHY', 'سرویس Paqet فعال است', details
         finally:
             iran.close()

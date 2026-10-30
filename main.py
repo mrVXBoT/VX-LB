@@ -575,6 +575,41 @@ def create_pool_flow():
         }
         settings['forward_target'] = settings['forward_target'].strip() or 'auto'
         gre_options = {'camouflage': settings}
+    elif selected_transport == 'wattunnel':
+        import secrets as _secrets_wattun
+        from core.wattunnel import PROFILES, PROFILE_LABELS, FORWARD_PROTOS, ICMP_TYPES, FAKE_MODES, FINGERPRINTS
+        console.print("[bold cyan]WatTunnel carrier:[/bold cyan]")
+        profile_choices = {str(i): name for i, name in enumerate(PROFILES, 1)}
+        for i, name in profile_choices.items():
+            console.print(f"  [{i}] {name} — {PROFILE_LABELS[name]}")
+        profile = profile_choices[Prompt.ask("Select WatTunnel profile", choices=list(profile_choices), default="4")]
+        console.print("[bold cyan]Forwarded service protocol:[/bold cyan]")
+        proto_choices = {str(i): name for i, name in enumerate(FORWARD_PROTOS, 1)}
+        for i, name in proto_choices.items():
+            console.print(f"  [{i}] {name}")
+        proto = proto_choices[Prompt.ask("Forward TCP, UDP, or both", choices=list(proto_choices), default="1")]
+        settings = {
+            'profile': profile,
+            'proto': proto,
+            'reverse': Prompt.ask("Reverse mode (Kharej dials Iran)? (y/n)", choices=['y', 'n'], default='n') == 'y',
+            'key': Prompt.ask("Pre-shared key (min 16 chars)", default=_secrets_wattun.token_hex(24)),
+        }
+        if profile != 'icmp':
+            default_listen = '53' if profile == 'udp-dns' else '4443'
+            settings['listen'] = Prompt.ask("Carrier listen port", default=default_listen)
+        if profile in ('icmp', 'fortress'):
+            console.print("ICMP type: " + ", ".join(ICMP_TYPES))
+            settings['icmp_type'] = Prompt.ask("ICMP type", choices=list(ICMP_TYPES), default='echo')
+        if profile in ('tls', 'wss', 'h2', 'grpc', 'fortress'):
+            settings['sni'] = Prompt.ask("TLS SNI (empty to skip)", default='')
+            settings['fp'] = Prompt.ask("TLS fingerprint", choices=list(FINGERPRINTS), default='chrome')
+        if profile in ('ws', 'wss', 'h2', 'h2c', 'grpc', 'fortress'):
+            settings['path'] = Prompt.ask("HTTP path", default='/wat')
+        if profile in ('tcp', 'tls', 'wss', 'h2', 'grpc', 'fortress'):
+            settings['fake_sni'] = Prompt.ask("Fake SNI (empty to skip)", default='')
+            if settings['fake_sni']:
+                settings['fake_mode'] = Prompt.ask("Fake-SNI mode", choices=list(FAKE_MODES), default='rst')
+        gre_options = {'camouflage': settings, 'engine': 'wattunnel'}
     elif selected_transport == 'paqet':
         import secrets as _secrets_paqet
         from core.paqet_engine import KCP_MODES
@@ -1129,6 +1164,10 @@ def migration_options_prompt(target):
             options['camouflage'].update(pkcs12=Prompt.ask('PKCS#12 path on Iran server'),
                 pkcs12_password=Prompt.ask('PKCS#12 password', password=True),
                 trusted_root=Prompt.ask('Trusted root path on Kharej server'))
+    if target in {'fake-sni', 'hop-ttl-injection'}:
+        options['fake_sni'] = Prompt.ask('Fake SNI hostname', default='www.shaparak.ir')
+    if target == 'hop-ttl-injection':
+        options['auto_ttl_delta'] = int(Prompt.ask('Auto-TTL delta (1-15)', default='3'))
     if target == 'slipstream':
         options['domain'] = Prompt.ask('Delegated DNS domain')
         options['resolvers'] = [value.strip() for value in Prompt.ask('DNS resolvers (comma separated)').split(',') if value.strip()]
@@ -1142,6 +1181,7 @@ def migration_options_prompt(target):
 def change_pool_transport_flow(pool_name: str):
     from core.transport_change import get_engine_for_transport, KERNEL_ENGINES
     from core.spoof_adapter import SPOOF_TRANSPORTS
+    from core.nfqws2_profiles import MODES as PACKET_MODES
     pool = get_pools().get(pool_name)
     if not pool:
         console.print('Pool no longer exists.')
@@ -1152,13 +1192,10 @@ def change_pool_transport_flow(pool_name: str):
             return
         run_change(pool_name, recovering=True)
     else:
-        if pool.get('engine') == 'spoof':
-            console.print('Create a separate pool to change packet profiles.')
-            return
         current = pool.get('transport')
         profiled = {'waterwall', 'gost', 'frp', 'hedioum', 'rathole'}
         choices = {key: value for key, value in SUPPORTED_TRANSPORTS.items()
-                   if value[0] not in SPOOF_TRANSPORTS
+                   if (value[0] not in SPOOF_TRANSPORTS or value[0] in PACKET_MODES)
                    and (value[0] != current or current in profiled)
                    and ((value[0] in {'http', 'https'}) == (current in {'http', 'https'}))
                    and (current != 'gre' or get_engine_for_transport(value[0]) in KERNEL_ENGINES)}

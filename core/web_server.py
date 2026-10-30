@@ -334,6 +334,7 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             pools_data = project(data)
             
             # Enrich pools with live node telemetry
+            from core.link_latency import extract as extract_latency
             pools_resp = []
             for p_name, p_val in pools_data.items():
                 cf_info = p_val.get("cloudflare") or data.get("cloudflare") or {}
@@ -364,11 +365,12 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                         "rathole": {"transport": n.get("rathole", {}).get("transport") or p_val.get("rathole_transport") or (p_val.get("camouflage") or {}).get("transport", "tcp"), "proto": n.get("rathole", {}).get("proto") or (p_val.get("camouflage") or {}).get("proto", "tcp"), "port": n.get("rathole", {}).get("port") or n.get("tunnel_port") or (p_val.get("camouflage") or {}).get("port", 2333)} if (n.get("engine") == "rathole" or p_val.get("engine") == "rathole" or p_val.get("transport") == "rathole") else None,
                         "candy": {"data_port": n.get("candy", {}).get("data_port") or (p_val.get("camouflage") or {}).get("data_port", 51820), "icmp_id": n.get("candy", {}).get("icmp_id") or (p_val.get("camouflage") or {}).get("icmp_id", 0x4321), "socks5_port": n.get("candy", {}).get("socks5_port") or (p_val.get("camouflage") or {}).get("socks5_port", 1080), "client_spoofed_ip": n.get("candy", {}).get("client_spoofed_ip") or (p_val.get("camouflage") or {}).get("client_spoofed_ip", "8.8.4.4"), "server_spoofed_ip": n.get("candy", {}).get("server_spoofed_ip") or (p_val.get("camouflage") or {}).get("server_spoofed_ip", "1.2.3.4")} if (n.get("engine") == "candy-spoof" or p_val.get("engine") == "candy-spoof" or p_val.get("transport") == "candy-spoof") else None,
                         "parsaksh": {"data_port": n.get("parsaksh", {}).get("data_port") or (p_val.get("camouflage") or {}).get("data_port", 8090), "transport": n.get("parsaksh", {}).get("transport") or (p_val.get("camouflage") or {}).get("transport", "udp"), "forward_target": n.get("parsaksh", {}).get("forward_target") or (p_val.get("camouflage") or {}).get("forward_target", ""), "client_udp_port": n.get("parsaksh", {}).get("client_udp_port") or (p_val.get("camouflage") or {}).get("client_udp_port", 51820)} if (n.get("engine") == "parsaksh" or p_val.get("engine") == "parsaksh" or p_val.get("transport") == "parsaksh") else None,
+                        "wattunnel": {"profile": n.get("wattunnel", {}).get("profile") or p_val.get("wattunnel_profile") or (p_val.get("camouflage") or {}).get("profile", "tcp"), "proto": n.get("wattunnel", {}).get("proto") or (p_val.get("camouflage") or {}).get("proto", "tcp"), "reverse": n.get("wattunnel", {}).get("reverse") if n.get("wattunnel") else (p_val.get("camouflage") or {}).get("reverse", False), "listen": n.get("wattunnel", {}).get("listen") if n.get("wattunnel") else (p_val.get("camouflage") or {}).get("listen"), "client_metrics": n.get("wattunnel", {}).get("client_metrics")} if (n.get("engine") == "wattunnel" or p_val.get("engine") == "wattunnel" or p_val.get("transport") == "wattunnel") else None,
                         "transport": n.get("transport", p_val.get("transport", "tcp")),
                         "status": "PROVISIONING" if n.get("creation_pending") else "DOWN" if n.get("provisioning") else telem.get("status", "IDLE"),
                         "reason": p_val.get("creation_job", {}).get("message", "در انتظار راه‌اندازی") if n.get("creation_pending") else "راه‌اندازی نود کامل نشده؛ منابع آن را بررسی یا پاک‌سازی کنید" if n.get("provisioning") else telem.get("reason", "Awaiting checks"),
                         "status_since": telem.get("status_since", ""),
-                        "latency_ms": n.get("latency_ms") or telem.get("latency_ms") or next((v.get("latency_ms") for v in telem.get("port_details", {}).values() if v.get("latency_ms")), None),
+                        "latency_ms": extract_latency(telem.get("port_details")) or telem.get("latency_ms") or n.get("latency_ms"),
                         "port_details": {port: {k: v for k, v in detail.items() if k != "socket_samples"} for port, detail in telem.get("port_details", {}).items()},
                         "updated_at": telem.get("updated_at", "")
                     })
@@ -396,7 +398,8 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "wireguard_port": p_val.get("wireguard_port") or p_val.get("tunnel_port"),
                     "status_note": p_val.get("status_note"),
                     "vni": p_val.get("vni"),
-                    "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name","profile","persona","transport","proto","port","data_port","icmp_id","pre_shared_key","tunnel_count","initial_cwnd","interface","client_spoofed_ip","server_spoofed_ip","spoofed_ip_pool","recv_port","spoof_port","forward_target")} if (p_val.get("engine") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet", "candy-spoof", "parsaksh") or p_val.get("transport") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet", "candy-spoof", "parsaksh")) else None,
+                    "camouflage": {key:p_val.get("camouflage",{}).get(key) for key in ("mode","server_name","profile","persona","transport","proto","port","data_port","icmp_id","pre_shared_key","tunnel_count","initial_cwnd","interface","client_spoofed_ip","server_spoofed_ip","spoofed_ip_pool","recv_port","spoof_port","forward_target","reverse","listen","sni","path","fake_sni","fake_mode","icmp_type","fp")} if (p_val.get("engine") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet", "candy-spoof", "parsaksh", "wattunnel") or p_val.get("transport") in ("waterwall", "gost", "frp", "hedioum", "rathole", "paqet", "candy-spoof", "parsaksh", "wattunnel")) else None,
+                    "wattunnel_profile": p_val.get("wattunnel_profile") or (p_val.get("camouflage") or {}).get("profile"),
                     "rathole_transport": p_val.get("rathole_transport") or (p_val.get("camouflage") or {}).get("transport"),
                     "rathole_proto": (p_val.get("camouflage") or {}).get("proto", "tcp"),
                     "operation_task": public_change_job(p_val.get("operation_task"), data),
@@ -641,12 +644,16 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             if not target_node:
                 return self._send_json({"error": "Server not found in inventory"}, 404)
 
+            from core.kernel_relay_ports import node_credentials
+            login = node_credentials(target_node)
             ssh = SSHManager(
-                target_node["ip"],
-                target_node.get("port", 22),
-                target_node.get("username", "root"),
-                target_node.get("password"),
-                timeout=6
+                login.get("ip") or ip,
+                int(login.get("port") or 22),
+                login.get("username") or "root",
+                login.get("password"),
+                key_path=login.get("key_path"),
+                private_key=login.get("private_key"),
+                timeout=12,
             )
             ok, msg = ssh.connect()
             if not ok:
@@ -715,6 +722,34 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             elif eng == 'parsaksh':
                 svc = f"vxlb-parsakshc-{nnq}.service" if node_name else "vxlb-parsaksh*.service"
                 _, log_text, _ = ssh.execute(f"journalctl --no-pager -n 80 -u {svc} 2>/dev/null")
+            elif eng == 'wattunnel':
+                from core.wattunnel import client_unit
+                svc = shquote(client_unit(node_name)) if node_name else "vxlb-wattun-c*.service"
+                _, journal, _ = ssh.execute(f"journalctl --no-pager -n 60 -u {svc} 2>/dev/null")
+                _, monitor, _ = ssh.execute("tail -n 40 /var/log/vxlb-user-connections.log 2>/dev/null")
+                parts = []
+                if journal and journal.strip():
+                    parts.append(journal.strip())
+                if monitor and monitor.strip():
+                    parts.append(monitor.strip())
+                log_text = "\n".join(parts) if parts else "No WatTunnel journal or connection monitor lines yet."
+            elif eng in ('http', 'https', 'spoof'):
+                identity = str((target_node.get('http_connect') or {}).get('id') or '')
+                if len(identity) == 32 and all(char in '0123456789abcdef' for char in identity):
+                    units = [
+                        f'vxlb-http-{identity}-client-firewall.service',
+                        f'vxlb-http-{identity}-client-carrier.service',
+                        f'vxlb-http-{identity}-client.service',
+                    ]
+                    if eng == 'spoof':
+                        units = [
+                            f'vxlb-spoof-{identity}-nfq.service',
+                            f'vxlb-spoof-{identity}-queue.service',
+                            *units,
+                        ]
+                    _, log_text, _ = ssh.execute('journalctl --no-pager -n 80 ' + ' '.join(f'-u {unit}' for unit in units) + ' 2>/dev/null')
+                else:
+                    _, log_text, _ = ssh.execute("echo 'No connection logs yet.'")
             else:
                 _, log_text, _ = ssh.execute("tail -n 60 /var/log/vxlb-user-connections.log 2>/dev/null || echo 'No connection logs yet.'")
             ssh.close()
@@ -1379,9 +1414,6 @@ class LDWebRequestHandler(http.server.BaseHTTPRequestHandler):
             pool_name = str(body.get("pool", "")).strip()
             transport = str(body.get("transport", "")).strip()
             current = get_pools().get(pool_name, {})
-            from core.nfqws2_profiles import MODES as packet_modes
-            if current.get('engine')=='spoof' or transport in packet_modes:
-                return self._send_json({'success':False,'error':'برای پروفایل پردازش بسته استخر جداگانه بسازید؛ تغییر موتور درجا پشتیبانی نمی‌شود'},409)
             if transport in ('http','https') or current.get('transport') in ('http','https'):
                 if current.get('transport') not in ('http','https') or transport not in ('http','https'):
                     return self._send_json({"success":False,"error":"مهاجرت بین CONNECT و موتورهای دیگر پشتیبانی نمی‌شود؛ استخر جداگانه بسازید"},409)

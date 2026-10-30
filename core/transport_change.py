@@ -132,9 +132,11 @@ def connect(server):
             address = '127.0.0.1' if ':' not in address else '::1'
     except (OSError, ValueError, subprocess.SubprocessError):
         pass
-    ssh = SSHManager(address, server.get('port',22), server.get('username','root'), server.get('password'))
-    ok, _ = ssh.connect()
-    if not ok: ssh.close(); raise RuntimeError('اتصال SSH به یکی از سرورها ناموفق بود')
+    ssh = SSHManager(address, server.get('port',22), server.get('username','root'), server.get('password'), timeout=20)
+    ok, message = ssh.connect()
+    if not ok:
+        ssh.close()
+        raise RuntimeError(f'اتصال SSH به {address} ناموفق بود: {message}')
     return ssh
 
 def unit_name(node):
@@ -269,6 +271,8 @@ def get_engine_for_transport(transport: str) -> str:
         return 'candy-spoof'
     if t == 'parsaksh':
         return 'parsaksh'
+    if t == 'wattunnel':
+        return 'wattunnel'
     if t == 'paqet':
         return 'paqet'
     if t == 'wireguard':
@@ -336,9 +340,10 @@ def _engine_module(engine):
         'rathole': 'core.rathole_engine',
         'candy-spoof': 'core.candy_spoof_transport',
         'parsaksh': 'core.parsaksh_transport',
+        'wattunnel': 'core.wattunnel',
         'paqet': 'core.paqet_engine',
         'slipstream': 'core.slipstream_adapter',
-        'spoof': 'core.spoof_adapter',
+        'spoof': 'core.spoof_transport',
         'http': 'core.http_transport',
         'https': 'core.http_transport',
     }
@@ -651,6 +656,24 @@ def _validate_target_prerequisites(
                         f"({host}) IPv6 عمومی بومی ندارد؛ تغییر انجام نشد و تونل قبلی دستنخورده ماند. "
                         "یا روی هر دو سرور IPv6 عمومی فعال کنید یا موتور دیگری (مثلاً dc6/sit یا tun) انتخاب کنید."
                     )
+        if to_engine == "wattunnel":
+            from core.dependency_manifest import get_dependency_manifest, verify_file_sha256
+            from core.wattunnel import _local_binary_path
+            manifest = get_dependency_manifest("wattunnel")
+            seen = set()
+            for sess in sessions:
+                _, arch_raw, _ = sess.execute("uname -m")
+                remote_arch = (arch_raw or "").strip().lower()
+                arch_dir = "x86_64" if remote_arch in ("x86_64", "amd64") else "aarch64" if remote_arch in ("aarch64", "arm64") else remote_arch
+                if arch_dir in seen:
+                    continue
+                seen.add(arch_dir)
+                expected = str(((manifest.architectures.get(arch_dir) or {}) if manifest else {}).get("sha256") or "")
+                if not expected or not verify_file_sha256(_local_binary_path(arch_dir), expected):
+                    return (
+                        f"باینری آفلاین WatTunnel برای {arch_dir} در depot نیست یا جمع‌آزمایی‌اش با نسخهٔ پین‌شده نمی‌خواند. "
+                        f"تونل قبلی دستنخورده ماند. اول {_local_binary_path(arch_dir)} را با scripts/bundle_binaries.py بگذارید."
+                    )
         return None
     except Exception as exc:
         return f"بررسی پیش‌شرط تونل مقصد ناموفق بود: {exc}"
@@ -879,18 +902,15 @@ def start_change(name, target, background=True, repair=False, **kwargs):
         except (ValueError, TypeError) as error:
             return False, str(error)
 
-        from core.spoof_adapter import SPOOF_TRANSPORTS
-        if target in SPOOF_TRANSPORTS or pool.get('engine') == 'spoof':
-            return False, 'برای پروفایل پردازش بسته استخر جداگانه بسازید'
         if target in {'http', 'https'} or pool.get('transport') in {'http', 'https'}:
             return False, 'برای تغییر HTTP/HTTPS از عملیات اختصاصی CONNECT استفاده کنید؛ مهاجرت بین موتورهای دیگر پشتیبانی نمی‌شود'
 
         target_engine = _coerce_engine(kwargs.get('engine'), target)
-        from core.capabilities import validate_production_readiness
+        from core.capabilities import readiness_subject, validate_production_readiness
         import os
         is_prod = bool(kwargs.get('is_production', False) or os.environ.get("VX_LB_PRODUCTION", "").lower() in ("1", "true", "yes"))
         allow_exp = bool(kwargs.get('allow_experimental', False))
-        ok_gate, gate_msg = validate_production_readiness(target_engine, is_production=is_prod, allow_experimental=allow_exp)
+        ok_gate, gate_msg = validate_production_readiness(readiness_subject(target_engine, target), is_production=is_prod, allow_experimental=allow_exp)
         if not ok_gate:
             return False, gate_msg
         try:

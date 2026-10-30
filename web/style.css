@@ -293,6 +293,7 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .engine-badge.engine-frp { color: #fb923c; background: rgba(251, 146, 60, 0.12); border-color: rgba(251, 146, 60, 0.28); }
 .engine-badge.engine-hedioum { color: #f472b6; background: rgba(244, 114, 182, 0.12); border-color: rgba(244, 114, 182, 0.28); }
 .engine-badge.engine-rathole { color: #2dd4bf; background: rgba(45, 212, 191, 0.12); border-color: rgba(45, 212, 191, 0.28); }
+.engine-badge.engine-wattunnel { color: #818cf8; background: rgba(129, 140, 248, 0.12); border-color: rgba(129, 140, 248, 0.28); }
 .engine-badge.engine-paqet { color: #06b6d4; background: rgba(6, 182, 212, 0.12); border-color: rgba(6, 182, 212, 0.28); }
 .engine-badge.engine-spoof { color: #f43f5e; background: rgba(244, 63, 94, 0.12); border-color: rgba(244, 63, 94, 0.28); }
 .pool-nodes-summary { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 11px; color: var(--text-sub); background: var(--bg-elevated); border: 1px solid var(--border-subtle); }

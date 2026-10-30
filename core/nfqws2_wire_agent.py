@@ -145,7 +145,7 @@ class Observer:
     def result(self):
         passed={'fake-sni':self.fake_md5,'hop-ttl-injection':bool(self.fake_ttl),
                 'tcp-state-desync':self.urg and self.fake_rst,'l7-header-mutation':self.hostcase,
-                'split-tls':bool(self.record_lengths),}[self.mode]
+                'split-tls':bool(self.record_lengths) and self.record_lengths[0]==2,}[self.mode]
         return dict(profile=self.mode,passed=bool(passed and not self.limited),observations=dict(
             packets=self.packets,fake_sni_md5=self.fake_md5,fake_sni_ttl=sorted(self.fake_ttl),
             urgent_data=self.urg,out_of_window_rst=self.fake_rst,host_header_mutated=self.hostcase,

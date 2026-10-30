@@ -90,6 +90,14 @@ def validate_options(transport, options):
         if 'forward_target' in camouflage and camouflage['forward_target']:
             if ':' not in str(camouflage['forward_target']):
                 raise ValueError('forward_target must be host:port')
+    if transport == 'wattunnel':
+        if 'reverse' in camouflage and not isinstance(camouflage['reverse'], bool):
+            raise ValueError('WatTunnel reverse must be a boolean')
+        from core.wattunnel import normalize_settings
+        probe = dict(camouflage)
+        probe.setdefault('profile', 'tcp')
+        probe.setdefault('key', '0' * 16)
+        normalize_settings(probe)
     if transport == 'waterwall' and camouflage.get('tls'):
         if not camouflage.get('certificate') or not camouflage.get('key'):
             raise ValueError('WaterWall TLS requires certificate and key paths')
@@ -179,6 +187,10 @@ def creation_options(pool):
     result = {key: copy.deepcopy(pool[key]) for key in fields if key in pool}
     if 'vxsec_dst_port' in pool:
         result['dst_port'] = pool['vxsec_dst_port']
+    if pool.get('fake_sni'):
+        result['fake_sni'] = copy.deepcopy(pool['fake_sni'])
+    if pool.get('transport') == 'hop-ttl-injection' and pool.get('ttl_delta') is not None:
+        result['auto_ttl_delta'] = copy.deepcopy(pool['ttl_delta'])
     return result
 
 

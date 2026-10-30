@@ -103,3 +103,32 @@ def test_load_balancer_routes_each_managed_packet_operation_to_correct_lifecycle
     action=MagicMock(return_value=(True,'done'));monkeypatch.setattr(runtime,operation,action)
     assert getattr(LoadBalancerManager,method)(*args)[0]
     action.assert_called_once_with(*expected)
+
+
+def _refuse(server):
+    raise RuntimeError('اتصال SSH به 192.0.2.1 ناموفق بود: banner')
+
+
+def test_recent_ssh_drop_keeps_the_verified_path(state, monkeypatch):
+    now = 1_700_000_000
+    monkeypatch.setattr(runtime, 'plan', lambda *args: {})
+    monkeypatch.setattr(runtime, 'connect', _refuse)
+    monkeypatch.setattr(runtime.time, 'time', lambda: now)
+    monkeypatch.setattr(runtime, 'load_data', lambda: {'node_telemetry': {'qa:192.0.2.9': {
+        'status': 'HEALTHY', 'reason': 'kept',
+        'port_details': {'2255': {'status': 'HEALTHY', 'last_success_epoch': now - 30}}}}})
+    status, reason, details = runtime.health('qa', {'ip': '192.0.2.9'}, ['2255'])
+    assert status == 'HEALTHY' and reason == 'kept'
+    assert details['2255']['last_success_epoch'] == now - 30
+
+
+def test_stale_path_proof_does_not_hide_an_ssh_failure(state, monkeypatch):
+    now = 1_700_000_000
+    monkeypatch.setattr(runtime, 'plan', lambda *args: {})
+    monkeypatch.setattr(runtime, 'connect', _refuse)
+    monkeypatch.setattr(runtime.time, 'time', lambda: now)
+    monkeypatch.setattr(runtime, 'load_data', lambda: {'node_telemetry': {'qa:192.0.2.9': {
+        'status': 'HEALTHY', 'reason': 'old',
+        'port_details': {'2255': {'status': 'HEALTHY', 'last_success_epoch': now - 180}}}}})
+    status, reason, _ = runtime.health('qa', {'ip': '192.0.2.9'}, ['2255'])
+    assert status == 'DOWN' and 'banner' in reason

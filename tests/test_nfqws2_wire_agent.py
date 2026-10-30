@@ -49,10 +49,14 @@ def test_state_profile_requires_both_urgent_data_and_out_of_window_rst():
     value.feed(frame(seq=1001-10000,flags=4));assert value.result()['passed']
 
 
-def test_split_requires_wire_records_and_accepts_record_split():
-    source=hello();data=split_hello(source[:5],source[5:])
+def test_split_accepts_the_in_order_two_byte_record_seen_on_the_wire():
+    source=hello()
+    whole=observer('split-tls');whole.feed(frame(source))
+    assert not whole.result()['passed']
+    data=split_hello(source[:5],source[5:])
     value=observer('split-tls');value.feed(frame(data))
-    result=value.result();assert result['passed']
+    result=value.result()
+    assert result['passed'] and result['observations']['tcp_reordered'] is False
     assert result['observations']['client_hello_records'][0]==2
 
 

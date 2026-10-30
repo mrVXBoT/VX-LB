@@ -589,8 +589,12 @@ def health(name, node, ports):
         listen_code, _, _ = iran.execute(f'ss -ltn | grep -q ":{socks5_port}\\b"')
         if listen_code != 0:
             details = {p: {'status': 'DEGRADED', 'reason': 'سرویس فعال است اما شنونده SOCKS5 یافت نشد'} for p in ports}
+            from core.link_latency import annotate
+            annotate(iran, pool['kharej_server']['ip'], details)
             return 'DEGRADED', 'سرویس فعال است اما شنونده SOCKS5 روی نود ایران پیدا نشد', details
         details = {p: {'status': 'HEALTHY', 'reason': 'سرویس Candy-Spoof فعال و شنونده SOCKS5 در دسترس است'} for p in ports}
+        from core.link_latency import annotate
+        annotate(iran, pool['kharej_server']['ip'], details)
         return 'HEALTHY', 'سرویس Candy-Spoof فعال است', details
     except Exception as error:
         return 'DOWN', str(error), {}

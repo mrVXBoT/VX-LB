@@ -10,7 +10,7 @@ import json
 import secrets
 import shlex
 import time
-from core.storage import get_pools,save_pool,delete_pool,atomic_update
+from core.storage import get_pools,save_pool,delete_pool,atomic_update,load_data
 from core.transport_change import connect,mutation_lock
 from core.validation import validate_pool_name,validate_ports
 from core.gre import write
@@ -270,6 +270,19 @@ def change_ports(name, requested, transport=None):
             for ssh in sessions:ssh.close()
 
 
+def retained_path(name, node):
+    """Keep a path that passed in the last two minutes when only the management login dropped."""
+    telemetry = load_data().get('node_telemetry', {}).get(f"{name}:{node.get('ip')}", {})
+    if telemetry.get('status') != 'HEALTHY':
+        return None
+    details = telemetry.get('port_details') or {}
+    now = time.time()
+    epochs = [item.get('last_success_epoch') for item in details.values() if isinstance(item, dict)]
+    if not epochs or any(not isinstance(value, (int, float)) or now - value > 120 for value in epochs):
+        return None
+    return telemetry.get('reason') or 'Last packet path verification still stands', details
+
+
 def health(name, node, ports):
     if node.get('provisioning'):return 'DOWN','Packet deployment/cleanup is incomplete',{}
     sessions=[]
@@ -288,10 +301,20 @@ for port in json.loads(sys.argv[1]):
 print(json.dumps(result))
 '''
         destinations=json.loads(execute(kharej,'python3 -c '+shlex.quote(program)+' '+shlex.quote(json.dumps(ports)),timeout=max(15,len(ports)*3)))
-        details={str(port):dict(status='HEALTHY' if destinations.get(str(port)) else 'DOWN',path_verified=True,
-                 destination_tcp=bool(destinations.get(str(port))),udp_application='UNVERIFIED',latency_ms=result['latency_ms']) for port in ports}
+        details={}
+        for port in ports:
+            ready=bool(destinations.get(str(port)))
+            details[str(port)]=dict(status='HEALTHY' if ready else 'DOWN',
+                reason='TCP destination accepted the probe' if ready else 'TCP destination did not accept the probe',
+                path_verified=True,destination_tcp=ready,udp_application='UNVERIFIED',latency_ms=result['latency_ms'],
+                last_success_epoch=time.time() if ready else None)
         count=sum(d['status']=='HEALTHY' for d in details.values())
         return ('HEALTHY' if count==len(ports) else 'DEGRADED' if count else 'DOWN'),f'{count}/{len(ports)} TCP destinations ready; Packet/mTLS TCP/UDP transport verified',details
-    except Exception as error:return 'DOWN','Packet/mTLS data verification failed: '+str(error),{}
+    except Exception as error:
+        kept = retained_path(name, node) if 'اتصال SSH' in str(error) else None
+        if kept:
+            reason, details = kept
+            return 'HEALTHY', reason, details
+        return 'DOWN','Packet/mTLS data verification failed: '+str(error),{}
     finally:
         for ssh in sessions:ssh.close()

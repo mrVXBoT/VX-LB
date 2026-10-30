@@ -57,7 +57,7 @@ class TelemetryWatchdog:
             else:
                 status_since = now_str
 
-            data["node_telemetry"][key] = {
+            record = {
                 "pool": pool_name,
                 "ip": ip,
                 "status": status,
@@ -68,12 +68,22 @@ class TelemetryWatchdog:
                 "logs": logs or [],
                 "updated_at": now_str
             }
+            from core.link_latency import extract
+            latency = extract(port_details)
+            if latency is not None:
+                record["latency_ms"] = latency
+            data["node_telemetry"][key] = record
 
         atomic_update(_updater)
 
     def analyze_node_health(self, pool_name: str, node: dict, client_ports: Optional[List[str]] = None) -> Tuple[str, str, List[str], Dict[str, dict]]:
         """Dispatch to the engine-specific health probe, or the generic BackPack monitor."""
         if node.get('engine') == 'spoof' and node.get('spoof'):
+            if node.get('provisioning'):
+                previous = self.get_node_telemetry(pool_name, node['ip'])
+                if previous.get('status'):
+                    return previous.get('status'), previous.get('reason', ''), previous.get('logs') or [], previous.get('port_details') or {}
+                return 'IDLE', 'Packet deployment is in progress', [], {}
             from core.spoof_transport import health
             status, reason, details = health(pool_name, node, client_ports or [])
             self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
@@ -170,6 +180,11 @@ class TelemetryWatchdog:
             return status, reason, [], details
         if node.get('engine') == 'parsaksh' or node.get('transport') == 'parsaksh':
             from core.parsaksh_transport import health
+            status, reason, details = health(pool_name, node, client_ports or [])
+            self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
+            return status, reason, [], details
+        if node.get('engine') == 'wattunnel' or node.get('transport') == 'wattunnel':
+            from core.wattunnel import health
             status, reason, details = health(pool_name, node, client_ports or [])
             self.save_node_telemetry(pool_name, node['ip'], status, reason, [], details)
             return status, reason, [], details
@@ -276,6 +291,13 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
         # 2. Check live sockets strictly across ports of this pool
         filter_expr = " or ".join([f"sport = :{p}" for p in ports])
         _, ss_out, _ = ssh.execute(f"ss -tan -i {filter_expr}")
+        tunnel_rtt = None
+        try:
+            from core.link_latency import peer_tcp_rtt
+            peer = ((load_data().get('pools', {}).get(pool_name, {}) or {}).get('kharej_server') or {}).get('ip')
+            tunnel_rtt = peer_tcp_rtt(ssh, peer)
+        except Exception:
+            tunnel_rtt = None
         ssh.close()
         if log_rc != 0:
             reason = 'Telemetry window unavailable; filtering cannot be confirmed'
@@ -288,6 +310,7 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
         # Parse live sockets per port: count both active data-flowing sockets and genuinely stuck sockets
         live_stalls_by_port = {p: 0 for p in ports}
         live_actives_by_port = {p: 0 for p in ports}
+        live_rtt_by_port = {p: [] for p in ports}
         lines = ss_out.strip().split("\n")
         i = 0
         while i < len(lines):
@@ -310,8 +333,17 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
                 # Parse active throughput metrics
                 m_ack = re.search(r'bytes_acked:(\d+)', tcp_info)
                 m_rx = re.search(r'bytes_received:(\d+)', tcp_info)
+                m_rtt = re.search(r'\brtt:([0-9.]+)', tcp_info)
                 bytes_ack = int(m_ack.group(1)) if m_ack else 0
                 bytes_rx = int(m_rx.group(1)) if m_rx else 0
+
+                if state == "ESTAB" and m_rtt and sock_port in live_rtt_by_port:
+                    try:
+                        sample = float(m_rtt.group(1))
+                    except ValueError:
+                        sample = 0
+                    if sample > 0:
+                        live_rtt_by_port[sock_port].append(sample)
 
                 # Active live session in kernel: ESTAB with bidirectional data flow and normal queue
                 if state == "ESTAB" and bytes_ack > 2000 and bytes_rx > 2000 and send_q < 30000 and "backoff:" not in tcp_info:
@@ -409,6 +441,10 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
                 'checked_epoch':now_ts, 'failure_epoch':latest_failure,
                 'failure_checks':streak, 'last_success_epoch':last_success,
                 'socket_samples':socket_samples[p], 'independent_clients':len(clients)}
+            if live_rtt_by_port.get(p):
+                port_results[p]['latency_ms'] = round(min(live_rtt_by_port[p]), 1)
+            elif tunnel_rtt:
+                port_results[p]['latency_ms'] = tunnel_rtt
 
         # Determine node status specifically for this pool
         filtered_ports = [p for p, res in port_results.items() if res["status"] == "FILTERED"]
@@ -494,9 +530,11 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
             client_ports = pool.get("client_ports", ["2222"])
             nodes = pool.get("nodes", [])
             current = load_data()
+            live_pool = current.get("pools", {}).get(pool_name, pool)
             pool_operation_active = any(current.get(key, {}).get(pool_name, {}).get('status') in ('queued','running') for key in ('pool_tasks','pool_creations'))
-            if pool_operation_active or pool.get("gre_update", {}).get("status") in ("running", "rollback_failed"):
-                log("GRE settings are in maintenance; retaining the previous DNS state")
+            change_status = (live_pool.get("transport_change") or {}).get("status")
+            if pool_operation_active or live_pool.get("gre_update", {}).get("status") in ("running", "rollback_failed") or change_status in TRANSPORT_ACTIVE:
+                log("Tunnel settings are changing; retaining the previous node state")
                 previous=load_data().get("watchdog_status",{}).get("pool_reports",{}).get(pool_name)
                 if previous: pool_reports[pool_name]=previous
                 continue
@@ -542,7 +580,9 @@ print(time.strftime('BP_CLOCK '+str(int(now))+' %Y-%m-%d %H:%M:%S'))
                         log(f"  ❌ [{status}] {ip}: {reason}")
 
                     for p, p_res in port_details.items():
-                        log(f"     ↳ Port {p}: [{p_res['status']}] {p_res['reason']}")
+                        if not isinstance(p_res, dict):
+                            continue
+                        log(f"     ↳ Port {p}: [{p_res.get('status', '?')}] {p_res.get('reason', '')}")
 
             # Categorize nodes for DNS routing in this pool:
             # 1. HEALTHY nodes: confirmed clean bidirectional traffic.

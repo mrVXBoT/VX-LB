@@ -330,7 +330,8 @@ for p in ports:
                 self.client.get_transport(), window_size=16 * 1024 * 1024,
                 max_packet_size=256 * 1024,
             )
-            sftp.get_channel().settimeout(60)
+            size = os.path.getsize(local_path)
+            sftp.get_channel().settimeout(max(60, int(size / 50000) + 30))
             sftp.put(local_path, temporary_path)
             if sftp.stat(temporary_path).st_size != os.path.getsize(local_path):
                 return False

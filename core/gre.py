@@ -317,9 +317,13 @@ def health(pool_name,node,ports):
         script='''import socket,json,sys
 host=sys.argv[1];result={}
 for port in json.loads(sys.argv[2]):
- item={"tcp":False,"udp":"silent"}
+ item={"tcp":False,"udp":"silent","ms":None}
+ start=__import__("time").monotonic()
  try:
   with socket.create_connection((host,int(port)),timeout=2):item["tcp"]=True
+  item["ms"]=round((__import__("time").monotonic()-start)*1000,1)
+ except ConnectionRefusedError:
+  item["ms"]=round((__import__("time").monotonic()-start)*1000,1)
  except OSError:item["tcp"]=False
  sock=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);sock.settimeout(1)
  try:
@@ -347,7 +351,7 @@ print(json.dumps(result))
                 reason='GRE tunnel TCP/UDP verified; destination TCP is up; destination UDP did not reply'
             else:
                 reason='GRE tunnel passed; TCP destination is not listening'
-            details[port]={'status':'HEALTHY' if tcp else 'DOWN','reason':reason,'destination_tcp':tcp,'udp_application':udp,'last_success_epoch':time.time() if tcp else None}
+            details[port]={'status':'HEALTHY' if tcp else 'DOWN','reason':reason,'destination_tcp':tcp,'udp_application':udp,'latency_ms':item.get('ms') if isinstance(item, dict) else None,'last_success_epoch':time.time() if tcp else None}
         live=sum(item['status']=='HEALTHY' for item in details.values())
         closed=sum(item.get('udp_application')=='closed' for item in details.values())
         summary='GRE data path verified; %s/%s TCP destinations reachable' % (live, len(ports))

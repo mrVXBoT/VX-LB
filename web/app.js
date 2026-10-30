@@ -892,6 +892,11 @@ function getPoolProtoTag(p) {
     const pp = p.camouflage?.transport || p.nodes?.[0]?.parsaksh?.transport || "udp";
     return `PARSAKSH / ${pp.toUpperCase()}`;
   }
+  if (eng === "wattunnel" || tr === "wattunnel") {
+    const profile = p.wattunnel_profile || p.camouflage?.profile || p.nodes?.[0]?.wattunnel?.profile || "tcp";
+    const direction = (p.camouflage?.reverse || p.nodes?.[0]?.wattunnel?.reverse) ? "REV" : "DIR";
+    return `WATTUNNEL / ${String(profile).toUpperCase()} / ${direction}`;
+  }
   if (eng === "paqet" || tr === "paqet") {
     const km = (p.paqet_kcp_mode || p.camouflage?.kcp_mode || "fast").toUpperCase();
     return `PAQET / KCP-${km}`;
@@ -1002,6 +1007,11 @@ function getEngineBadge(engine, transport, pool) {
     cls = "engine-spoof";
     const pkTr = pool?.camouflage?.transport || pool?.nodes?.[0]?.parsaksh?.transport || "udp";
     label = `ParsaKSH · ${pkTr.toUpperCase()}`;
+  } else if (eng === "wattunnel" || tr === "wattunnel") {
+    cls = "engine-wattunnel";
+    const profile = pool?.wattunnel_profile || pool?.camouflage?.profile || pool?.nodes?.[0]?.wattunnel?.profile || "tcp";
+    const direction = (pool?.camouflage?.reverse || pool?.nodes?.[0]?.wattunnel?.reverse) ? "reverse" : "direct";
+    label = `WatTunnel · ${profile} · ${direction}`;
   } else if (eng === "spoof" || MANAGED_PACKET_TRANSPORTS.includes(tr) || tr.startsWith("spoof")) {
     cls = "engine-spoof";
     label = `پردازش بسته · ${getTransportTagLabel({transport: tr})}`;
@@ -1221,6 +1231,7 @@ function renderPools(pools) {
             ${(n.engine === 'rathole' || p.transport === 'rathole' || p.engine === 'rathole') ? `<div class="gre-private-route"><span>مسیر Rathole:</span><bdi dir="ltr">${escapeHtml(n.ip)}:${escapeHtml(String(n.rathole?.port || n.tunnel_port || p.camouflage?.port || 2333))}</bdi><span>(سرور ایران) &larr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}</bdi><span>(کلاینت خارج) · انتقال: <strong style="color:var(--text-main);">${escapeHtml(String(n.rathole?.transport || p.rathole_transport || p.camouflage?.transport || "tcp").toUpperCase())}</strong></span></div>` : ''}
             ${(n.engine === 'candy-spoof' || p.transport === 'candy-spoof' || p.engine === 'candy-spoof') ? `<div class="gre-private-route"><span>مسیر Candy-Spoof:</span><bdi dir="ltr">${escapeHtml(n.ip)}:${escapeHtml(String(n.candy?.socks5_port || p.camouflage?.socks5_port || 1080))}</bdi><span>(SOCKS5 ایران) &rarr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}</bdi><span>(سرور خارج) · UDP ${escapeHtml(String(n.candy?.data_port || p.camouflage?.data_port || 51820))}</span></div>` : ''}
             ${(n.engine === 'parsaksh' || p.transport === 'parsaksh' || p.engine === 'parsaksh') ? `<div class="gre-private-route"><span>مسیر ParsaKSH:</span><bdi dir="ltr">${escapeHtml(n.ip)}:${escapeHtml(String(n.parsaksh?.client_udp_port || p.camouflage?.client_udp_port || 51820))}</bdi><span>(UDP ایران) &rarr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}</bdi><span>(سرور خارج) · فوروارد ${escapeHtml(String(n.parsaksh?.forward_target || p.camouflage?.forward_target || "-"))}</span></div>` : ''}
+            ${(n.engine === 'wattunnel' || p.transport === 'wattunnel' || p.engine === 'wattunnel') ? `<div class="gre-private-route"><span>مسیر WatTunnel:</span><bdi dir="ltr">${escapeHtml(n.ip)}</bdi><span>(${(n.wattunnel?.reverse || p.camouflage?.reverse) ? 'شنوندهٔ ایران' : 'کلاینت ایران'}) &rarr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}${n.wattunnel?.listen || p.camouflage?.listen ? ':' + escapeHtml(String(n.wattunnel?.listen || p.camouflage?.listen)) : ''}</bdi><span>(خارج) · حامل <strong style="color:var(--text-main);">${escapeHtml(String(n.wattunnel?.profile || p.wattunnel_profile || p.camouflage?.profile || 'tcp'))}</strong> · فوروارد ${escapeHtml(String(n.wattunnel?.proto || p.camouflage?.proto || 'tcp'))}</span></div>` : ''}
             ${(n.engine === 'paqet' || p.engine === 'paqet' || p.transport === 'paqet') ? `<div class="gre-private-route"><span>مسیر Paqet KCP:</span><bdi dir="ltr">${escapeHtml(n.ip)}</bdi><span>(کلاینت ایران) &rarr;</span><bdi dir="ltr">${escapeHtml(p.kharej_ip || "-")}:${escapeHtml(String(n.paqet?.port || p.camouflage?.port || 8888))}</bdi><span>(سرور خارج) · حالت: <strong style="color:var(--text-main);">${escapeHtml(String(n.paqet?.kcp_mode || p.camouflage?.kcp_mode || "fast").toUpperCase())}</strong></span></div>` : ''}
             <div class="node-dns-line"><span class="status-badge ${dns.verified ? (dns.ips.includes(n.ip) ? 'healthy' : 'idle') : 'unknown'}">${dns.verified ? (dns.ips.includes(n.ip) ? (p.dns_scope === 'all_subdomains' ? 'آی‌پی در همهٔ ساب‌دامین‌ها ثبت است' : 'آی‌پی در DNS ثبت است') : (p.dns_scope === 'all_subdomains' ? 'آی‌پی در همهٔ ساب‌دامین‌ها ثبت نیست' : 'آی‌پی در DNS نیست')) : 'وضعیت DNS تأیید نشده'}</span><span>${dns.source}</span></div>
               </div>
@@ -2014,6 +2025,22 @@ async function submitCreatePool(e) {
                    forward_target: (document.getElementById('parsaksh-forward')?.value || '').trim()
                  }
                } :
+               transport === 'wattunnel' ? {
+                 engine: 'wattunnel',
+                 camouflage: {
+                   profile: getSelectedWattunnelProfile(),
+                   proto: document.getElementById('wattunnel-proto')?.value || 'tcp',
+                   reverse: document.getElementById('wattunnel-reverse')?.checked || false,
+                   listen: document.getElementById('wattunnel-listen')?.value || '',
+                   key: (document.getElementById('wattunnel-key')?.value || '').trim() || genSecret(32),
+                   sni: (document.getElementById('wattunnel-sni')?.value || '').trim(),
+                   path: (document.getElementById('wattunnel-path')?.value || '').trim() || '/wat',
+                   fake_sni: (document.getElementById('wattunnel-fake-sni')?.value || '').trim(),
+                   fake_mode: document.getElementById('wattunnel-fake-mode')?.value || 'rst',
+                   icmp_type: document.getElementById('wattunnel-icmp-type')?.value || 'echo',
+                   fp: document.getElementById('wattunnel-fp')?.value || 'chrome'
+                 }
+               } :
                transport === 'paqet' ? {
                 engine: 'paqet',
                 camouflage: {
@@ -2519,8 +2546,8 @@ async function openLogsModal(ip, name, pool) {
     if (data.logs && data.logs.length) {
       content.innerHTML = data.logs.map(l => {
         let cls = "";
-        if (l.includes("CLEAN_FLOW") || l.includes("USER_SESSION_ACTIVE")) cls = "log-healthy";
-        else if (l.includes("STALL") || l.includes("DROP")) cls = "log-err";
+        if (l.includes("CLEAN_FLOW") || l.includes("USER_SESSION_ACTIVE") || l.includes("لینک WatTunnel برقرار")) cls = "log-healthy";
+        else if (l.includes("STALL") || l.includes("DROP") || l.includes("no reply from the server") || l.includes("lost contact")) cls = "log-err";
         return `<div class="${cls}">${escapeHtml(withoutEmoji(l))}</div>`;
       }).join("");
       content.scrollTop = content.scrollHeight;
@@ -2854,6 +2881,22 @@ const ENGINE_TRANSPORTS = {
       { value: "parsaksh", label: "ParsaKSH Spoof Tunnel", hint: "جعل دوطرفه IP (Go/Rust)؛ کلاینت UDP روی ایران و سرور فوروارد در خارج؛ پروتکل‌های ICMP/ICMPv6/UDP/TCP-SYN." }
     ]
   },
+  wattunnel: {
+    label: "WatTunnel",
+    transports: [
+      { value: "wattunnel", profile: "icmp", label: "ICMP", hint: "تونل رمزشده وقتی فقط ping عبور می‌کند. هر دو سمت به CAP_NET_RAW نیاز دارند." },
+      { value: "wattunnel", profile: "udp", label: "UDP", hint: "کم‌تأخیرترین حامل وقتی UDP باز است. پورت کاربر همچنان جدا از پورت حامل است." },
+      { value: "wattunnel", profile: "udp-dns", label: "UDP-DNS", hint: "هر دیتاگرام شبیه DNS است. پورت پیش‌فرض حامل 53 است و هر دو سمت باید این حالت را داشته باشند." },
+      { value: "wattunnel", profile: "tcp", label: "TCP", hint: "حامل TCP که شروع اتصال را شبیه ClientHello می‌کند. رمزنگاری نشست جدا از این ظاهر است." },
+      { value: "wattunnel", profile: "tls", label: "TLS", hint: "حامل TLS شبیه HTTPS. SNI و اثر انگشت ClientHello قابل تنظیم است." },
+      { value: "wattunnel", profile: "ws", label: "WebSocket", hint: "حامل WebSocket بدون TLS. مسیر URL در دو سمت یکی است." },
+      { value: "wattunnel", profile: "wss", label: "WSS", hint: "WebSocket روی TLS. برای مسیرهایی که فقط HTTPS عبور می‌کند." },
+      { value: "wattunnel", profile: "h2", label: "HTTP/2", hint: "حامل HTTP/2 روی TLS. از این حالت برای عبور از Cloudflare استفاده نکنید؛ آنجا WSS یا gRPC مناسب‌تر است." },
+      { value: "wattunnel", profile: "h2c", label: "H2C", hint: "HTTP/2 بدون TLS، معمولاً پشت پروکسی که TLS را خودش تمام می‌کند." },
+      { value: "wattunnel", profile: "grpc", label: "gRPC", hint: "حامل gRPC. درخواست‌ها به مسیر انتخاب‌شده به‌علاوهٔ /Tun می‌روند." },
+      { value: "wattunnel", profile: "fortress", label: "Fortress", hint: "چند حامل ICMP+TCP+TLS+WSS+UDP در یک نشست. اگر یکی بسته شود بقیه می‌مانند. پورت پایه و سه پورت بعدی را آزاد بگذارید." }
+    ]
+  },
   kernel: {
     label: "تونل‌های شبکه و کرنل",
     transports: [
@@ -2869,14 +2912,14 @@ const ENGINE_TRANSPORTS = {
     ]
   },
   spoof: {
-    label: "پروفایل‌های پردازش بسته (آزمایشی)",
+    label: "پروفایل‌های پردازش بسته",
     transports: [
       { value: "fake-sni", label: "Fake SNI + MD5/BadSum (پایدار)", hint: "تزریق ClientHello با SNI انتخابی و بررسی بستهٔ واقعی در کنار آزمون TCP/UDP" },
-      { value: "split-tls", label: "TLS Record + TCP Disorder (آزمایشی)", hint: "تقسیم رکورد ClientHello و ارسال معکوس قطعات TCP روی مسیر mTLS" },
-      { value: "hop-ttl-injection", label: "TTL محدود با برآورد هاپ (آزمایشی)", hint: "تزریق ClientHello با TTL برآوردشده و محدود؛ مقدار جایگزین و BadSum حفظ می‌شوند" },
-      { value: "tcp-state-desync", label: "RST + OOB (آزمایشی)", hint: "تزریق RST نامعتبر و دادهٔ خارج از باند؛ پذیرش فقط پس از مشاهدهٔ تغییر و عبور داده" },
+      { value: "split-tls", label: "TLS Record + TCP Disorder (پایدار)", hint: "تقسیم رکورد ClientHello روی مسیر mTLS؛ پذیرش با رکورد اول ۲ بایتی است" },
+      { value: "hop-ttl-injection", label: "TTL محدود با برآورد هاپ (پایدار)", hint: "تزریق ClientHello با TTL برآوردشده و محدود؛ مقدار جایگزین و BadSum حفظ می‌شوند" },
+      { value: "tcp-state-desync", label: "RST + OOB (پایدار)", hint: "تزریق RST نامعتبر و دادهٔ خارج از باند؛ پذیرش فقط پس از مشاهدهٔ هر دو و عبور داده" },
       { value: "l3-ip-spoof", disabled: true, label: "L3 Source-IP Spoofing (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." },
-      { value: "l7-header-mutation", label: "HTTP Host Header Mutation (آزمایشی)", hint: "تغییر واقعی حروف نام هدر Host روی CONNECT؛ دادهٔ TCP/UDP در mTLS عبور می‌کند" },
+      { value: "l7-header-mutation", label: "HTTP Host Header Mutation (پایدار)", hint: "تغییر واقعی حروف نام هدر Host روی CONNECT؛ دادهٔ TCP/UDP در mTLS عبور می‌کند" },
       { value: "udp-raw-spoof", disabled: true, label: "Raw UDP / QUIC Spoofing (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." },
       { value: "dns-spoof", disabled: true, label: "DNS Anti-Poisoning (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." },
       { value: "spoof-tcp-syn", disabled: true, label: "TCP SYN Spoofing (غیرفعال)", hint: "در این نسخه پشتیبانی عملیاتی ندارد و قابل انتخاب نیست." },
@@ -2909,10 +2952,16 @@ function populatePoolTransports(engineKey, preferredTransport) {
   if (!protoSel) return;
   const cfg = ENGINE_TRANSPORTS[engineKey] || ENGINE_TRANSPORTS.backpack;
   const opts = cfg.transports;
-  const chosen = opts.some(t => !t.disabled && t.value === preferredTransport) ? preferredTransport : (engineKey === "kernel" ? "wireguard" : (opts.find(t => !t.disabled)?.value || ""));
-  protoSel.innerHTML = opts.map(t => `<option value="${escapeHtml(t.value)}"${t.mode ? ` data-mode="${escapeHtml(t.mode)}"` : ''}${t.profile ? ` data-profile="${escapeHtml(t.profile)}"` : ''} ${t.disabled ? "disabled" : ""} ${t.value === chosen ? "selected" : ""}>${escapeHtml(t.label)}</option>`).join("");
-  protoSel.value = chosen;
-  updateTransportDesc(engineKey, chosen);
+  let chosen = opts.find(t => !t.disabled && t.value === preferredTransport && (!t.profile || t.profile === preferredTransport));
+  if (!chosen && engineKey === "kernel") chosen = opts.find(t => !t.disabled && t.value === "wireguard");
+  if (!chosen && engineKey === "wattunnel") chosen = opts.find(t => !t.disabled && t.profile === "tcp");
+  if (!chosen) chosen = opts.find(t => !t.disabled);
+  protoSel.innerHTML = opts.map(t => `<option value="${escapeHtml(t.value)}"${t.mode ? ` data-mode="${escapeHtml(t.mode)}"` : ''}${t.profile ? ` data-profile="${escapeHtml(t.profile)}"` : ''} ${t.disabled ? "disabled" : ""} ${t === chosen ? "selected" : ""}>${escapeHtml(t.label)}</option>`).join("");
+  if (chosen) {
+    protoSel.selectedIndex = Math.max(0, opts.indexOf(chosen));
+    protoSel.value = chosen.value;
+  }
+  updateTransportDesc(engineKey, chosen ? chosen.value : "");
 }
 
 function updateTransportDesc(engineKey, transportValue) {
@@ -2990,6 +3039,12 @@ function getSelectedRatholeTransport() {
   const protoEl = document.getElementById('new-pool-proto');
   const opt = protoEl && protoEl.selectedOptions && protoEl.selectedOptions[0];
   return (opt && opt.dataset && opt.dataset.mode) || 'tcp';
+}
+
+function getSelectedWattunnelProfile() {
+  const protoEl = document.getElementById('new-pool-proto');
+  const opt = protoEl && protoEl.selectedOptions && protoEl.selectedOptions[0];
+  return (opt && opt.dataset && opt.dataset.profile) || 'tcp';
 }
 
 function getSelectedHedioumMode() {
@@ -3090,11 +3145,10 @@ function populateTransportModalOptions(engineKey, currentTransport, currentMode,
   const cfg = ENGINE_TRANSPORTS[engineKey] || ENGINE_TRANSPORTS.backpack;
   const opts = cfg.transports;
   const httpFamily = ['http','https'].includes(currentTransport);
-  const packetCurrent = TRANSPORT_TO_ENGINE[currentTransport]==='spoof';
   const isExactCurrent = t => t.value === currentTransport &&
       (!t.mode || t.mode === currentMode) &&
       (!t.profile || t.profile === currentProfile);
-  const unavailable = t => t.disabled || packetCurrent || engineKey==='spoof' ||
+  const unavailable = t => t.disabled ||
       (currentTransport==='gre' && engineKey!=='kernel') ||
       (httpFamily ? !['http','https'].includes(t.value) : ['http','https'].includes(t.value)) ||
       isExactCurrent(t);
@@ -3114,8 +3168,7 @@ function populateTransportModalOptions(engineKey, currentTransport, currentMode,
   updateTransportModalDesc(engineKey, targetSel.value);
   updateTransportModalAdaptiveFields();
   const submit=document.getElementById('transport-submit');
-  if(submit){submit.disabled=!firstAvailable;submit.title=packetCurrent||engineKey==='spoof'?'برای این پروفایل استخر جداگانه بسازید':!firstAvailable?'نوع قابل تغییر موجود نیست':'';}
-  if(packetCurrent||engineKey==='spoof'){const description=document.getElementById('transport-target-desc');if(description)description.textContent='برای تغییر پروفایل پردازش بسته، استخر جداگانه بسازید.';}
+  if(submit){submit.disabled=!firstAvailable;submit.title=!firstAvailable?'نوع قابل تغییر موجود نیست':'';}
 }
 
 function onTransportChangeEngineChanged() {
@@ -3166,7 +3219,23 @@ function updateTransportModalAdaptiveFields() {
   }
   const spoofGroup = document.getElementById('transport-change-spoof-fields');
   if (spoofGroup) {
-    spoofGroup.classList.toggle('hidden', !['fake-sni', 'split-tls', 'hop-ttl-injection', 'tcp-state-desync', 'l3-ip-spoof', 'l7-header-mutation', 'udp-raw-spoof', 'dns-spoof', 'spoof', 'spoof-tcp-syn', 'spoof-udp-raw', 'spoof-icmp', 'qs-dns-hybrid', 'hyperion-x'].includes(transport));
+    const managed = MANAGED_PACKET_TRANSPORTS.includes(transport);
+    const fields = {
+      'transport-spoof-fake-sni': managed && ['fake-sni', 'hop-ttl-injection'].includes(transport),
+      'transport-spoof-ttl-delta': managed && transport === 'hop-ttl-injection',
+      'transport-spoof-ip-list': false,
+      'transport-spoof-peer-ip': false,
+      'transport-spoof-dns-resolvers': false,
+      'transport-spoof-fake-send-ip': false,
+      'transport-spoof-knock-key': false
+    };
+    spoofGroup.classList.toggle('hidden', !Object.values(fields).some(Boolean));
+    Object.entries(fields).forEach(([id, visible]) => {
+      const input = document.getElementById(id);
+      if (!input) return;
+      input.disabled = !visible;
+      input.closest?.('.input-group')?.classList.toggle('hidden', !visible);
+    });
   }
 }
 
@@ -3193,14 +3262,13 @@ async function submitTransportChange(event) {
       payload.dc6_mtu = payload.mtu;
     }
 
-    if (['fake-sni', 'split-tls', 'hop-ttl-injection', 'tcp-state-desync', 'l3-ip-spoof', 'l7-header-mutation', 'udp-raw-spoof', 'dns-spoof', 'spoof', 'spoof-tcp-syn', 'spoof-udp-raw', 'spoof-icmp', 'qs-dns-hybrid', 'hyperion-x'].includes(transport)) {
-      payload.fake_sni = (document.getElementById('transport-spoof-fake-sni')?.value || 'www.shaparak.ir').trim();
-      payload.auto_ttl_delta = parseInt(document.getElementById('transport-spoof-ttl-delta')?.value || '3', 10);
-      payload.spoof_ips = (document.getElementById('transport-spoof-ip-list')?.value || '').trim();
-      payload.peer_spoof_ip = (document.getElementById('transport-spoof-peer-ip')?.value || '').trim();
-      payload.dns_resolvers = (document.getElementById('transport-spoof-dns-resolvers')?.value || '').trim();
-      payload.fake_send_ip = (document.getElementById('transport-spoof-fake-send-ip')?.value || '').trim();
-      payload.knock_key = (document.getElementById('transport-spoof-knock-key')?.value || '').trim();
+    if (MANAGED_PACKET_TRANSPORTS.includes(transport)) {
+      if (['fake-sni', 'hop-ttl-injection'].includes(transport)) {
+        payload.fake_sni = (document.getElementById('transport-spoof-fake-sni')?.value || 'www.shaparak.ir').trim();
+      }
+      if (transport === 'hop-ttl-injection') {
+        payload.auto_ttl_delta = parseInt(document.getElementById('transport-spoof-ttl-delta')?.value || '3', 10);
+      }
     }
     if (['gre', 'gre6', 'ip6ip6', 'wireguard', 'vxlan', 'vxlan_ipsec', 'geneve_ipsec', 'tun'].includes(transport)) {
       payload.mtu = parseInt(document.getElementById('transport-mtu-input')?.value || '1400', 10);
@@ -3237,6 +3305,20 @@ async function submitTransportChange(event) {
           hostname: document.getElementById('transport-rathole-hostname')?.value || ''
         } : {})
       };
+    }
+    if (transport === 'wattunnel') {
+      const targetSel = document.getElementById('transport-target');
+      const opt = targetSel && targetSel.selectedOptions && targetSel.selectedOptions[0];
+      const existing = (cachedStatus?.pools || []).find(pool => pool.name === poolForTransport);
+      const same = existing && (existing.engine === 'wattunnel' || existing.transport === 'wattunnel');
+      payload.engine = 'wattunnel';
+      payload.camouflage = {
+        profile: (opt && opt.dataset && opt.dataset.profile) || 'tcp'
+      };
+      if (!same) {
+        payload.camouflage.proto = 'tcp';
+        payload.camouflage.reverse = false;
+      }
     }
     if (transport === 'paqet') {
       payload.camouflage = {
@@ -3536,6 +3618,41 @@ function updateGreCreateFields() {
     ['parsaksh-transport', 'parsaksh-data-port', 'parsaksh-recv-port', 'parsaksh-spoof-port', 'parsaksh-client-sip', 'parsaksh-server-sip', 'parsaksh-forward'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.disabled = !isParsaksh;
+    });
+  }
+
+  // WatTunnel
+  const wattunnelDiv = document.getElementById('wattunnel-create-fields');
+  if (wattunnelDiv) {
+    const isWattunnel = mode === 'wattunnel';
+    wattunnelDiv.classList.toggle('hidden', !isWattunnel);
+    const profile = getSelectedWattunnelProfile();
+    const needsListen = profile !== 'icmp';
+    const needsIcmp = profile === 'icmp' || profile === 'fortress';
+    const needsTls = ['tls', 'wss', 'h2', 'grpc', 'fortress'].includes(profile);
+    const needsPath = ['ws', 'wss', 'h2', 'h2c', 'grpc', 'fortress'].includes(profile);
+    const needsFake = ['tcp', 'tls', 'wss', 'h2', 'grpc', 'fortress'].includes(profile);
+    const listenEl = document.getElementById('wattunnel-listen');
+    if (listenEl && isWattunnel && !listenEl.dataset.touched) {
+      listenEl.placeholder = profile === 'udp-dns' ? '53' : '4443';
+    }
+    [
+      ['wattunnel-proto', true],
+      ['wattunnel-reverse', true],
+      ['wattunnel-key', true],
+      ['wattunnel-listen', needsListen],
+      ['wattunnel-icmp-type', needsIcmp],
+      ['wattunnel-sni', needsTls],
+      ['wattunnel-fp', needsTls],
+      ['wattunnel-path', needsPath],
+      ['wattunnel-fake-sni', needsFake],
+      ['wattunnel-fake-mode', needsFake],
+    ].forEach(([id, visible]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const show = isWattunnel && visible;
+      el.disabled = !show;
+      el.closest?.('.input-group')?.classList.toggle('hidden', !show);
     });
   }
 

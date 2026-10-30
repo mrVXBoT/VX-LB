@@ -217,6 +217,27 @@ CAPABILITIES_CATALOG: Dict[str, EngineCapabilities] = {
         supports_raw_link=True,
         requires_external_domain=False,
     ),
+    # WatTunnel
+    "wattunnel": EngineCapabilities(
+        engine_id="wattunnel",
+        display_name="WatTunnel",
+        description="Encrypted port forwarding over ICMP, UDP, DNS-shaped UDP, TCP, TLS, WebSocket, HTTP/2, gRPC, or a bonded fortress",
+        supported_protocols=["tcp", "udp"],
+        address_families=["ipv4", "ipv6"],
+        layer="L4",
+        directionality="bidirectional",
+        supported_topologies=["1:1", "N:1"],
+        requires_encryption=True,
+        encryption_type="chacha20-poly1305",
+        kernel_requirements=["raw_socket"],
+        support_status="experimental",
+        status_reason="WatTunnel 3.1.2 carriers generated as wattun configs; direct N:1 shares one Kharej server; ICMP needs CAP_NET_RAW and the pinned release checksum",
+        default_mtu=1400,
+        overhead_bytes=48,
+        supports_port_forwarding=True,
+        supports_raw_link=True,
+        requires_external_domain=False,
+    ),
     # GOST
     "gost": EngineCapabilities(
         engine_id="gost",
@@ -784,6 +805,13 @@ def _register_spoof_capabilities():
         ("hyperion-x", "HYPERION-X Tri-Vector", "شاهکار سه‌مسیره ضد فیلترینگ با Dark Knock و تغییر چهره هوشمند", "L3", ["tcp", "udp"], "noise"),
     ]
     packet_profiles={'fake-sni','split-tls','hop-ttl-injection','tcp-state-desync','l7-header-mutation'}
+    verified_reasons={
+        'fake-sni':'Verified Fake SNI injection with managed mTLS TCP/UDP and owned NFQUEUE packet processing',
+        'split-tls':'Verified TLS record split with a 2-byte first record, managed mTLS TCP/UDP and owned NFQUEUE',
+        'hop-ttl-injection':'Verified bounded-TTL fake ClientHello with managed mTLS TCP/UDP and owned NFQUEUE',
+        'tcp-state-desync':'Verified urgent data and out-of-window RST with managed mTLS TCP/UDP and owned NFQUEUE',
+        'l7-header-mutation':'Verified Host header case mutation on CONNECT with managed TCP/UDP relay and owned NFQUEUE',
+    }
     for tid, name, desc_fa, layer, protos, enc in spoof_transports:
         managed=tid in packet_profiles or tid=='spoof'
         if tid not in CAPABILITIES_CATALOG:
@@ -799,8 +827,8 @@ def _register_spoof_capabilities():
                 requires_encryption=True if managed else enc != "none",
                 encryption_type="tls13" if managed else enc,
                 kernel_requirements=["nfnetlink_queue","iptables"] if managed else ["raw_socket","nftables"],
-                support_status="verified" if tid == "fake-sni" else ("experimental" if managed else "unsupported"),
-                status_reason="Verified Fake SNI injection with managed mTLS TCP/UDP and owned NFQUEUE packet processing" if tid == "fake-sni" else ("Managed mTLS TCP/UDP, owned NFQUEUE and required wire-effect verification; live acceptance pending" if managed else "No managed bidirectional runtime and data verification implemented"),
+                support_status="verified" if tid in verified_reasons else ("experimental" if managed else "unsupported"),
+                status_reason=verified_reasons.get(tid) or ("Managed packet family; deploy a concrete profile" if managed else "No managed bidirectional runtime and data verification implemented"),
                 default_mtu=1400,
                 overhead_bytes=40,
                 supports_port_forwarding=True,
@@ -874,6 +902,14 @@ def is_engine_supported(engine_id: str) -> bool:
     """Check if an engine is verified or experimental (i.e. not unsupported)."""
     cap = get_capability(engine_id)
     return cap is not None and cap.support_status != "unsupported"
+
+def readiness_subject(engine_id: str, transport: Optional[str] = None) -> str:
+    """Gate a concrete packet profile instead of the experimental spoof family label."""
+    profile = str(transport or '').lower().strip()
+    if profile in {'fake-sni', 'split-tls', 'hop-ttl-injection', 'tcp-state-desync', 'l7-header-mutation'}:
+        return profile
+    return engine_id
+
 
 def validate_production_readiness(
     engine_id: str,

@@ -702,6 +702,8 @@ print(json.dumps(result))
                 'reason': port_reason,
                 'last_success_epoch': time.time() if ok else None,
             }
+        from core.link_latency import annotate
+        annotate(sessions[0], pool['kharej_server']['ip'], details)
 
         all_ok = availability and all(availability.values())
         status = 'HEALTHY' if all_ok else 'DEGRADED'

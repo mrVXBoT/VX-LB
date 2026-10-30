@@ -28,13 +28,13 @@ def start(arguments):
         return False, str(error)
     name = arguments['pool_name']
     transport = arguments.get('transport', 'pck')
-    from core.capabilities import validate_production_readiness
+    from core.capabilities import readiness_subject, validate_production_readiness
     from core.transport_change import _coerce_engine
     engine = _coerce_engine(arguments.get('engine'), transport)
     import os
     is_prod = bool(arguments.get('is_production', False) or os.environ.get("VX_LB_PRODUCTION", "").lower() in ("1", "true", "yes"))
     allow_exp = bool(arguments.get('allow_experimental', False))
-    ok_gate, gate_msg = validate_production_readiness(engine, is_production=is_prod, allow_experimental=allow_exp)
+    ok_gate, gate_msg = validate_production_readiness(readiness_subject(engine, transport), is_production=is_prod, allow_experimental=allow_exp)
     if not ok_gate:
         return False, gate_msg
     try:

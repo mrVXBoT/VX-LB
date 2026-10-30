@@ -351,8 +351,12 @@ def health(name, node, ports):
         listen_code, _, _ = iran.execute(f'ss -lunp | grep -q ":{udp_port}\\b"')
         if listen_code != 0:
             details = {p: {'status': 'DEGRADED', 'reason': 'سرویس فعال است اما شنونده UDP یافت نشد'} for p in ports}
+            from core.link_latency import annotate
+            annotate(iran, pool['kharej_server']['ip'], details)
             return 'DEGRADED', 'سرویس فعال است اما شنونده UDP روی نود ایران پیدا نشد', details
         details = {p: {'status': 'HEALTHY', 'reason': 'سرویس ParsaKSH فعال و شنونده UDP در دسترس است'} for p in ports}
+        from core.link_latency import annotate
+        annotate(iran, pool['kharej_server']['ip'], details)
         return 'HEALTHY', 'سرویس ParsaKSH فعال است', details
     except Exception as error:
         return 'DOWN', str(error), {}

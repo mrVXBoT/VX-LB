@@ -261,6 +261,8 @@ def health(pool_name, node, ports):
         ssh = connection(server)
         result = SlipstreamAdapter().probe(ssh, None, node=node)
         details = {str(port): {"transport_probe": result, "status": "UNVERIFIED"} for port in ports}
+        from core.link_latency import stamp
+        stamp(details, result.get("latency_ms"))
         if not result.get("passed"):
             return "FILTERED", "آزمون دادهٔ احرازهویت‌شدهٔ مسیر DNS ناموفق بود", details
         # مسیر DNS و TLS 1.3 و احراز هویت متقابل تأیید شد؛ این پروب سلامت مسیر

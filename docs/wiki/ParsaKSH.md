@@ -6,6 +6,8 @@ ParsaKSH/spoof-tunnel یک تانل جعل دوطرفهٔ IP (لایه ۳/۴) ب
 
 **چیدمان در VX-LB:** نود ایران «local» است و روی `0.0.0.0:<پورت سرویس>` (اولین پورت استخر) UDP گوش می‌دهد؛ سرور خارج «remote» است، روی `data_port` گوش می‌دهد و به `forward_target` فوروارد می‌کند.
 
+<!-- profile:parsaksh:parsaksh:default -->
+
 ## فیلدهای تنظیم
 
 - `transport`: پروتکل تونل — `udp` (پیش‌فرض)، `icmp`، `icmpv6`، `tcp` (SYN).

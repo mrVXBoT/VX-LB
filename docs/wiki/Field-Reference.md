@@ -73,7 +73,7 @@
 | --- | --- | --- |
 | نام استخر (مثلاً VIP-LB) · `new-pool-name` | `text`؛ خالی/پویا |   |
 | انتخاب سرور مقصد خارج · `new-pool-kharej` | `select`؛ خالی/پویا |   |
-| موتور تونل · `new-pool-engine` | `select`؛ backpack |  `backpack`: BackPack؛ `waterwall`: WaterWall؛ `gost`: GOST؛ `frp`: FRP؛ `hedioum`: Hedioum؛ `rathole`: Rathole؛ `paqet`: Paqet؛ `kernel`: تونل‌های شبکه و کرنل؛ `spoof`: پردازش بسته (DPI Spoof)؛ `other`: وب و تونل DNS |
+| موتور تونل · `new-pool-engine` | `select`؛ backpack |  `backpack`: BackPack؛ `waterwall`: WaterWall؛ `gost`: GOST؛ `frp`: FRP؛ `hedioum`: Hedioum؛ `rathole`: Rathole؛ `paqet`: Paqet؛ `candy`: Candy-Spoof؛ `parsaksh`: ParsaKSH؛ `wattunnel`: WatTunnel؛ `kernel`: تونل‌های شبکه و کرنل؛ `spoof`: پردازش بسته (DPI Spoof)؛ `other`: وب و تونل DNS |
 | روش انتقال یا پروفایل · `new-pool-proto` | `select`؛ tcp |  `tcp`: TCP؛ `stealth`: Stealth (Noise)؛ `pck`: PCK (Raw TCP)؛ `kcp`: KCP؛ `wss`: WSS (WebSocket + TLS)؛ `quic`: QUIC |
 | پورت ترجیحی اتصال به سرور خارج · `waterwall-outer-port` | `number`؛ 443 | حداقل 1، حداکثر 65535  |
 | مسیر WaterWall روی هر دو سرور · `waterwall-binary` | `text`؛ /usr/local/bin/waterwall |   |
@@ -108,6 +108,31 @@
 | حالت KCP · `paqet-kcp-mode` | `select`؛ fast |  `normal`: normal؛ `fast`: fast؛ `fast2`: fast2؛ `fast3`: fast3 |
 | اتصال‌های موازی KCP · `paqet-conn` | `number`؛ 1 | حداقل 1، حداکثر 64  |
 | MTU کانال KCP (1280-1500) · `paqet-mtu` | `number`؛ 1280 | حداقل 1280، حداکثر 1500  |
+| پورت UDP کانال داده (مشترک دو سمت) · `candy-data-port` | `number`؛ 51820 | حداقل 1، حداکثر 65535  |
+| شناسهٔ ICMP Echo (مشترک دو سمت، 0-65535) · `candy-icmp-id` | `number`؛ 4321 | حداقل 0، حداکثر 65535  |
+| کلید پیش‌مشترک (PSK، حداقل ۱۶ نویسه) · `candy-pre-shared-key` | `text`؛ خالی/پویا |   |
+| آی‌پی جعلی مبدأ کلاینت (لبهٔ ایران) · `candy-client-sip` | `text`؛ 8.8.4.4 |   |
+| آی‌پی جعلی مبدأ سرور (خروجی خارج) · `candy-server-sip` | `text`؛ 1.2.3.4 |   |
+| تعداد تونل‌های موازی (1-32) · `candy-tunnel-count` | `number`؛ 4 | حداقل 1، حداکثر 32  |
+| MTU (576-9000) · `candy-mtu` | `number`؛ 1380 | حداقل 576، حداکثر 9000  |
+| رابط شبکه (خالی = تشخیص خودکار) · `candy-interface` | `text`؛ خالی/پویا |   |
+| پروتکل تونل · `parsaksh-transport` | `select`؛ udp |  `udp`: UDP؛ `icmp`: ICMP Echo؛ `icmpv6`: ICMPv6؛ `tcp`: TCP-SYN |
+| پورت UDP تونل (سرور، دو سمت) · `parsaksh-data-port` | `number`؛ 8090 | حداقل 1، حداکثر 65535  |
+| پورت دریافت کلاینت (دو سمت) · `parsaksh-recv-port` | `number`؛ 5001 | حداقل 1، حداکثر 65535  |
+| پورت سورس جعلشده · `parsaksh-spoof-port` | `number`؛ 443 | حداقل 1، حداکثر 65535  |
+| آی‌پی جعلی مبدأ کلاینت (ایران) · `parsaksh-client-sip` | `text`؛ 8.8.4.4 |   |
+| آی‌پی جعلی مبدأ سرور (خارج) · `parsaksh-server-sip` | `text`؛ 1.2.3.4 |   |
+| مقصد فوروارد سرور (host:port؛ خالی = خودکار) · `parsaksh-forward` | `text`؛ خالی/پویا |   |
+| پروتکل سرویس کاربران · `wattunnel-proto` | `select`؛ tcp |  `tcp`: tcp؛ `udp`: udp؛ `both`: tcp + udp |
+| پورت حامل (خالی = پیش‌فرض پروفایل) · `wattunnel-listen` | `number`؛ خالی/پویا | حداقل 1، حداکثر 65535  |
+| حالت معکوس: خارج به ایران وصل می‌شود · `wattunnel-reverse` | `checkbox`؛ خالی/پویا |   |
+| کلید مشترک (حداقل ۱۶ نویسه؛ خالی = تولید خودکار) · `wattunnel-key` | `password`؛ محرمانه؛ در راهنما ثبت نمی‌شود |   |
+| نوع ICMP · `wattunnel-icmp-type` | `select`؛ echo |  `echo`: echo؛ `timestamp`: timestamp؛ `info`: info؛ `mask`: mask |
+| SNI برای TLS · `wattunnel-sni` | `text`؛ خالی/پویا |   |
+| اثر انگشت ClientHello · `wattunnel-fp` | `select`؛ chrome |  `chrome`: chrome؛ `firefox`: firefox؛ `safari`: safari؛ `edge`: edge؛ `random`: random؛ `go`: go |
+| مسیر HTTP · `wattunnel-path` | `text`؛ /wat |   |
+| Fake SNI (خالی = خاموش) · `wattunnel-fake-sni` | `text`؛ خالی/پویا |   |
+| حالت Fake SNI · `wattunnel-fake-mode` | `select`؛ rst |  `rst`: rst؛ `seq`: seq؛ `ttl`: ttl؛ `synrst`: synrst؛ `paws`: paws؛ `auto`: auto |
 | MTU اینترفیس TUN (1200 تا 1420، پیش‌فرض 1280) · `new-pool-tun-mtu` | `number`؛ 1280 | حداقل 1200، حداکثر 1420  |
 | نوع حامل DC6 · `new-pool-dc6-carrier` | `select`؛ ip6gre |  `ip6gre`: ip6gre (RFC 7676 - استاندارد با کمترین سربار)؛ `ip6ip6`: ip6ip6 (RFC 2473 - کپسوله‌سازی مستقیم)؛ `sit`: sit (IPv6 in IPv4) |
 | MTU حامل DC6 (1280 تا 1440، پیش‌فرض 1280) · `new-pool-dc6-mtu` | `number`؛ 1280 | حداقل 1280، حداکثر 1440  |
@@ -156,7 +181,7 @@
 
 | فیلد / شناسه | نوع و پیش‌فرض فرم | محدودیت / گزینه‌ها |
 | --- | --- | --- |
-| موتور تونل · `transport-change-engine` | `select`؛ خالی/پویا |  `backpack`: BackPack؛ `waterwall`: WaterWall؛ `gost`: GOST؛ `frp`: FRP؛ `hedioum`: Hedioum؛ `rathole`: Rathole؛ `paqet`: Paqet؛ `kernel`: تونل‌های شبکه و کرنل؛ `spoof`: پردازش بسته — استخر جداگانه بسازید (غیرفعال)؛ `other`: وب و تونل DNS |
+| موتور تونل · `transport-change-engine` | `select`؛ خالی/پویا |  `backpack`: BackPack؛ `waterwall`: WaterWall؛ `gost`: GOST؛ `frp`: FRP؛ `hedioum`: Hedioum؛ `rathole`: Rathole؛ `paqet`: Paqet؛ `candy`: Candy-Spoof؛ `parsaksh`: ParsaKSH؛ `wattunnel`: WatTunnel؛ `kernel`: تونل‌های شبکه و کرنل؛ `spoof`: پردازش بسته؛ `other`: وب و تونل DNS |
 | روش انتقال یا پروفایل جدید · `transport-target` | `select`؛ خالی/پویا |  ``: نوع جدید را انتخاب کنید (غیرفعال) |
 | شناسهٔ VNI (خالی: خودکار) · `transport-overlay-vni` | `number`؛ خالی/پویا | حداقل 1، حداکثر 16777215  |
 | پورت UDP برای VXLAN · `transport-overlay-port` | `number`؛ 4789 | حداقل 1، حداکثر 65535  |

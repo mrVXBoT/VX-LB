@@ -41,6 +41,29 @@ def log_event(event: str, peer: str, port: str, details: str):
 _cached_ports = None
 _last_ports_check = 0.0
 
+def ports_from_wattunnel_yaml(text):
+    """Listen ports from a WatTunnel client config. `8443:443` publishes 8443."""
+    found = set()
+    in_ports = False
+    for raw in str(text or '').splitlines():
+        line = raw.split('#', 1)[0].rstrip()
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if not line[:1].isspace() and not stripped.startswith('-'):
+            in_ports = stripped == 'ports:'
+            continue
+        if not in_ports or not stripped.startswith('-'):
+            continue
+        item = stripped[1:].strip().strip('"').strip("'")
+        item = item.split('/', 1)[0]
+        if ':' in item:
+            item = item.split(':', 1)[0]
+        if item.isdigit():
+            found.add(item)
+    return found
+
+
 def get_monitored_ports():
     global _cached_ports, _last_ports_check
     now = time.time()
@@ -55,6 +78,12 @@ def get_monitored_ports():
                     if line.strip().startswith("ports"):
                         found = re.findall(r'"(\d+)"', line)
                         ports.update(found)
+        except Exception:
+            pass
+    for f in glob.glob("/etc/vxlb/wattunnel/client-*.yml"):
+        try:
+            with open(f) as fp:
+                ports.update(ports_from_wattunnel_yaml(fp.read()))
         except Exception:
             pass
     _cached_ports = sorted(list(ports)) if ports else ["2222"]

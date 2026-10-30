@@ -20,9 +20,10 @@
 | [Hedioum](Hedioum.md) | SOCKS5، TUN، Gateway و Personaها |
 | [Rathole](Rathole.md) | TCP، TLS، Noise و WebSocket |
 | [Paqet](Paqet.md) | انتقال پورت، چهار حالت KCP و پارامترهای شبکه |
+| [WatTunnel](WatTunnel.md) | ICMP، UDP، UDP-DNS، TCP، TLS، WS، WSS، HTTP/2، gRPC و Fortress |
 | [کرنل و شبکه](Kernel-Tunnels.md) | WireGuard، TUN، GRE/IPsec، GRE6، IP6IP6، VXLAN، DC6 و Geneve/IPsec |
 | [وب و DNS](Web-and-DNS.md) | WS، HTTP/HTTPS CONNECT و Slipstream |
-| [پردازش بسته](Packet-Profiles.md) | پنج پروفایل آزمایشی و فهرست گزینه‌های غیرفعال |
+| [پردازش بسته](Packet-Profiles.md) | پنج پروفایل تأییدشده و فهرست گزینه‌های غیرفعال |
 
 ## قابلیت‌های پنل
 

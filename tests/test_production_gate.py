@@ -29,7 +29,7 @@ class TestProductionReadinessGate(unittest.TestCase):
 
     def test_verified_engine_approved_directly(self):
         # Engines that completed production verification
-        for eng in ["backpack", "gre_ipv4", "fake-sni"]:
+        for eng in ["backpack", "gre_ipv4", "fake-sni", "split-tls", "hop-ttl-injection", "tcp-state-desync", "l7-header-mutation"]:
             ok, msg = validate_production_readiness(eng, is_production=True)
             self.assertTrue(ok, f"Verified engine {eng} failed production validation: {msg}")
             self.assertIn("verified", msg.lower())
@@ -77,14 +77,16 @@ class TestProductionReadinessGate(unittest.TestCase):
 
         self.assertTrue(is_engine_supported("fake-sni"))
 
-        # Contrast with sibling spoof engine that remains experimental
-        ok_sibling_prod, msg_sibling_prod = validate_production_readiness("split-tls", is_production=True, allow_experimental=False)
-        self.assertFalse(ok_sibling_prod, "Sibling spoof engine split-tls must still be blocked in production")
-        self.assertIn("allow_experimental=True", msg_sibling_prod)
+        # The spoof family label stays experimental; unfinished profiles stay unsupported.
+        ok_family, msg_family = validate_production_readiness("spoof", is_production=True, allow_experimental=False)
+        self.assertFalse(ok_family, msg_family)
+        ok_unfinished, msg_unfinished = validate_production_readiness("l3-ip-spoof", is_production=True, allow_experimental=True)
+        self.assertFalse(ok_unfinished, msg_unfinished)
+        self.assertIn("unsupported", msg_unfinished)
 
     def test_experimental_engine_gating(self):
         # Experimental engines: permitted in dev/lab, blocked in prod unless allow_experimental=True
-        for exp_eng in ["waterwall", "wireguard", "sit", "6to4_unicast", "geneve", "split-tls", "hop-ttl-injection"]:
+        for exp_eng in ["waterwall", "wireguard", "sit", "6to4_unicast", "geneve", "spoof", "candy-spoof", "parsaksh", "wattunnel"]:
             # In non-production (dev / staging / lab) -> Allowed
             ok_lab, msg_lab = validate_production_readiness(exp_eng, is_production=False)
             self.assertTrue(ok_lab, f"Experimental engine {exp_eng} should be permitted in non-production")

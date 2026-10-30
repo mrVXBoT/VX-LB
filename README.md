@@ -81,9 +81,10 @@ These are the families the dashboard offers. The client publishes a TCP port on 
 | Paqet | Port forwarding | KCP over raw packets. Presets: normal, fast, fast2, fast3 | [Paqet](docs/wiki/Paqet.md) |
 | Candy-Spoof | One tunnel | Spoofed source address, SOCKS5 on Iran | [Candy-Spoof](docs/wiki/Candy-Spoof.md) |
 | ParsaKSH | One tunnel | ICMP, ICMPv6, UDP, or TCP-SYN | [ParsaKSH](docs/wiki/ParsaKSH.md) |
+| WatTunnel | ICMP, UDP, UDP-DNS, TCP, TLS, WS, WSS, HTTP/2, H2C, gRPC, Fortress | Encrypted port forwarding. The published service stays TCP unless the profile also forwards UDP | [WatTunnel](docs/wiki/WatTunnel.md) |
 | Kernel | WireGuard, TUN, GRE + IPsec, GRE6, IP6IP6, VXLAN, VXLAN + IPsec, DC6, Geneve + IPsec | A kernel interface on the selected encapsulation | [Kernel tunnels](docs/wiki/Kernel-Tunnels.md) |
 | Web and DNS | WebSocket, HTTP CONNECT, HTTPS CONNECT, Slipstream | The selected application or DNS carrier | [Web and DNS](docs/wiki/Web-and-DNS.md) |
-| Packet profiles | Five experimental profiles | A managed packet path. The other registry names are disabled | [Packet profiles](docs/wiki/Packet-Profiles.md) |
+| Packet profiles | Five verified profiles | A managed packet path. The other registry names are disabled | [Packet profiles](docs/wiki/Packet-Profiles.md) |
 
 Encryption is a property of the profile, not of the family. Plain BackPack TCP, plain Rathole TCP, raw VXLAN, GRE6, IP6IP6, and DC6 do not encrypt on their own. Paqet and the spoof tunnels need raw packet access. Read the linked guide before choosing a profile for production. Experimental engines need an explicit production override.
 

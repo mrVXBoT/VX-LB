@@ -350,6 +350,27 @@ PLATFORM_DEPENDENCIES: Dict[str, BinaryManifest] = {
             }
         }
     ),
+    "wattunnel": BinaryManifest(
+        name="WatTunnel",
+        engine_id="wattunnel",
+        pinned_version="v3.1.2",
+        license_spdx="MIT",
+        executable_name="wattun",
+        required_capabilities=["cap_net_raw", "cap_net_bind_service"],
+        architectures={
+            # Checksums copied from the v3.1.2 SHA256SUMS asset. Do not invent replacements.
+            "x86_64": {
+                "sha256": "65cc6ea4ce3e418a4a395528a24a1b104d5acbf2b87b24a899630517193958a2",
+                "source_url": "https://github.com/JohnWatsoon/WatTunnel/releases/download/v3.1.2/wattun-linux-amd64",
+                "is_verified": True
+            },
+            "aarch64": {
+                "sha256": "6518ac89c2f9b5a898ad8e95968ca23bfcc7d91321eb98f8ea15f3023c15e9f6",
+                "source_url": "https://github.com/JohnWatsoon/WatTunnel/releases/download/v3.1.2/wattun-linux-arm64",
+                "is_verified": True
+            }
+        }
+    ),
 }
 
 def get_dependency_manifest(name: str) -> Optional[BinaryManifest]:

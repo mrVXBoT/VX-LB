@@ -297,6 +297,8 @@ def health(name, node, ports):
         if not ok:
             return 'DOWN', 'سرویس FRP در یکی از سرورها فعال نیست', {}
         details = {p: {'status': 'HEALTHY', 'reason': 'سرویس FRP فعال است'} for p in ports}
+        from core.link_latency import annotate
+        annotate(sessions[0], pool['kharej_server']['ip'], details)
         return 'HEALTHY', 'سرویس FRP فعال است', details
     except Exception as error:
         return 'DOWN', str(error), {}

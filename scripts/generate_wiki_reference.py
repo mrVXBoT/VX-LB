@@ -14,6 +14,7 @@ from core.capabilities import CAPABILITIES_CATALOG  # noqa: E402
 
 FAMILY_PAGES = {'backpack':'BackPack', 'waterwall':'WaterWall', 'gost':'GOST',
                 'frp':'FRP', 'hedioum':'Hedioum', 'rathole':'Rathole', 'paqet':'Paqet',
+                'candy':'Candy-Spoof', 'parsaksh':'ParsaKSH', 'wattunnel':'WatTunnel',
                 'kernel':'Kernel-Tunnels', 'spoof':'Packet-Profiles', 'other':'Web-and-DNS'}
 
 
@@ -111,6 +112,9 @@ def render(catalog):
       'hedioum':'حالت‌های SOCKS5، TUN و gateway با Persona قابل انتخاب',
       'rathole':'پراکسی معکوس با حامل TCP، TLS، Noise یا WebSocket',
       'paqet':'انتقال پورت با KCP روی بسته خام و تنظیم interface/MAC',
+      'candy-spoof':'تونل جعل دوطرفهٔ آدرس مبدأ با SOCKS5 روی ایران',
+      'parsaksh':'جعل دوطرفهٔ IP با حامل UDP، ICMP، ICMPv6 یا TCP-SYN',
+      'wattunnel':'فوروارد رمزشدهٔ ایران/خارج روی ICMP، UDP، TCP، TLS، WebSocket، HTTP/2، gRPC یا پیوند Fortress',
       'gost':'زنجیره‌های پراکسی و سیزده پروفایل اختصاصی پنل',
       'slipstream':'حامل DNS آزمایشی بر زیردامنه واگذارشده و رله امن',
       'gre_ipv4':'GRE روی IPv4 با IPsec اجباری در مسیر مدیریت‌شده',
@@ -148,7 +152,7 @@ def render(catalog):
       'fake-sni':'تزریق ClientHello جعلی با کنترل و شاهد بسته',
       'split-tls':'تقسیم رکورد TLS و بی‌نظمی TCP در حامل احرازشده',
       'hop-ttl-injection':'بسته جعلی با TTL محدود و برآورد مسیر',
-      'tcp-state-desync':'تغییر آزمایشی وضعیت TCP با RST/OOB و پذیرش مبتنی بر شواهد',
+      'tcp-state-desync':'تغییر وضعیت TCP با RST/OOB و پذیرش مبتنی بر شواهد',
       'l7-header-mutation':'تغییر حروف نام هدر Host روی CONNECT',
     }
     disabled = {'l3-ip-spoof','udp-raw-spoof','dns-spoof','spoof-tcp-syn','spoof-udp-raw','spoof-icmp','qs-dns-hybrid','hyperion-x'}
@@ -205,6 +209,8 @@ def check_coverage(catalog):
         ('core/frp_engine.py', 'MODES', 'FRP'),
         ('core/rathole_engine.py', 'TRANSPORTS', 'Rathole'),
         ('core/rathole_engine.py', 'SERVICE_PROTOCOLS', 'Rathole'),
+        ('core/wattunnel.py', 'PROFILES', 'WatTunnel'),
+        ('core/wattunnel.py', 'FORWARD_PROTOS', 'WatTunnel'),
         ('core/waterwall_modes.py', 'MODES', 'WaterWall'),
     ]
     for filename, constant, page in constants:

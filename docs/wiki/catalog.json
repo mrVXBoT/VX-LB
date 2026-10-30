@@ -83,7 +83,7 @@
           "value": "gost",
           "profile": "shadowsocks-udp",
           "label": "Shadowsocks UDP",
-          "hint": "رلهٔ UDP با Shadowsocks و رمزنگاری AES-256-GCM؛ نیازمند دسترسی UDP."
+          "hint": "پورت کاربر TCP است. مسیر بین ایران و خارج Shadowsocks روی UDP است."
         },
         {
           "value": "gost",
@@ -125,19 +125,19 @@
           "value": "gost",
           "profile": "ssh",
           "label": "SSH Tunnel",
-          "hint": "انتقال پورت‌ها در تونل SSH؛ نیازمند احراز هویت و دسترسی به سرویس SSH."
+          "hint": "پورت کاربر TCP است. GOST آن را با SSH خودش به خارج می‌برد، نه با SSH مدیریت سرور."
         },
         {
           "value": "gost",
           "profile": "kcp-obfs4",
           "label": "KCP + obfs4",
-          "hint": "ترکیب KCP در حالت Fast3 و مبهم‌سازی obfs4؛ نیازمند دسترسی UDP."
+          "hint": "پورت کاربر TCP است. مسیر بین ایران و خارج KCP و obfs4 روی UDP است."
         },
         {
           "value": "gost",
           "profile": "web-tunnel",
-          "label": "Web-Tunnel (HTTP + MWSS)",
-          "hint": "انتقال HTTP روی WebSocket امن و چندجریانی (MWSS)."
+          "label": "Web-Tunnel (HTTP + WSS)",
+          "hint": "انتقال HTTP روی WebSocket امن. باینری فعلی MWSS را رد می‌کند."
         },
         {
           "value": "gost",
@@ -149,7 +149,7 @@
           "value": "gost",
           "profile": "quic-socks5",
           "label": "QUIC + SOCKS5",
-          "hint": "پراکسی SOCKS5 روی QUIC؛ نیازمند دسترسی UDP."
+          "hint": "پورت کاربر TCP است. مسیر بین ایران و خارج QUIC روی UDP است."
         }
       ]
     },
@@ -166,7 +166,7 @@
           "value": "frp",
           "mode": "udp",
           "label": "FRP · UDP",
-          "hint": "انتقال پورت‌های UDP از ایران به سرویس مقصد از طریق اتصال معکوس FRP."
+          "hint": "پورت کاربر TCP می‌ماند و همان پورت UDP هم فوروارد می‌شود."
         },
         {
           "value": "frp",
@@ -183,19 +183,19 @@
           "value": "hedioum",
           "mode": "socks",
           "label": "SOCKS5",
-          "hint": "ارائهٔ پراکسی SOCKS5؛ پورت پیش‌فرض از اولین پورت کلاینت گرفته می‌شود."
+          "hint": "پورت کاربر TCP خام است و به Xray خارج می‌رسد. SOCKS5 هدیوم فقط روی لوکال ایران می‌ماند."
         },
         {
           "value": "hedioum",
           "mode": "tun",
           "label": "TUN",
-          "hint": "ایجاد رابط شبکهٔ TUN با امکان فعال‌سازی انتقال DNS."
+          "hint": "رابط TUN روی ایران ساخته می‌شود. پورت کاربر همچنان TCP خام است و به Xray خارج می‌رسد."
         },
         {
           "value": "hedioum",
           "mode": "gateway",
           "label": "Gateway (L3)",
-          "hint": "دروازهٔ شفاف لایهٔ ۳ برای شبکهٔ محلی با استفاده از رابط TUN."
+          "hint": "دروازهٔ لایهٔ ۳ برای شبکهٔ محلی. پورت کاربر همچنان TCP خام است و به Xray خارج می‌رسد."
         }
       ]
     },
@@ -259,6 +259,77 @@
         }
       ]
     },
+    "wattunnel": {
+      "label": "WatTunnel",
+      "transports": [
+        {
+          "value": "wattunnel",
+          "profile": "icmp",
+          "label": "ICMP",
+          "hint": "تونل رمزشده وقتی فقط ping عبور می‌کند. هر دو سمت به CAP_NET_RAW نیاز دارند."
+        },
+        {
+          "value": "wattunnel",
+          "profile": "udp",
+          "label": "UDP",
+          "hint": "کم‌تأخیرترین حامل وقتی UDP باز است. پورت کاربر همچنان جدا از پورت حامل است."
+        },
+        {
+          "value": "wattunnel",
+          "profile": "udp-dns",
+          "label": "UDP-DNS",
+          "hint": "هر دیتاگرام شبیه DNS است. پورت پیش‌فرض حامل 53 است و هر دو سمت باید این حالت را داشته باشند."
+        },
+        {
+          "value": "wattunnel",
+          "profile": "tcp",
+          "label": "TCP",
+          "hint": "حامل TCP که شروع اتصال را شبیه ClientHello می‌کند. رمزنگاری نشست جدا از این ظاهر است."
+        },
+        {
+          "value": "wattunnel",
+          "profile": "tls",
+          "label": "TLS",
+          "hint": "حامل TLS شبیه HTTPS. SNI و اثر انگشت ClientHello قابل تنظیم است."
+        },
+        {
+          "value": "wattunnel",
+          "profile": "ws",
+          "label": "WebSocket",
+          "hint": "حامل WebSocket بدون TLS. مسیر URL در دو سمت یکی است."
+        },
+        {
+          "value": "wattunnel",
+          "profile": "wss",
+          "label": "WSS",
+          "hint": "WebSocket روی TLS. برای مسیرهایی که فقط HTTPS عبور می‌کند."
+        },
+        {
+          "value": "wattunnel",
+          "profile": "h2",
+          "label": "HTTP/2",
+          "hint": "حامل HTTP/2 روی TLS. از این حالت برای عبور از Cloudflare استفاده نکنید؛ آنجا WSS یا gRPC مناسب‌تر است."
+        },
+        {
+          "value": "wattunnel",
+          "profile": "h2c",
+          "label": "H2C",
+          "hint": "HTTP/2 بدون TLS، معمولاً پشت پروکسی که TLS را خودش تمام می‌کند."
+        },
+        {
+          "value": "wattunnel",
+          "profile": "grpc",
+          "label": "gRPC",
+          "hint": "حامل gRPC. درخواست‌ها به مسیر انتخاب‌شده به‌علاوهٔ /Tun می‌روند."
+        },
+        {
+          "value": "wattunnel",
+          "profile": "fortress",
+          "label": "Fortress",
+          "hint": "چند حامل ICMP+TCP+TLS+WSS+UDP در یک نشست. اگر یکی بسته شود بقیه می‌مانند. پورت پایه و سه پورت بعدی را آزاد بگذارید."
+        }
+      ]
+    },
     "kernel": {
       "label": "تونل‌های شبکه و کرنل",
       "transports": [
@@ -310,7 +381,7 @@
       ]
     },
     "spoof": {
-      "label": "پروفایل‌های پردازش بسته (آزمایشی)",
+      "label": "پروفایل‌های پردازش بسته",
       "transports": [
         {
           "value": "fake-sni",
@@ -319,18 +390,18 @@
         },
         {
           "value": "split-tls",
-          "label": "TLS Record + TCP Disorder (آزمایشی)",
-          "hint": "تقسیم رکورد ClientHello و ارسال معکوس قطعات TCP روی مسیر mTLS"
+          "label": "TLS Record + TCP Disorder (پایدار)",
+          "hint": "تقسیم رکورد ClientHello روی مسیر mTLS؛ پذیرش با رکورد اول ۲ بایتی است"
         },
         {
           "value": "hop-ttl-injection",
-          "label": "TTL محدود با برآورد هاپ (آزمایشی)",
+          "label": "TTL محدود با برآورد هاپ (پایدار)",
           "hint": "تزریق ClientHello با TTL برآوردشده و محدود؛ مقدار جایگزین و BadSum حفظ می‌شوند"
         },
         {
           "value": "tcp-state-desync",
-          "label": "RST + OOB (آزمایشی)",
-          "hint": "تزریق RST نامعتبر و دادهٔ خارج از باند؛ پذیرش فقط پس از مشاهدهٔ تغییر و عبور داده"
+          "label": "RST + OOB (پایدار)",
+          "hint": "تزریق RST نامعتبر و دادهٔ خارج از باند؛ پذیرش فقط پس از مشاهدهٔ هر دو و عبور داده"
         },
         {
           "value": "l3-ip-spoof",
@@ -340,7 +411,7 @@
         },
         {
           "value": "l7-header-mutation",
-          "label": "HTTP Host Header Mutation (آزمایشی)",
+          "label": "HTTP Host Header Mutation (پایدار)",
           "hint": "تغییر واقعی حروف نام هدر Host روی CONNECT؛ دادهٔ TCP/UDP در mTLS عبور می‌کند"
         },
         {
@@ -467,6 +538,7 @@
     "vxlan",
     "vxlan_ipsec",
     "waterwall",
+    "wattunnel",
     "wireguard",
     "wireguard_amnezia",
     "wireguard_hybrid",
@@ -535,6 +607,31 @@
     "paqet-kcp-mode",
     "paqet-conn",
     "paqet-mtu",
+    "candy-data-port",
+    "candy-icmp-id",
+    "candy-pre-shared-key",
+    "candy-client-sip",
+    "candy-server-sip",
+    "candy-tunnel-count",
+    "candy-mtu",
+    "candy-interface",
+    "parsaksh-transport",
+    "parsaksh-data-port",
+    "parsaksh-recv-port",
+    "parsaksh-spoof-port",
+    "parsaksh-client-sip",
+    "parsaksh-server-sip",
+    "parsaksh-forward",
+    "wattunnel-proto",
+    "wattunnel-listen",
+    "wattunnel-reverse",
+    "wattunnel-key",
+    "wattunnel-icmp-type",
+    "wattunnel-sni",
+    "wattunnel-fp",
+    "wattunnel-path",
+    "wattunnel-fake-sni",
+    "wattunnel-fake-mode",
     "new-pool-tun-mtu",
     "new-pool-dc6-carrier",
     "new-pool-dc6-mtu",
@@ -627,6 +724,9 @@
     "hedioum": "Hedioum",
     "rathole": "Rathole",
     "paqet": "Paqet",
+    "candy": "Candy-Spoof",
+    "parsaksh": "ParsaKSH",
+    "wattunnel": "WatTunnel",
     "kernel": "Kernel-Tunnels",
     "spoof": "Packet-Profiles",
     "other": "Web-and-DNS"

@@ -69,7 +69,7 @@ def build(mode, queue, carrier_port, directory, fake_sni='www.shaparak.ir', ttl_
         # remains intact after the receiver reassembles it.
         args+=['--lua-desync=fakeddisorder:pos=midsld:pattern=fake_default_tls:badsum']
     elif mode=='hop-ttl-injection':
-        args+=['--lua-desync=fake:blob=fake_default_tls:tls_mod=sni='+domain+':badsum:ip_ttl=6:ip_autottl='+str(delta)+',3-14:repeats=2']
+        args+=['--lua-desync=fake:blob=fake_default_tls:tls_mod=sni='+domain+':ip_ttl=6:ip_autottl='+str(delta)+',1-14:repeats=2']
     elif mode=='tcp-state-desync':
         args+=['--lua-desync=rst:badsum:tcp_seq=-10000:repeats=2']
     else:
